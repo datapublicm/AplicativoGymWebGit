@@ -5,6 +5,7 @@ import { getTargetVisibility, shouldAutoRotate } from './visibility.js';
 import { animateRotation, rotateToPreferredView } from './autoRotate.js';
 import { VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE } from './shaders.js';
 import { cameraDistanceForAspect } from './visualStyle.js';
+import { resolveExerciseMuscleTargets } from './exerciseMuscles.js';
 function compile(gl, type, source) {
     const shader = gl.createShader(type);
     if (!shader)
@@ -138,20 +139,22 @@ export class ViewerController {
     cancelAutoRotation() { this.rotationAbort?.abort(); this.rotationAbort = undefined; }
     async selectExercise(exercise) {
         this.cancelAutoRotation();
-        const highlight = applyMuscleHighlight(this.registry, exercise.primary, exercise.secondary);
-        const primaryMeshes = exercise.primary.flatMap(id => this.registry.get(id) ?? []);
+        const targets = resolveExerciseMuscleTargets(exercise);
+        const highlight = applyMuscleHighlight(this.registry, targets.primary, targets.secondary);
+        const missing = [...new Set([...targets.unresolved, ...highlight.missing])];
+        const primaryMeshes = targets.primary.flatMap(id => this.registry.get(id) ?? []);
         if (!primaryMeshes.length)
-            return { rotated: false, missing: highlight.missing };
+            return { rotated: false, missing };
         const visibility = getTargetVisibility(primaryMeshes, this.state);
         if (!shouldAutoRotate(visibility))
-            return { rotated: false, missing: highlight.missing };
+            return { rotated: false, missing };
         const abort = new AbortController();
         this.rotationAbort = abort;
         const plan = rotateToPreferredView(this.state, exercise.preferredView, { durationMs: 550, signal: abort.signal });
         const result = await animateRotation(plan, state => { this.state = state; }, abort.signal);
         if (this.rotationAbort === abort)
             this.rotationAbort = undefined;
-        return { rotated: result === 'completed', missing: highlight.missing };
+        return { rotated: result === 'completed', missing };
     }
     getModel() {
         const rx = rotationX(this.state.pitch);
