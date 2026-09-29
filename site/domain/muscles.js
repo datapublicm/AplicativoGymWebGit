@@ -1,40 +1,9 @@
-export const MUSCLE_IDS = [
-    'pectoralis',
-    'deltoid_anterior',
-    'deltoid_lateral',
-    'deltoid_posterior',
-    'biceps',
-    'triceps',
-    'forearm',
-    'abdominals',
-    'obliques',
-    'latissimus',
-    'trapezius',
-    'erector_spinae',
-    'gluteals',
-    'quadriceps',
-    'hamstrings',
-    'adductors',
-    'abductors',
-    'calves',
-];
-export const MUSCLE_LABELS = {
-    pectoralis: 'Pectoral',
-    deltoid_anterior: 'Deltoides anterior',
-    deltoid_lateral: 'Deltoides lateral',
-    deltoid_posterior: 'Deltoides posterior',
-    biceps: 'Bíceps',
-    triceps: 'Tríceps',
-    forearm: 'Antebrazo',
-    abdominals: 'Abdominales',
-    obliques: 'Oblicuos',
-    latissimus: 'Dorsal ancho',
-    trapezius: 'Trapecio',
-    erector_spinae: 'Erectores espinales',
-    gluteals: 'Glúteos',
-    quadriceps: 'Cuádriceps',
-    hamstrings: 'Isquiotibiales',
-    adductors: 'Aductores',
-    abductors: 'Abductores / glúteo medio',
-    calves: 'Gemelos / sóleo',
-};
+import { ANATOMY_ZONES, getMuscleLabel } from './anatomy.js';
+
+export const MUSCLE_IDS = ANATOMY_ZONES
+  .filter((zone) => zone.active && zone.renderMeshId === zone.id)
+  .map((zone) => zone.id);
+
+export const MUSCLE_LABELS = Object.fromEntries(
+  MUSCLE_IDS.map((id) => [id, getMuscleLabel(id)]),
+);
