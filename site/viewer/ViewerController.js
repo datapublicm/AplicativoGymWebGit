@@ -33,6 +33,7 @@ export class ViewerController {
     cleanup = [];
     registry;
     rotationAbort;
+    currentExercise;
     constructor(canvas, gl, model) {
         this.canvas = canvas;
         this.gl = gl;
@@ -137,8 +138,21 @@ export class ViewerController {
     setViewState(next) { this.state = { ...next }; }
     getMeshes() { return this.model.meshes; }
     cancelAutoRotation() { this.rotationAbort?.abort(); this.rotationAbort = undefined; }
+    replaceModel(model) {
+        this.cancelAutoRotation();
+        const registry = buildMuscleRegistry(model.meshes);
+        if (this.currentExercise) {
+            const targets = resolveExerciseMuscleTargets(this.currentExercise);
+            applyMuscleHighlight(registry, targets.primary, targets.secondary);
+        }
+        const previous = this.model;
+        this.model = model;
+        this.registry = registry;
+        previous?.dispose();
+    }
     async selectExercise(exercise) {
         this.cancelAutoRotation();
+        this.currentExercise = exercise;
         const targets = resolveExerciseMuscleTargets(exercise);
         const highlight = applyMuscleHighlight(this.registry, targets.primary, targets.secondary);
         const missing = [...new Set([...targets.unresolved, ...highlight.missing])];
