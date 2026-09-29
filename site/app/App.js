@@ -1,11 +1,11 @@
 import { getExerciseById } from '../domain/exercises.js';
 import { MUSCLE_LABELS } from '../domain/muscles.js';
-import { DEFAULT_BODY_VARIANT, getBodyVariant } from '../domain/bodyVariants.js';
-import { requestBodyVariantChange } from '../domain/bodyVariantSelection.js';
+import { DEFAULT_BODY_VARIANT, getBodyVariant } from '../domain/bodyVariants.js?v=0.5.1';
+import { requestBodyVariantChange } from '../domain/bodyVariantSelection.js?v=0.5.1';
 import { createExercisePanel } from '../ui/exercisePanel.js';
-import { createBodyVariantSelector } from '../ui/bodyVariantSelector.js';
-import { createViewer } from '../viewer/createViewer.js';
-import { switchViewerModel } from '../viewer/switchModel.js';
+import { createBodyVariantSelector } from '../ui/bodyVariantSelector.js?v=0.5.1';
+import { createViewer } from '../viewer/createViewer.js?v=0.5.1';
+import { switchViewerModel } from '../viewer/switchModel.js?v=0.5.1';
 
 function muscleLabels(ids) {
     return ids.length ? ids.map((id) => MUSCLE_LABELS[id]).join(' · ') : '—';
@@ -30,7 +30,7 @@ export async function mountApp(root, initialBodyVariant = DEFAULT_BODY_VARIANT) 
     root.innerHTML = `
     <main class="app-shell">
       <header class="topbar">
-        <div><strong>AplicativoGym</strong><span>Visor muscular 3D</span></div>
+        <div><strong>AplicativoGym <span class="app-version">v0.5</span></strong><span>Visor muscular 3D</span></div>
         <div class="legend"><span class="legend-primary">● Principal</span><span class="legend-secondary">● Secundario</span></div>
       </header>
       <aside class="exercise-sidebar">
