@@ -1,5 +1,5 @@
-import { mountApp } from './app/App.js';
-import { DEFAULT_BODY_VARIANT } from './domain/bodyVariants.js';
+import { mountApp } from './app/App.js?v=0.5.1';
+import { DEFAULT_BODY_VARIANT } from './domain/bodyVariants.js?v=0.5.1';
 async function boot() {
     const root = document.querySelector('#root');
     if (!root)
