@@ -1,4 +1,4 @@
-import { PRIMARY_MUSCLE_COLOR, SECONDARY_MUSCLE_COLOR } from './visualStyle.js';
+import { PRIMARY_MUSCLE_COLOR, SECONDARY_MUSCLE_COLOR } from './visualStyle.js?v=0.5.2';
 export function applyMuscleHighlight(registry, primary, secondary) {
     for (const meshes of registry.values()) {
         for (const mesh of meshes)
