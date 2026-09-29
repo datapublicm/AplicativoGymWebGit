@@ -1,10 +1,10 @@
 import { multiply, perspective, rotationX, rotationY, translation } from './math.js';
 import { buildMuscleRegistry } from './muscleRegistry.js';
-import { applyMuscleHighlight } from './highlightMuscles.js';
+import { applyMuscleHighlight } from './highlightMuscles.js?v=0.5.2';
 import { getTargetVisibility, shouldAutoRotate } from './visibility.js';
 import { animateRotation, rotateToPreferredView } from './autoRotate.js';
-import { VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE } from './shaders.js';
-import { cameraDistanceForAspect } from './visualStyle.js';
+import { VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE } from './shaders.js?v=0.5.2';
+import { cameraDistanceForAspect } from './visualStyle.js?v=0.5.2';
 import { resolveExerciseMuscleTargets } from './exerciseMuscles.js';
 function compile(gl, type, source) {
     const shader = gl.createShader(type);
