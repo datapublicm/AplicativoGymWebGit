@@ -1,5 +1,5 @@
-import { loadHumanModel } from './loadHumanModel.js';
-import { ViewerController } from './ViewerController.js?v=0.5.1';
+import { loadHumanModel } from './loadHumanModel.js?v=0.5.2';
+import { ViewerController } from './ViewerController.js?v=0.5.2';
 export async function createViewer(container, modelUrl) {
     const canvas = document.createElement('canvas');
     canvas.dataset.testid = 'viewer-canvas';
