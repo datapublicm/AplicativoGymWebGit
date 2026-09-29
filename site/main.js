@@ -1,10 +1,11 @@
 import { mountApp } from './app/App.js';
+import { DEFAULT_BODY_VARIANT } from './domain/bodyVariants.js';
 async function boot() {
     const root = document.querySelector('#root');
     if (!root)
         throw new Error('App root missing');
     try {
-        const app = await mountApp(root, './models/human-muscle-v2.glb');
+        const app = await mountApp(root, DEFAULT_BODY_VARIANT);
         window.__GYM_APP__ = app;
         window.__GYM_VIEWER__ = app.viewer;
         window.__GYM_VIEWER_READY__ = true;

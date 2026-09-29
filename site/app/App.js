@@ -1,7 +1,12 @@
 import { getExerciseById } from '../domain/exercises.js';
 import { MUSCLE_LABELS } from '../domain/muscles.js';
+import { DEFAULT_BODY_VARIANT, getBodyVariant } from '../domain/bodyVariants.js';
+import { requestBodyVariantChange } from '../domain/bodyVariantSelection.js';
 import { createExercisePanel } from '../ui/exercisePanel.js';
+import { createBodyVariantSelector } from '../ui/bodyVariantSelector.js';
 import { createViewer } from '../viewer/createViewer.js';
+import { switchViewerModel } from '../viewer/switchModel.js';
+
 function muscleLabels(ids) {
     return ids.length ? ids.map((id) => MUSCLE_LABELS[id]).join(' · ') : '—';
 }
@@ -20,7 +25,8 @@ function renderExerciseDetail(container, exercise) {
     </div>`;
     container.dataset.detailExerciseId = exercise.id;
 }
-export async function mountApp(root, modelUrl) {
+export async function mountApp(root, initialBodyVariant = DEFAULT_BODY_VARIANT) {
+    const initialVariant = getBodyVariant(initialBodyVariant);
     root.innerHTML = `
     <main class="app-shell">
       <header class="topbar">
@@ -33,6 +39,7 @@ export async function mountApp(root, modelUrl) {
       </aside>
       <section class="viewer-shell">
         <div class="viewer-host" data-testid="viewer-host"></div>
+        <div class="body-variant-control" data-testid="body-variant-control"></div>
         <article class="exercise-detail" data-testid="exercise-detail" aria-live="polite">
           <div class="detail-placeholder"><strong>Selecciona un ejercicio</strong><span>Verás aquí sus músculos principales y secundarios.</span></div>
         </article>
@@ -42,12 +49,17 @@ export async function mountApp(root, modelUrl) {
     const shell = root.querySelector('.app-shell');
     const viewerHost = root.querySelector('.viewer-host');
     const panelHost = root.querySelector('.exercise-panel');
+    const variantHost = root.querySelector('.body-variant-control');
     const detail = root.querySelector('.exercise-detail');
     const status = root.querySelector('.viewer-status');
-    const viewer = await createViewer(viewerHost, modelUrl);
+    const viewer = await createViewer(viewerHost, initialVariant.modelUrl);
+    let currentBodyVariant = initialVariant.id;
+    let selectedExercise;
+    shell.dataset.bodyVariant = currentBodyVariant;
     let selectionSerial = 0;
     const selectExercise = async (exercise) => {
         const serial = ++selectionSerial;
+        selectedExercise = exercise;
         panel.setSelected(exercise.id);
         renderExerciseDetail(detail, exercise);
         shell.dataset.pendingExercise = exercise.id;
@@ -65,6 +77,27 @@ export async function mountApp(root, modelUrl) {
         return result;
     };
     const panel = createExercisePanel(panelHost, selectExercise);
+    const variantSelector = createBodyVariantSelector(variantHost, {
+        initialId: currentBodyVariant,
+        onChange: async (nextId) => {
+            const previousId = currentBodyVariant;
+            const nextVariant = getBodyVariant(nextId);
+            status.textContent = `Cambiando a ${nextVariant.label}…`;
+            const effectiveId = await requestBodyVariantChange(previousId, nextId, async (id) => {
+                const variant = getBodyVariant(id);
+                await switchViewerModel(viewer, variant.modelUrl);
+            });
+            currentBodyVariant = effectiveId;
+            shell.dataset.bodyVariant = effectiveId;
+            const effectiveVariant = getBodyVariant(effectiveId);
+            status.textContent = effectiveId === nextId
+                ? selectedExercise
+                    ? `${selectedExercise.name} · ${effectiveVariant.label} · vista conservada`
+                    : `${effectiveVariant.label} activo · arrastra para girar`
+                : `${effectiveVariant.label} activo · no se pudo cargar ${nextVariant.label}`;
+            return effectiveId;
+        },
+    });
     return {
         viewer,
         async selectExerciseById(id) {
@@ -73,6 +106,12 @@ export async function mountApp(root, modelUrl) {
                 throw new Error(`Unknown exercise: ${id}`);
             return selectExercise(exercise);
         },
-        dispose() { panel.dispose(); viewer.dispose(); root.replaceChildren(); },
+        getBodyVariantId() { return currentBodyVariant; },
+        dispose() {
+            variantSelector.dispose();
+            panel.dispose();
+            viewer.dispose();
+            root.replaceChildren();
+        },
     };
 }
