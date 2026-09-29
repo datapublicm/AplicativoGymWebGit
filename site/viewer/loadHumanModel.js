@@ -1,4 +1,4 @@
-import { BODY_COLOR, INACTIVE_MUSCLE_COLOR } from './visualStyle.js';
+import { BODY_COLOR, INACTIVE_MUSCLE_COLOR } from './visualStyle.js?v=0.5.2';
 function parseGlb(buffer) {
     const view = new DataView(buffer);
     if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2)
