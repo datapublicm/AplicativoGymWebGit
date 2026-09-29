@@ -21,6 +21,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Test web application
+        run: npm test
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -56,8 +64,6 @@ jobs:
         run: |
           python tools/generate_model.py
           python tools/verify_model_contract.py
-          # Transitional alias: v0.4 main.js still requests this path until the body selector lands.
-          cp site/models/human-muscle-male-v05.glb site/models/human-muscle-v2.glb
 
       - name: Verify generated site assets
         run: |
@@ -65,7 +71,6 @@ jobs:
           test -s site/main.js
           test -s site/models/human-muscle-male-v05.glb
           test -s site/models/human-muscle-female-v05.glb
-          test -s site/models/human-muscle-v2.glb
           python - <<'PY'
           from pathlib import Path
           for name in ('human-muscle-male-v05.glb', 'human-muscle-female-v05.glb'):

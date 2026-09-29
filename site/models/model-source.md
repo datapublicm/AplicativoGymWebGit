@@ -48,7 +48,7 @@ Todos se descargan desde `makehuman/data/targets/macrodetails/`. Los archivos of
 - exporta el cuerpo como `body__male` o `body__female`;
 - exporta las zonas con el contrato estable `muscle__<muscle_id>`.
 
-Durante la transición entre v0.4 y el selector Hombre/Mujer, el workflow también crea `human-muscle-v2.glb` como alias temporal del modelo masculino para que el mockup actual siga funcionando. Ese alias no define una tercera anatomía.
+La web v0.5 carga directamente uno de estos dos GLB mediante el selector Hombre/Mujer. No se mantiene una tercera anatomía ni un alias de modelo activo.
 
 ## Contrato y verificación
 
