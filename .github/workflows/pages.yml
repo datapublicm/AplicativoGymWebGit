@@ -29,26 +29,49 @@ jobs:
       - name: Install model build dependencies
         run: pip install -r requirements-model.txt
 
-      - name: Download official MakeHuman CC0 base mesh
+      - name: Test model generation helpers
+        run: python -m unittest tests/test_model_generation.py tests/test_model_contract.py -v
+
+      - name: Download official MakeHuman CC0 base mesh and targets
         run: |
-          mkdir -p .build-assets
+          mkdir -p .build-assets/targets
           curl -fL \
             https://raw.githubusercontent.com/makehumancommunity/makehuman/master/makehuman/data/3dobjs/base.obj \
             -o .build-assets/makehuman-base.obj
+          for target in \
+            african-female-young.target \
+            african-male-young.target \
+            asian-female-young.target \
+            asian-male-young.target \
+            caucasian-female-young.target \
+            caucasian-male-young.target
+          do
+            curl -fL \
+              "https://raw.githubusercontent.com/makehumancommunity/makehuman/master/makehuman/data/targets/macrodetails/${target}" \
+              -o ".build-assets/targets/${target}"
+            grep -q "released as CC0" ".build-assets/targets/${target}"
+          done
 
-      - name: Generate muscle-segmented GLB
-        run: python tools/generate_model.py
+      - name: Generate male and female muscle-segmented GLBs
+        run: |
+          python tools/generate_model.py
+          python tools/verify_model_contract.py
+          # Transitional alias: v0.4 main.js still requests this path until the body selector lands.
+          cp site/models/human-muscle-male-v05.glb site/models/human-muscle-v2.glb
 
       - name: Verify generated site assets
         run: |
           test -s site/index.html
           test -s site/main.js
+          test -s site/models/human-muscle-male-v05.glb
+          test -s site/models/human-muscle-female-v05.glb
           test -s site/models/human-muscle-v2.glb
           python - <<'PY'
           from pathlib import Path
-          p = Path('site/models/human-muscle-v2.glb')
-          assert p.stat().st_size > 250_000, p.stat().st_size
-          print(f'GLB verified: {p.stat().st_size} bytes')
+          for name in ('human-muscle-male-v05.glb', 'human-muscle-female-v05.glb'):
+              p = Path('site/models') / name
+              assert p.stat().st_size > 250_000, (name, p.stat().st_size)
+              print(f'{name}: {p.stat().st_size} bytes')
           PY
 
       - name: Configure Pages
