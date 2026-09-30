@@ -37,6 +37,7 @@ jobs:
           assert d["vertices"] > 10000
           assert d["faces"] > 10000
           assert d["glb_bytes"] > 100000
+          assert d["male_glb_bytes"] > 100000
           print(json.dumps(d, indent=2))
           PY
       - name: Upload prepared basemesh
