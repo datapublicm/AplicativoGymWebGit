@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feature/task-13-2c-male-basemesh
+  pull_request:
+    branches:
+      - feature/task-13-2c-male-basemesh
   workflow_dispatch:
 
 permissions:
