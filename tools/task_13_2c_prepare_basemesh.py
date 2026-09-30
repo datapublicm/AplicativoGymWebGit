@@ -58,7 +58,8 @@ def extract_body_group() -> tuple[int, int]:
         fh.write("g body_hm08\n")
         for face in faces:
             fh.write("f " + " ".join(str(remap[idx]) for idx in face) + "\n")
-    return len(used), len(faces)
+    triangle_count = sum(max(0, len(face) - 2) for face in faces)
+    return len(used), triangle_count
 
 def count_face_components(faces: np.ndarray, vertex_count: int) -> int:
     parent = list(range(vertex_count))
@@ -95,7 +96,7 @@ def export_glb(parsed_vertices: int, parsed_faces: int) -> dict:
     if len(mesh.vertices) != parsed_vertices:
         raise RuntimeError(f"vertex mismatch: {len(mesh.vertices)} != {parsed_vertices}")
     if len(mesh.faces) != parsed_faces:
-        raise RuntimeError(f"face mismatch: {len(mesh.faces)} != {parsed_faces}")
+        raise RuntimeError(f"triangle mismatch: {len(mesh.faces)} != {parsed_faces}")
     mesh.remove_degenerate_faces()
     mesh.remove_duplicate_faces()
     mesh.fix_normals()
