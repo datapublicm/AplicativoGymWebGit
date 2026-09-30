@@ -30,8 +30,9 @@ def _render_one(meshes,angle,path):
     for node,m in meshes:
         rv=_rotate_y(m.vertices,angle); xy=rv[:,[0,1]]; z=rv[:,2]
         allxy.append(xy); face_xy=xy[m.faces]; depth=z[m.faces].mean(axis=1)
-        tri=rv[m.faces]; normals=np.cross(tri[:,1]-tri[:,0],tri[:,2]-tri[:,0]); lens=np.linalg.norm(normals,axis=1); normals=normals/np.maximum(lens[:,None],1e-9)
-        lam=np.clip(normals@light,0,1); shade=.62+.38*lam
+        vn=_rotate_y(m.vertex_normals,angle)
+        vlam=np.clip(vn@light,0,1)
+        shade=.58+.42*vlam[m.faces].mean(axis=1)
         base=np.array([.78,.78,.78]) if node.startswith('body__') else np.array([.16,.16,.16])
         for poly,d,sh in zip(face_xy,depth,shade):
             rgb=np.clip(base*sh,0,1); entries.append((float(d),poly,(*rgb,1.0)))
