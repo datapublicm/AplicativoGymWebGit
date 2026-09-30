@@ -28,6 +28,12 @@ def stabilize_torso_samples(samples:list[SilhouetteSample])->list[SilhouetteSamp
     if 'pecho_max' in data and 'hombros' in data:
         chest=data['pecho_max']; sh=data['hombros']
         data['hombros']=SilhouetteSample(sh.name,sh.y_norm,max(sh.half_width,chest.half_width*1.12),max(sh.front_depth,chest.front_depth*.78),max(sh.back_depth,chest.back_depth*.78))
+    if 'cuello' in data:
+        neck=data['cuello']
+        data['cuello']=SilhouetteSample(neck.name,neck.y_norm,min(.060,max(.045,neck.half_width)),max(.035,neck.front_depth),max(.035,neck.back_depth))
+    if 'menton' in data:
+        jaw=data['menton']
+        data['menton']=SilhouetteSample(jaw.name,jaw.y_norm,max(.052,jaw.half_width),max(.055,jaw.front_depth),max(.052,jaw.back_depth))
     return [data[s.name] for s in samples]
 
 def build_torso_sections(samples:list[SilhouetteSample])->list[BodySection]:
@@ -41,10 +47,10 @@ def build_torso_sections(samples:list[SilhouetteSample])->list[BodySection]:
         if not out: out.append(a)
         if a.name=='menton' and b.name=='coronilla':
             jaw=a.points_xz
-            for j,(t,wm,dm) in enumerate(((.28,1.12,1.10),(.56,1.16,1.13),(.80,1.02,1.02),(.94,.82,.86))):
+            for j,(t,wm,dm) in enumerate(((.18,.96,1.02),(.38,1.10,1.10),(.62,1.16,1.14),(.82,1.08,1.08),(.94,.78,.80))):
                 pts=jaw.copy(); pts[:,0]*=wm; pts[:,1]*=dm
                 out.append(BodySection(f'head_{j}',a.y+(b.y-a.y)*t,pts,'head'))
-            crown=jaw.copy(); crown[:,0]*=.58; crown[:,1]*=.62
+            crown=jaw.copy(); crown[:,0]*=.30; crown[:,1]*=.35
             out.append(BodySection('coronilla',b.y,crown,'head'))
             continue
         steps=5
