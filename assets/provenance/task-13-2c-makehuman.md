@@ -13,6 +13,16 @@
 
 La documentación oficial de MakeHuman establece que sus assets gráficos, incluido el base mesh, están bajo CC0 1.0. El código fuente de MakeHuman tiene una licencia distinta; este proyecto utiliza el asset gráfico, no el código fuente de la aplicación.
 
+## Ajuste masculino inicial
+
+Para que la basemesh tenga una forma masculina coherente antes del ajuste por siluetas, se aplica el promedio de los tres targets oficiales `male-young` de MakeHuman:
+
+- `macrodetails/african-male-young.target`
+- `macrodetails/asian-male-young.target`
+- `macrodetails/caucasian-male-young.target`
+
+Estos targets se utilizan solo como punto de partida anatómico; la forma final seguirá determinada por el mockup aprobado en Task 13.2D.
+
 ## Decisión técnica
 
 Esta basemesh **no es todavía el modelo masculino final**. Será la superficie anatómica inicial sobre la que se aplicará:
