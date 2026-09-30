@@ -97,8 +97,6 @@ def export_glb(parsed_vertices: int, parsed_faces: int) -> dict:
         raise RuntimeError(f"vertex mismatch: {len(mesh.vertices)} != {parsed_vertices}")
     if len(mesh.faces) != parsed_faces:
         raise RuntimeError(f"triangle mismatch: {len(mesh.faces)} != {parsed_faces}")
-    mesh.remove_degenerate_faces()
-    mesh.remove_duplicate_faces()
     mesh.fix_normals()
     mesh.vertices -= mesh.vertices.mean(axis=0)
     height = float(np.ptp(mesh.vertices[:, 1]))
