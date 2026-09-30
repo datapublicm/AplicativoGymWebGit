@@ -60,14 +60,38 @@ def extract_body_group() -> tuple[int, int]:
             fh.write("f " + " ".join(str(remap[idx]) for idx in face) + "\n")
     return len(used), len(faces)
 
+def count_face_components(faces: np.ndarray, vertex_count: int) -> int:
+    parent = list(range(vertex_count))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    for face in faces:
+        a, b, c = (int(face[0]), int(face[1]), int(face[2]))
+        union(a, b)
+        union(b, c)
+        union(c, a)
+
+    used = {find(int(v)) for face in faces for v in face}
+    return len(used)
+
+
 def export_glb(parsed_vertices: int, parsed_faces: int) -> dict:
     mesh = trimesh.load(BODY_OBJ, force="mesh", process=False)
     if not isinstance(mesh, trimesh.Trimesh):
         raise RuntimeError("body-only OBJ did not load as one mesh")
     mesh.remove_unreferenced_vertices()
-    components = mesh.split(only_watertight=False)
-    if len(components) != 1:
-        raise RuntimeError(f"expected one connected body component, got {len(components)}")
+    components = count_face_components(mesh.faces, len(mesh.vertices))
+    if components != 1:
+        raise RuntimeError(f"expected one connected body component, got {components}")
     if len(mesh.vertices) != parsed_vertices:
         raise RuntimeError(f"vertex mismatch: {len(mesh.vertices)} != {parsed_vertices}")
     if len(mesh.faces) != parsed_faces:
@@ -94,7 +118,7 @@ def export_glb(parsed_vertices: int, parsed_faces: int) -> dict:
         "source_sha256_matches": digest == EXPECTED_SHA256,
         "vertices": int(len(mesh.vertices)),
         "faces": int(len(mesh.faces)),
-        "components": int(len(mesh.split(only_watertight=False))),
+        "components": int(count_face_components(mesh.faces, len(mesh.vertices))),
         "height_source_units": height,
         "glb_bytes": int(BODY_GLB.stat().st_size),
         "node": "body__male_basemesh_hm08",
