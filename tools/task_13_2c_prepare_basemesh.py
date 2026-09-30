@@ -122,7 +122,8 @@ def apply_male_targets(source_vertices: np.ndarray) -> np.ndarray:
             deltas[index] += delta / len(MALE_TARGETS)
     return source_vertices + deltas
 
-def export_glb(parsed_vertices: int, parsed_faces: int) -> dict:    mesh = trimesh.load(BODY_OBJ, force="mesh", process=False)
+def export_glb(parsed_vertices: int, parsed_faces: int) -> dict:
+    mesh = trimesh.load(BODY_OBJ, force="mesh", process=False)
     if not isinstance(mesh, trimesh.Trimesh):
         raise RuntimeError("body-only OBJ did not load as one mesh")
     mesh.remove_unreferenced_vertices()
