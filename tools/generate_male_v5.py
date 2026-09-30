@@ -6,7 +6,7 @@ if __package__ in (None, ''):
 from tools.v5.silhouette_input import normalize_reference_pair
 from tools.v5.anatomical_landmarks import load_landmarks
 from tools.v5.silhouette_sampling import sample_profile
-from tools.v5.body_sections import build_torso_sections
+from tools.v5.body_sections import build_torso_sections, stabilize_torso_samples
 from tools.v5.body_loft import build_male_cage
 from tools.v5.anatomical_refinement import refine_anatomy
 from tools.v5.extremity_detail import shape_head_hands_feet
@@ -18,7 +18,7 @@ TORSO_NAMES=('entrepierna','pelvis','cintura','ombligo','pecho_max','hombros','c
 def generate_male_v5(front_path:Path,side_path:Path,landmarks_path:Path,output_path:Path)->Path:
     front,side=normalize_reference_pair(Path(front_path),Path(side_path))
     lm=load_landmarks(Path(landmarks_path))
-    samples=sample_profile(front,side,lm,TORSO_NAMES)
+    samples=stabilize_torso_samples(sample_profile(front,side,lm,TORSO_NAMES))
     sections=build_torso_sections(samples)
     cage=build_male_cage(sections,{})
     cage=refine_anatomy(cage,{})
