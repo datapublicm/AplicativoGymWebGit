@@ -30,6 +30,19 @@ class Tests(unittest.TestCase):
         self.assertGreaterEqual(out['hombros'].front_depth,out['pecho_max'].front_depth*.75)
         self.assertGreaterEqual(out['hombros'].back_depth,out['pecho_max'].back_depth*.75)
 
+    def test_stabilize_torso_repairs_degenerate_head_and_neck_depth(self):
+        from tools.v5.body_sections import stabilize_torso_samples
+        samples=[
+            SilhouetteSample('cuello',.835,.062,.016,.055),
+            SilhouetteSample('menton',.88,.035,.060,.034),
+            SilhouetteSample('coronilla',1.0,.006,.012,.007),
+        ]
+        out={x.name:x for x in stabilize_torso_samples(samples)}
+        self.assertGreaterEqual(out['cuello'].front_depth,.035)
+        self.assertGreaterEqual(out['cuello'].back_depth,.035)
+        self.assertGreaterEqual(out['menton'].half_width,.052)
+        self.assertGreaterEqual(out['menton'].back_depth,.052)
+
     def test_invalid_dimensions_fail(self):
         from tools.v5.body_sections import build_limb_station_profile
         with self.assertRaises(ValueError): build_limb_station_profile(0,.1,.1)
