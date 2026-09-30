@@ -26,15 +26,18 @@ def _rotate_y(v,angle):
 def _render_one(meshes,angle,path):
     fig,ax=plt.subplots(figsize=(5,8),dpi=160)
     entries=[]; allxy=[]
+    light=np.array([-.45,.65,.85],dtype=float); light/=np.linalg.norm(light)
     for node,m in meshes:
         rv=_rotate_y(m.vertices,angle); xy=rv[:,[0,1]]; z=rv[:,2]
         allxy.append(xy); face_xy=xy[m.faces]; depth=z[m.faces].mean(axis=1)
-        color='#d8d8d8' if node.startswith('body__') else '#333333'
-        for poly,d in zip(face_xy,depth): entries.append((float(d),poly,color))
+        tri=rv[m.faces]; normals=np.cross(tri[:,1]-tri[:,0],tri[:,2]-tri[:,0]); lens=np.linalg.norm(normals,axis=1); normals=normals/np.maximum(lens[:,None],1e-9)
+        lam=np.clip(normals@light,0,1); shade=.62+.38*lam
+        base=np.array([.78,.78,.78]) if node.startswith('body__') else np.array([.16,.16,.16])
+        for poly,d,sh in zip(face_xy,depth,shade):
+            rgb=np.clip(base*sh,0,1); entries.append((float(d),poly,(*rgb,1.0)))
     entries.sort(key=lambda x:x[0])
-    for color in ('#d8d8d8','#333333'):
-        polys=[p for _,p,c in entries if c==color]
-        if polys: ax.add_collection(PolyCollection(polys,facecolor=color,edgecolor='none',linewidth=0))
+    if entries:
+        ax.add_collection(PolyCollection([p for _,p,_ in entries],facecolors=[c for _,_,c in entries],edgecolors='none',linewidths=0,antialiaseds=False))
     pts=np.vstack(allxy); xmin,ymin=pts.min(axis=0); xmax,ymax=pts.max(axis=0); pad=max(xmax-xmin,ymax-ymin)*.06
     ax.set_xlim(xmin-pad,xmax+pad); ax.set_ylim(ymin-pad,ymax+pad); ax.set_aspect('equal'); ax.axis('off')
     fig.patch.set_facecolor('#f3f3f3'); ax.set_facecolor('#f3f3f3')
