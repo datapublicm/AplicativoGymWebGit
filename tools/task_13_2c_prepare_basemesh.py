@@ -17,7 +17,13 @@ OUT_DIR = Path("artifacts/task-13-2c")
 SOURCE_OBJ = OUT_DIR / "upstream_base_hm08.obj"
 BODY_OBJ = OUT_DIR / "male_basemesh_hm08_body.obj"
 BODY_GLB = OUT_DIR / "male_basemesh_hm08_body.glb"
+MALE_GLB = OUT_DIR / "male_basemesh_hm08_male_v1.glb"
 STATS = OUT_DIR / "basemesh_stats.json"
+
+MALE_TARGETS = (
+    "macrodetails/universal-male-young-maxmuscle-minweight.target",
+    "macrodetails/universal-male-young-minmuscle-maxweight.target",
+)
 
 def sha256(path: Path) -> str:
     h = hashlib.sha256()
@@ -30,6 +36,14 @@ def download_source() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with urllib.request.urlopen(BASE_URL, timeout=120) as response:
         SOURCE_OBJ.write_bytes(response.read())
+
+    target_root = OUT_DIR / "targets"
+    target_root.mkdir(parents=True, exist_ok=True)
+    for rel in MALE_TARGETS:
+        target_path = target_root / Path(rel).name
+        url = f"https://raw.githubusercontent.com/{UPSTREAM_REPO}/{UPSTREAM_COMMIT}/makehuman/data/targets/{rel}"
+        with urllib.request.urlopen(url, timeout=120) as response:
+            target_path.write_bytes(response.read())
 
 def extract_body_group() -> tuple[int, int]:
     vertices = []
@@ -85,8 +99,30 @@ def count_face_components(faces: np.ndarray, vertex_count: int) -> int:
     return len(used)
 
 
-def export_glb(parsed_vertices: int, parsed_faces: int) -> dict:
-    mesh = trimesh.load(BODY_OBJ, force="mesh", process=False)
+def parse_target(path: Path) -> dict[int, np.ndarray]:
+    deltas = {}
+    with path.open("r", encoding="utf-8") as fh:
+        for line_number, raw in enumerate(fh, start=1):
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) != 4:
+                raise ValueError(f"{path}:{line_number}: expected index dx dy dz")
+            deltas[int(parts[0])] = np.asarray([float(parts[1]), float(parts[2]), float(parts[3])], dtype=np.float64)
+    return deltas
+
+def apply_male_targets(source_vertices: np.ndarray) -> np.ndarray:
+    deltas = np.zeros_like(source_vertices, dtype=np.float64)
+    for name in MALE_TARGETS:
+        target = parse_target(OUT_DIR / "targets" / Path(name).name)
+        for index, delta in target.items():
+            if index < 0 or index >= len(source_vertices):
+                raise ValueError(f"target index {index} out of range: {name}")
+            deltas[index] += delta / len(MALE_TARGETS)
+    return source_vertices + deltas
+
+def export_glb(parsed_vertices: int, parsed_faces: int) -> dict:    mesh = trimesh.load(BODY_OBJ, force="mesh", process=False)
     if not isinstance(mesh, trimesh.Trimesh):
         raise RuntimeError("body-only OBJ did not load as one mesh")
     mesh.remove_unreferenced_vertices()
@@ -104,6 +140,30 @@ def export_glb(parsed_vertices: int, parsed_faces: int) -> dict:
     scene = trimesh.Scene()
     scene.add_geometry(mesh, node_name="body__male_basemesh_hm08", geom_name="body__male_basemesh_hm08")
     BODY_GLB.write_bytes(scene.export(file_type="glb"))
+
+    source_vertices = []
+    with SOURCE_OBJ.open("r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if line.startswith("v "):
+                _, x, y, z = line.split()[:4]
+                source_vertices.append((float(x), float(y), float(z)))
+    source_vertices = np.asarray(source_vertices, dtype=np.float64)
+    male_vertices = apply_male_targets(source_vertices)
+    body_obj_vertices = []
+    with BODY_OBJ.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            if line.startswith("v "):
+                _, x, y, z = line.split()[:4]
+                body_obj_vertices.append((float(x), float(y), float(z)))
+    body_obj_vertices = np.asarray(body_obj_vertices, dtype=np.float64)
+    lookup = {tuple(np.round(v, 7)): i for i, v in enumerate(source_vertices)}
+    used_indices = [lookup[tuple(np.round(v, 7))] for v in body_obj_vertices]
+    male_body_vertices = male_vertices[np.asarray(used_indices, dtype=np.int64)]
+    male_mesh = trimesh.Trimesh(vertices=male_body_vertices, faces=mesh.faces.copy(), process=False)
+    male_mesh.vertices -= male_mesh.vertices.mean(axis=0)
+    male_scene = trimesh.Scene()
+    male_scene.add_geometry(male_mesh, node_name="body__male_basemesh_hm08_male_v1", geom_name="body__male_basemesh_hm08_male_v1")
+    MALE_GLB.write_bytes(male_scene.export(file_type="glb"))
     digest = sha256(SOURCE_OBJ)
     result = {
         "task": "13.2C",
@@ -119,8 +179,9 @@ def export_glb(parsed_vertices: int, parsed_faces: int) -> dict:
         "components": int(count_face_components(mesh.faces, len(mesh.vertices))),
         "height_source_units": height,
         "glb_bytes": int(BODY_GLB.stat().st_size),
-        "node": "body__male_basemesh_hm08",
-        "status": "GREEN",
+        "male_glb_bytes": int(MALE_GLB.stat().st_size),
+        "male_target_blend": list(MALE_TARGETS),
+        "node": "body__male_basemesh_hm08_male_v1",        "status": "GREEN",
     }
     STATS.write_text(json.dumps(result, indent=2), encoding="utf-8")
     return result
