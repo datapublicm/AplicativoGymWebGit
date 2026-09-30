@@ -21,7 +21,9 @@ MALE_GLB = OUT_DIR / "male_basemesh_hm08_male_v1.glb"
 STATS = OUT_DIR / "basemesh_stats.json"
 
 MALE_TARGETS = (
-    "macrodetails/universal-male-young-averagemuscle-averageweight.target",
+    "macrodetails/african-male-young.target",
+    "macrodetails/asian-male-young.target",
+    "macrodetails/caucasian-male-young.target",
 )
 
 def sha256(path: Path) -> str:
