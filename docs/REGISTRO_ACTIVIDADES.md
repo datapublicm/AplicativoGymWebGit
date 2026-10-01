@@ -58,3 +58,15 @@ Formato de hora: `DD/MM/YYYY HH:MM` (Perú, UTC-5).
 - **Archivo:** `docs/REGISTRO_ACTIVIDADES.md`.
 - **Resultado:** a partir de esta entrada, todo archivo creado, guardado, modificado o eliminado deberá quedar identificado con su fecha y hora de Perú, junto con una descripción breve de la acción.
 - **Siguiente paso:** continuar Task 1 con el perfil lateral femenino y registrar el resultado con nueva marca de fecha y hora.
+
+---
+
+## 30/09/2026 21:43 — hora de Perú
+
+### Task 1 — Perfil lateral femenino registrado
+- **Acción:** se midió y documentó el segundo bloque proporcional de la referencia femenina, correspondiente a la vista lateral.
+- **Archivo creado:** `docs/superpowers/specs/2026-09-30-v5-female-lateral-proportions.md`.
+- **Referencia utilizada:** lámina femenina aprobada `115978.png`, panel comparativo lateral.
+- **Resultado:** se fijaron profundidades preliminares normalizadas para cabeza, tórax/hombros, pecho, cintura, pelvis/glúteo, muslo, rodilla, pantorrilla y tobillo; se mantuvieron los mismos niveles verticales del perfil frontal para asegurar coherencia entre ambas vistas.
+- **Criterio:** las medidas laterales se consideran preliminares con tolerancia aproximada de `±0.01 H` a `±0.015 H` y deberán respetarse simultáneamente con los anchos frontales al construir la malla Quad.
+- **Siguiente paso:** consolidar frontal + lateral femenino en un único perfil y después iniciar el bloque de proporciones masculinas antes de construir la malla.
