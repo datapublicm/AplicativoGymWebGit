@@ -1,43 +1,45 @@
 # AplicativoGymWebGit
 
-Aplicación web de gimnasio con visor muscular 3D, buscador, filtros de ejercicios y selección de representación corporal Hombre/Mujer.
+Aplicación web de gimnasio con visor muscular 3D, buscador, filtros de ejercicios, selección de representación corporal y resaltado de músculos por ejercicio.
 
-## Estado
+## Estado actual
 
-Versión web **v0.5** de AplicativoGym. Mantiene el mockup e interacciones de v0.4 y añade una base anatómica extensible sin rediseñar la experiencia principal.
+El proyecto conserva la interfaz y la lógica funcional del prototipo web: catálogo de ejercicios, resolución anatómica, giro automático, rotación/zoom manual y selección Hombre/Mujer.
 
-Incluye:
+La reconstrucción del modelo humano se trabaja por separado en **Task 13.2B-v5.0**. El pipeline anterior basado en MakeHuman y los intentos de geometría por metaballs/campos implícitos fueron retirados del proyecto activo.
 
-- dos representaciones 3D MakeHuman hm08, **Hombre** y **Mujer**, generadas a partir de activos oficiales CC0;
-- selector Hombre/Mujer integrado como control flotante del visor;
-- conservación de ejercicio seleccionado, orientación y zoom al cambiar de representación corporal;
-- 18 zonas musculares renderizables con el mismo contrato lógico en ambos modelos;
-- taxonomía anatómica jerárquica con subdivisiones iniciales y fallback a la zona padre cuando todavía no existe una malla 3D específica;
-- 18 ejercicios con músculo principal y secundarios;
-- giro automático inteligente y rotación/zoom manual;
-- buscador y filtros por grupo muscular;
-- diseño responsive para escritorio y móvil;
-- alias de ejercicios recuperados del historial de gimnasio.
+La dirección vigente para v5.0 es una **base anatómica propia de topología Quad**, ajustada contra referencias frontal/lateral y sometida a aprobación visual antes de sustituir el modelo productivo. La segmentación muscular definitiva se incorpora después de aprobar la forma base.
+
+## Principios de continuidad
+
+- No rehacer la interfaz web desde cero.
+- Conservar buscador, filtros, detalle de ejercicio, giro automático, giro manual y zoom.
+- Mantener desacoplada la lógica de ejercicios/músculos de la geometría 3D concreta.
+- No integrar un nuevo GLB como modelo productivo hasta superar el gate visual.
+- Mantener la futura compatibilidad con modelo masculino y femenino y con la posterior versión Android.
+
+## Task 13.2B-v5.0
+
+La especificación de trabajo vigente está en:
+
+`docs/superpowers/specs/2026-09-30-task-13-2b-v5-0-quad-base-design.md`
+
+Los activos de trabajo de esta fase se organizan fuera del repositorio en la carpeta de proyecto correspondiente, separando referencias, fuentes, renders, exportaciones, documentación y pruebas.
+
+## Pruebas web
+
+Las pruebas JavaScript se ejecutan con Node.js mediante:
+
+```bash
+npm test
+```
+
+El repositorio ya no instala NumPy/trimesh ni genera modelos 3D con Python durante el despliegue web.
 
 ## Publicación
 
-GitHub Pages se despliega mediante `.github/workflows/pages.yml`. En cada despliegue, CI:
+GitHub Pages publica únicamente la carpeta `site/`. El workflow ejecuta primero las pruebas web y verifica que los archivos base del sitio existan antes de subir el artefacto.
 
-1. ejecuta los tests web con **Node 24**;
-2. ejecuta los tests del generador de modelos con Python;
-3. descarga desde MakeHuman la malla base y seis targets macro oficiales CC0;
-4. genera `human-muscle-male-v05.glb` y `human-muscle-female-v05.glb`;
-5. verifica que ambos modelos mantengan exactamente el mismo contrato de 18 zonas y que sus geometrías corporales sean distintas;
-6. publica únicamente la carpeta `site/`.
+## Alcance anatómico
 
-Los GLB de v0.5 se reconstruyen en GitHub Actions y no necesitan almacenarse como binarios fuente en Git.
-
-## Continuidad del mockup
-
-v0.5 evoluciona sobre la interfaz publicada en v0.4. El buscador, filtros, lista de ejercicios, tarjeta de detalle, giro automático, giro manual y zoom continúan siendo la base de la experiencia. El selector corporal se añadió sin reemplazar esos componentes.
-
-## Modelo y alcance anatómico
-
-Las zonas mostradas son **regiones musculares superficiales aproximadas para visualización de entrenamiento**. No constituyen un atlas anatómico médico ni representan volúmenes musculares internos individuales. Las subdivisiones lógicas pueden usar temporalmente la región padre renderizable hasta disponer de una delimitación 3D propia.
-
-La procedencia, transformación y licencia de los modelos se documentan en `site/models/model-source.md`.
+Las zonas musculares de la aplicación son regiones orientadas a visualización de entrenamiento. No constituyen un atlas anatómico médico. La geometría y delimitación muscular definitiva dependen de la aprobación del nuevo modelo base.
