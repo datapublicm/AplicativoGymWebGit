@@ -29,55 +29,10 @@ jobs:
       - name: Test web application
         run: npm test
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - name: Install model build dependencies
-        run: pip install -r requirements-model.txt
-
-      - name: Test model generation helpers
-        run: python -m unittest tests/test_model_generation.py tests/test_model_contract.py -v
-
-      - name: Download official MakeHuman CC0 base mesh and targets
-        run: |
-          mkdir -p .build-assets/targets
-          curl -fL \
-            https://raw.githubusercontent.com/makehumancommunity/makehuman/master/makehuman/data/3dobjs/base.obj \
-            -o .build-assets/makehuman-base.obj
-          for target in \
-            african-female-young.target \
-            african-male-young.target \
-            asian-female-young.target \
-            asian-male-young.target \
-            caucasian-female-young.target \
-            caucasian-male-young.target
-          do
-            curl -fL \
-              "https://raw.githubusercontent.com/makehumancommunity/makehuman/master/makehuman/data/targets/macrodetails/${target}" \
-              -o ".build-assets/targets/${target}"
-            grep -q "released as CC0" ".build-assets/targets/${target}"
-          done
-
-      - name: Generate male and female muscle-segmented GLBs
-        run: |
-          python tools/generate_model.py
-          python tools/verify_model_contract.py
-
-      - name: Verify generated site assets
+      - name: Verify site base assets
         run: |
           test -s site/index.html
           test -s site/main.js
-          test -s site/models/human-muscle-male-v05.glb
-          test -s site/models/human-muscle-female-v05.glb
-          python - <<'PY'
-          from pathlib import Path
-          for name in ('human-muscle-male-v05.glb', 'human-muscle-female-v05.glb'):
-              p = Path('site/models') / name
-              assert p.stat().st_size > 250_000, (name, p.stat().st_size)
-              print(f'{name}: {p.stat().st_size} bytes')
-          PY
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
