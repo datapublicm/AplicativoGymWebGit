@@ -88,3 +88,20 @@ Formato de hora: `DD/MM/YYYY HH:MM` (Perú, UTC-5).
 - **Referencia utilizada:** lámina masculina aprobada `115977.png`, panel comparativo frontal.
 - **Resultado:** se fijaron anchos preliminares de cabeza, hombros, pecho, cintura y pelvis, junto con niveles verticales principales y restricciones de silueta atlética en V.
 - **Siguiente paso:** medir y documentar el perfil lateral masculino; luego consolidar frontal + lateral antes de pasar a la construcción de la malla base.
+
+---
+
+## 30/09/2026 21:47 — hora de Perú
+
+### Task 1 — Perfil masculino lateral y consolidación completados
+- **Acción:** se documentó el perfil lateral masculino y se consolidaron frontal + lateral en una única especificación de control.
+- **Archivos:**
+  - `docs/superpowers/specs/2026-09-30-v5-male-lateral-proportions.md`
+  - `docs/superpowers/specs/2026-09-30-v5-male-consolidated-profile.md`
+- **Resultado:** quedaron definidos niveles verticales, anchos frontales, profundidades laterales, tolerancias y reglas anatómicas del modelo masculino; hombros `0.30 H`, pecho `0.27 H`, cintura `0.19 H`, pelvis `0.22 H`, profundidad máxima de pecho `0.16 H` y pelvis/glúteo `0.14 H`.
+- **Criterio visual:** silueta atlética en V, tórax con volumen, hombro-brazo continuo, extremidades no cilíndricas, pelvis-muslo integrado y lordosis natural.
+
+### Task 1 — Cierre
+- **Estado:** COMPLETADA.
+- **Resultado global:** existen perfiles consolidados femenino y masculino derivados de las referencias aprobadas, con medidas y restricciones suficientes para iniciar la construcción volumétrica sin volver a improvisar proporciones.
+- **Siguiente paso:** Task 2 — construir la base Quad / cage volumétrico inicial y validarlo contra ambas vistas antes de añadir detalle anatómico.
