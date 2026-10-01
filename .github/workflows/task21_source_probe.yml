@@ -1,0 +1,77 @@
+name: Task 2.1 source probe
+
+on:
+  push:
+    branches:
+      - feature/task-13-2b-v5-female-topology-fix
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch CC0 female OBJ
+        run: |
+          set -euxo pipefail
+          mkdir -p task21_probe
+          curl -L --fail --retry 3 \
+            'https://opengameart.org/sites/default/files/WomanBody13.obj' \
+            -o task21_probe/WomanBody13.obj
+          ls -lh task21_probe/WomanBody13.obj
+
+      - name: Install probe dependencies
+        run: python -m pip install --quiet numpy trimesh matplotlib
+
+      - name: Inspect and render source
+        run: |
+          python - <<'PY'
+          import numpy as np
+          import trimesh
+          import matplotlib.pyplot as plt
+          from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+          from pathlib import Path
+
+          p = Path('task21_probe/WomanBody13.obj')
+          loaded = trimesh.load(p, force='scene', process=False)
+          meshes = [g for g in loaded.geometry.values() if isinstance(g, trimesh.Trimesh)]
+          print('geometry_count=', len(meshes))
+          for i, m in enumerate(meshes):
+              print(i, 'vertices=', len(m.vertices), 'faces=', len(m.faces), 'bounds=', m.bounds.tolist(), 'extents=', m.extents.tolist(), 'watertight=', m.is_watertight)
+          if not meshes:
+              raise SystemExit('No mesh geometry found')
+          m = max(meshes, key=lambda x: len(x.faces)).copy()
+          m.remove_unreferenced_vertices()
+          np.savez_compressed('task21_probe/source_mesh.npz', vertices=np.asarray(m.vertices), faces=np.asarray(m.faces))
+
+          V = np.asarray(m.vertices)
+          F = np.asarray(m.faces)
+          spans = V.max(0)-V.min(0)
+          up = int(np.argmax(spans))
+          axes = [0,1,2]
+          horiz = [a for a in axes if a != up]
+          print('detected_up_axis=', up, 'horizontal_axes=', horiz)
+
+          fig = plt.figure(figsize=(12,6), dpi=120)
+          views=[('A', (20,-60)),('B',(10,0)),('C',(10,90))]
+          for j,(name,(elev,azim)) in enumerate(views,1):
+              ax=fig.add_subplot(1,3,j,projection='3d')
+              # decimate faces only for drawing speed
+              idx=np.arange(len(F))[::max(1,len(F)//12000)]
+              poly=Poly3DCollection(V[F[idx]], linewidths=0.03, alpha=1.0)
+              poly.set_facecolor((0.75,0.72,0.70,1)); poly.set_edgecolor((0.25,0.25,0.25,0.18))
+              ax.add_collection3d(poly)
+              mn=V.min(0); mx=V.max(0)
+              ax.set_xlim(mn[0],mx[0]); ax.set_ylim(mn[1],mx[1]); ax.set_zlim(mn[2],mx[2])
+              ax.set_box_aspect(np.maximum(spans,1e-6))
+              ax.view_init(elev=elev,azim=azim); ax.set_axis_off(); ax.set_title(name)
+          plt.tight_layout()
+          fig.savefig('task21_probe/source_preview.png', bbox_inches='tight')
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: task21-source-probe
+          path: task21_probe/
+          if-no-files-found: error
