@@ -1,8 +1,24 @@
 # Registro de actividades — AplicativoGym
 
-Este documento conserva el historial operativo del proyecto. Cada avance relevante debe añadir una nueva entrada con fecha, tarea, cambios realizados, archivos afectados y siguiente paso.
+Este documento conserva el historial operativo del proyecto.
 
-## 2026-09-30
+## Regla de registro
+Desde el 30/09/2026 a las 21:34 (hora de Perú, UTC-5), cada avance relevante debe registrar:
+- fecha;
+- hora de Perú;
+- tarea o fase;
+- acción realizada;
+- archivo(s) o carpeta(s) afectados;
+- resultado;
+- siguiente paso.
+
+Formato de hora: `DD/MM/YYYY HH:MM` (Perú, UTC-5).
+
+> Las actividades anteriores a la adopción de esta regla conservan su fecha, pero no se les asigna una hora retroactiva inventada.
+
+---
+
+## 30/09/2026 — actividades previas sin hora registrada
 
 ### Limpieza previa a Task 13.2B-v5.0
 - Se retiraron del flujo activo los scripts y dependencias del pipeline anterior basado en MakeHuman y generación Python.
@@ -14,7 +30,12 @@ Este documento conserva el historial operativo del proyecto. Cada avance relevan
 
 ### Organización de referencias v5.0
 - Se confirmó la estructura de Drive `01_Modelos_3D/Task_13.2B-v5.0/`.
-- Se guardaron las cuatro referencias visuales aprobadas dentro de `01_Referencias/`.
+- Se guardaron cuatro referencias visuales aprobadas dentro de `01_Referencias/`.
+- Entre los archivos guardados figuran:
+  - `v5_referencia_masculina_diseno_anatomico.png`
+  - `v5_referencia_femenina_diseno_anatomico.png`
+  - `v5_referencia_visual_03.png`
+  - `v5_referencia_visual_04.png`
 - Se mantiene separada la nueva fase de los diseños fallidos anteriores.
 
 ### Task 1 — Referencias y proporciones
@@ -28,8 +49,12 @@ Este documento conserva el historial operativo del proyecto. Cada avance relevan
   - ancho de pelvis ≈ 0.23
 - También se fijaron los niveles verticales principales para mentón, hombros, cintura, cadera, rodilla y tobillo.
 
-### Siguiente paso
-- Completar el perfil lateral femenino.
-- Consolidar frontal + lateral en un único perfil de proporciones.
-- Repetir el mismo procedimiento con el modelo masculino.
-- No iniciar la malla Quad hasta cerrar y documentar las proporciones de referencia.
+---
+
+## 30/09/2026 21:34 — hora de Perú
+
+### Registro de actividades formalizado
+- **Acción:** se actualizó el documento permanente de seguimiento del proyecto para incluir fecha y hora en cada actividad futura.
+- **Archivo:** `docs/REGISTRO_ACTIVIDADES.md`.
+- **Resultado:** a partir de esta entrada, todo archivo creado, guardado, modificado o eliminado deberá quedar identificado con su fecha y hora de Perú, junto con una descripción breve de la acción.
+- **Siguiente paso:** continuar Task 1 con el perfil lateral femenino y registrar el resultado con nueva marca de fecha y hora.
