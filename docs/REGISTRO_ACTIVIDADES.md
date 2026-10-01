@@ -70,3 +70,21 @@ Formato de hora: `DD/MM/YYYY HH:MM` (Perú, UTC-5).
 - **Resultado:** se fijaron profundidades preliminares normalizadas para cabeza, tórax/hombros, pecho, cintura, pelvis/glúteo, muslo, rodilla, pantorrilla y tobillo; se mantuvieron los mismos niveles verticales del perfil frontal para asegurar coherencia entre ambas vistas.
 - **Criterio:** las medidas laterales se consideran preliminares con tolerancia aproximada de `±0.01 H` a `±0.015 H` y deberán respetarse simultáneamente con los anchos frontales al construir la malla Quad.
 - **Siguiente paso:** consolidar frontal + lateral femenino en un único perfil y después iniciar el bloque de proporciones masculinas antes de construir la malla.
+
+---
+
+## 30/09/2026 21:45 — hora de Perú
+
+### Task 1 — Perfil femenino consolidado
+- **Acción:** se unificaron las medidas frontal y lateral femeninas en una sola especificación de control para la malla Quad.
+- **Archivo creado:** `docs/superpowers/specs/2026-09-30-v5-female-consolidated-profile.md`.
+- **Resultado:** quedaron consolidados los niveles verticales, anchos frontales, profundidades laterales, tolerancias y restricciones anatómicas que deben respetarse simultáneamente.
+- **Criterio visual:** se fijó como obligatorio conservar una silueta atlética natural, cintura marcada sin exageración, pelvis/glúteo integrado, piernas no cilíndricas y continuidad anatómica torso-extremidades.
+- **Siguiente paso:** iniciar el perfil masculino equivalente.
+
+### Task 1 — Perfil masculino frontal iniciado
+- **Acción:** se documentó el primer bloque proporcional masculino sobre la referencia frontal aprobada.
+- **Archivo creado:** `docs/superpowers/specs/2026-09-30-v5-male-frontal-proportions.md`.
+- **Referencia utilizada:** lámina masculina aprobada `115977.png`, panel comparativo frontal.
+- **Resultado:** se fijaron anchos preliminares de cabeza, hombros, pecho, cintura y pelvis, junto con niveles verticales principales y restricciones de silueta atlética en V.
+- **Siguiente paso:** medir y documentar el perfil lateral masculino; luego consolidar frontal + lateral antes de pasar a la construcción de la malla base.
