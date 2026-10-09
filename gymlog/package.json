@@ -1,0 +1,22 @@
+{
+  "name": "gymlog",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build:web": "vite build",
+    "android:init": "npx cap add android",
+    "android:sync": "npm run build:web && npx cap sync android",
+    "android:open": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/android": "^7.4.4",
+    "@supabase/supabase-js": "^2.76.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.4",
+    "vite": "^7.1.10"
+  }
+}
