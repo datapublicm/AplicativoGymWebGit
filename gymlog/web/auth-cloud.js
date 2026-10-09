@@ -41,6 +41,7 @@ async function updateState(session) {
     $('loggedEmail').textContent=signedIn.email;
     setStatus('Sesión activa · Supabase '+config.environment);
     try {
+      window.GymBaseCatalog=await cloud.loadInitialCatalog();
       window.GymCustomCatalog=await cloud.loadOwnCatalog();
       if(typeof cascade==='function')cascade(0);
       if(typeof renderOwnCatalog==='function')renderOwnCatalog();
@@ -48,7 +49,7 @@ async function updateState(session) {
       await cloud.loadCatalogStats();
     }
     catch(error){setStatus('Sesión activa; error al cargar datos: '+error.message);}
-  } else {window.GymCustomCatalog=[];model.records=[];model.photos={};drawRecent();drawHistory();drawReports();}
+  } else {window.GymBaseCatalog=[];window.GymCustomCatalog=[];model.records=[];model.photos={};drawRecent();drawHistory();drawReports();}
   showPage('sesion');
 }
 async function findOrCreate(table,fields,insertExtra={}) {
@@ -109,6 +110,22 @@ const cloud={
     series:'Serie '+s.numero_serie,subdivision:s.subdivision||'-',unit:s.unidad,
     weight:Number(s.peso||0),reps:Number(s.repeticiones||0),assistance:s.asistencias,
     notes:r.observaciones||'',createdAt:s.created_at}];
+  });
+ },
+ async loadInitialCatalog(){
+  if(!owns())return [];
+  const {data,error}=await db.from('tbl_catalogo_predeterminado')
+    .select('id,gimnasio,sede,anotacion,zona_entrenamiento,instrumento,ejercicio,accesorio_implemento,tecnica_actualizada,musculos_principales,musculos_secundarios')
+    .eq('activo',true).order('fila_origen',{ascending:true}).limit(1000);
+  must(data,error);
+  return (data||[]).map(x=>{
+    const equipment=x.instrumento||'';
+    const kind=/máquina|maquina|freemotion|estación|polea|hack|peck deck/i.test(equipment)?'Máquina':
+      /mancuerna|barra|disco|banca/i.test(equipment)?'Implemento libre':'Otro';
+    return {cloud_base_id:x.id,g:x.gimnasio,s:x.sede,z:x.zona_entrenamiento||x.anotacion||'Sin clasificar',
+      kind,i:equipment,e:x.ejercicio,a:x.accesorio_implemento&&x.accesorio_implemento!=='-'?x.accesorio_implemento:'No especificado',
+      gr:'No especificado',t:[x.tecnica_actualizada||'01 - Ejecución base'],
+      m:x.musculos_principales||'Pendiente de asignación',ms:x.musculos_secundarios||'Pendiente de asignación',n:0,last:null};
   });
  },
  async loadOwnCatalog(){
