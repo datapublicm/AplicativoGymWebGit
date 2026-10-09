@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 const here=fileURLToPath(new URL('.',import.meta.url));
 function copyPreviewAssets(){return {name:'copy-gymlog-assets',closeBundle(){
- for(const name of ['app.js','catalogo.js','sw.js','manifest.webmanifest'])fs.copyFileSync(path.join(here,'web',name),path.join(here,'dist',name));
+ for(const name of ['app.js','catalogo.js','sw.js','manifest.webmanifest','styles.css'])fs.copyFileSync(path.join(here,'web',name),path.join(here,'dist',name));
  for(const directory of ['assets','icons']){
   const from=path.join(here,'web',directory),to=path.join(here,'dist',directory);
   fs.cpSync(from,to,{recursive:true,force:true});

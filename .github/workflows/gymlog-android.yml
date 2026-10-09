@@ -1,0 +1,82 @@
+name: GymLog Android APK - Pruebas
+on:
+  push:
+    branches: ['feature/gymlog-apk-inicio']
+    paths:
+      - 'gymlog/**'
+      - '.github/workflows/gymlog-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gymlog-android-apk
+  cancel-in-progress: true
+
+jobs:
+  android-debug:
+    name: Compilar APK de pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: gymlog
+    steps:
+      - name: Obtener codigo
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Pruebas iniciales de la fuente
+        run: npm run test:static
+      - name: Instalar dependencias Node y Capacitor
+        run: npm install --no-audit --no-fund
+      - name: Generar web compartida con Supabase Pruebas
+        env:
+          VITE_SUPABASE_URL: https://jasuqnxrskhqfobsazwd.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_sQH_z37OD2mzNMoL4M3Lwg_jF8Lpmx2
+          VITE_SUPABASE_SCHEMA: sch_android_gymlog
+          VITE_GYMLOG_ENVIRONMENT: pruebas
+        run: npm run build:web
+      - name: Comprobar salida web
+        run: |
+          test -s dist/index.html
+          test -s dist/app.js
+          test -s dist/catalogo.js
+          test -s dist/sw.js
+          test -s dist/styles.css
+      - name: Generar proyecto nativo Capacitor
+        run: |
+          if [ -f android/README.md ]; then
+            mv android/README.md docs/ANDROID_ORIGINAL.md
+            rmdir android
+          fi
+          npx cap add android
+          npx cap sync android
+      - name: Compilar APK Android debug
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+      - name: Preparar APK instalable
+        run: |
+          mkdir -p artifacts
+          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/GymLog_Pruebas_Debug.apk
+          test -s artifacts/GymLog_Pruebas_Debug.apk
+          sha256sum artifacts/GymLog_Pruebas_Debug.apk
+      - name: Publicar APK como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: GymLog-Pruebas-APK
+          path: gymlog/artifacts/GymLog_Pruebas_Debug.apk
+          if-no-files-found: error
+          retention-days: 14
