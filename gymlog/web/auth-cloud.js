@@ -244,8 +244,24 @@ $('authForm').addEventListener('submit',async event=>{
   if(!client){setStatus('Falta configurar Supabase: copia .env.example como .env y añade tu clave publicable.');return;}
   $('authSubmit').disabled=true;
   try{
-    const email=$('authEmail').value.trim();const password=$('authPassword').value;
-    must(null,(await client.auth.signInWithPassword({email,password})).error);
+    const identifier=$('authEmail').value.trim();const password=$('authPassword').value;
+    if(identifier.includes('@')){
+      must(null,(await client.auth.signInWithPassword({email:identifier,password})).error);
+    }else{
+      const {data,error}=await client.functions.invoke('gymlog-login-usuario',{
+        body:{username:identifier,password}
+      });
+      if(error){
+        let detail=error.message;
+        try{detail=(await error.context?.json())?.error||detail;}catch{}
+        throw new Error(detail);
+      }
+      if(data?.error||!data?.access_token||!data?.refresh_token)
+        throw new Error(data?.error||'No se pudo iniciar sesión con el usuario.');
+      must(null,(await client.auth.setSession({
+        access_token:data.access_token,refresh_token:data.refresh_token
+      })).error);
+    }
     $('authPassword').value='';
   }catch(error){setStatus('No fue posible iniciar sesión: '+error.message);}
   finally{$('authSubmit').disabled=false;}
@@ -253,19 +269,23 @@ $('authForm').addEventListener('submit',async event=>{
 $('authRegister').addEventListener('click',async()=>{
   if(!client)return setStatus('Configura Supabase antes de registrar cuentas.');
   const email=$('authEmail').value.trim(),password=$('authPassword').value;
-  if(!email||password.length<6)return setStatus('Introduce correo y contraseña válida.');
+  if(!email.includes('@')||password.length<6)return setStatus('Para crear una cuenta personal necesitas un correo real y una contraseña válida. Para prueba, utiliza Ingresar.');
   const {data,error}=await client.auth.signUp({email,password});
   if(error)return setStatus(error.message);
   setStatus(data.session?'Sesión iniciada; un administrador debe habilitar tu acceso a GymLog.':'Revisa tu correo para confirmar la cuenta. Un administrador deberá habilitar tu acceso a GymLog.');
 });
 $('authRecovery').addEventListener('click',async()=>{
   if(!client)return setStatus('Configura Supabase antes de recuperar acceso.');
-  const email=$('authEmail').value.trim();if(!email)return setStatus('Indica tu correo electrónico.');
+  const email=$('authEmail').value.trim();
+  if(!email.includes('@'))return setStatus('Para recuperar acceso debes introducir tu correo real. La cuenta prueba no usa correo de recuperación.');
   const {error}=await client.auth.resetPasswordForEmail(email);
   setStatus(error?'No se pudo enviar la solicitud: '+error.message:'Si existe una cuenta, recibirás las instrucciones de recuperación.');
 });
 $('authLogout').addEventListener('click',async()=>{if(client)await client.auth.signOut();});
 if(client){
   client.auth.onAuthStateChange((_,session)=>{queueMicrotask(()=>updateState(session));});
-  client.auth.getSession().then(({data})=>updateState(data.session)).catch(e=>setStatus(e.message));
+  client.auth.getSession().then(({data})=>{
+    updateState(data.session);
+    if(!data.session) setStatus('Introduce tu usuario o correo y contraseña.');
+  }).catch(e=>setStatus('Error de conexión con Supabase: '+e.message));
 }else {setStatus('Proyecto preparado. Configura URL y clave publicable de Supabase para iniciar sesión.');updateState(null);}
