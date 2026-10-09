@@ -17,7 +17,7 @@ test('Visor anatómico con dos formatos y marcadores vacíos',()=>{
   assert.ok(html.includes('id="'+id+'"'),id);
 });
 test('Las tablas y bucket privados de GymLog están referenciados',()=>{
- for(const table of ['tbl_usuarios','tbl_reportes','tbl_series','tbl_ejercicio_musculos','tbl_musculos','tbl_musculo_imagenes','tbl_musculo_zonas3d','tbl_fotos'])
+ for(const table of ['tbl_usuarios','vw_historial_series','tbl_ejercicio_musculos','tbl_musculos','tbl_musculo_imagenes','tbl_musculo_zonas3d','tbl_fotos'])
   assert.ok(auth.includes(table),table);
  assert.ok(auth.includes('gymlog-usuarios'));
  assert.ok(auth.includes('gymlog-anatomia'));
