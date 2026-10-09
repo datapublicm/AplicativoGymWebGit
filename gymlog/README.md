@@ -1,29 +1,35 @@
-# GymLog — Inicio Android / APK
+# GymLog — Android / GitHub Pages / Hostinger · Fuente compartida (v0.2)
 
-Rama: `feature/gymlog-apk-inicio`
+Esta es la fuente web completa para continuar la aplicación GymLog **sin compilar la APK**. Conserva el diseño móvil oscuro cian y violeta del prototipo v4. El APK final utilizará Capacitor para encapsular esta misma interfaz, sin duplicar los datos.
 
-Se comienza el proyecto multiplataforma de GymLog usando **una fuente web** para GitHub Pages, Hostinger y Android (Capacitor). Esta rama es de desarrollo: no cambia la web publicada en `main/site`.
+## Incluido (código desarrollado, integración real aún por probar)
 
-**Entregable completo del prototipo móvil:** paquete `GymLog_APK_Inicio_Sin_Compilar.zip` generado en la conversación de trabajo. Su carpeta `web/` está pendiente de incorporarse a esta rama; aquí queda configurada la base Android para esa misma carpeta.
+- Cinco pestañas: Sesión, Catálogos, Registro, Tablas y Dashboard; cuatro pestañas bloqueadas hasta autenticación autorizada.
+- Supabase Auth con correo/contraseña, registro (sujeto a habilitación administrativa), recuperar acceso, cierre de sesión y sesión persistente.
+- Catálogo inicial del Excel de referencia y formulario para ejercicios privados en Supabase (`tbl_gimnasios`, `tbl_sedes`, `tbl_ejercicios`).
+- Registro de series normales, Sub1/Sub2 o Derecha/Izquierda, con guardado atómico en la RPC `sch_android_gymlog.guardar_entrenamiento`.
+- Historial y estadísticas basados en `tbl_reportes`/`tbl_series` y filtrados por cuenta.
+- Ventana anatómica Fotos/3D que consulta `tbl_ejercicio_musculos`, `tbl_musculos`, `tbl_musculo_imagenes`, `tbl_musculo_zonas3d`; conserva placeholders cuando faltan datos.
+- Subida de fotografías del equipo/ejercicio y vistas anatómicas personales al bucket privado `gymlog-usuarios`, registrando rutas en `tbl_fotos`.
+- Buckets privados de pruebas: `gymlog-anatomia` y `gymlog-usuarios`, con políticas de acceso por usuario. No se han cargado modelos 3D ni fotografías compartidas.
 
-La interfaz incluye las 5 áreas Sesión, Catálogos, Registro, Tablas y Dashboard, así como el visor muscular Fotos/3D (3D inicialmente vacío). El acceso de GymLog se realiza con Supabase Auth del entorno elegido; las tablas se mantienen en el esquema `sch_android_gymlog`.
+## Pendiente o no verificado
 
-## Estado y siguientes acciones
-- **Sí:** configuración `capacitor.config.json`, `package.json`, `vite.config.js`, plantilla `.env.example` y documentación Android.
-- **Pendiente:** incorporar el código fuente `web/` del ZIP y verificar el bundle con dependencias instaladas.
-- **Pendiente:** habilitar y probar exposición de esquema Supabase Data API sin afectar otros esquemas.
-- **Pendiente:** configurar las URLs/clave publicable por entorno y probar Supabase Auth + permisos RLS.
-- **Pendiente:** generar el proyecto nativo `android/`, importar visor 3D existente y compilar una APK cuando se autorice.
+- **No se han instalado paquetes ni ejecutado build web/Android ni generado Gradle ni APK.**
+- Integración de Supabase Data API: el esquema personalizado `sch_android_gymlog` debe constar entre los expuestos para PostgREST. No está verificado con una sesión real de la aplicación.
+- Debe configurarse la clave publicable de Supabase por entorno y autorizar los dominios de GitHub Pages, Hostinger y el retorno Android en Auth Redirect URLs.
+- El visor 3D interactivo existe en el repositorio web independiente `site/`, pero aún no se ha portado a GymLog. GymLog lee las zonas y deja la vista 3D preparada/vacía. Fotos 2D pueden permanecer vacías.
+- Se requiere probar sincronización real entre clientes, RLS, subida de fotos y funcionalidad en Android.
+- La copia de desarrollo en GitHub se encuentra en una rama separada; antes de publicar deberán incorporarse allí **todos** los archivos de esta carpeta `web/`.
 
-**No se han instalado paquetes ni compilado APK.** No publicar las claves privadas de Supabase ni archivos de firma Android.
+## Configuración de Pruebas
 
-## Flujo previsto (NO ejecutado)
-```bash
-npm install
-npm run build:web
-npm run android:init
-npm run android:sync
-npm run android:open
-```
+1. Copia `.env.example` a `.env` e introduce la clave **publicable** del proyecto `ProyectosPrueba`; nunca la clave service_role.
+2. Comprueba API Data API schemas y RLS en Supabase.
+3. `npm install` (pendiente de autorización para instalar); después `npm run dev` para probar en navegador.
+4. En una fase posterior, `npm run build:web` genera `dist/` para GitHub Pages, Hostinger y Capacitor.
+5. Después de validar la web, `npm run android:init` y `npm run android:sync` generan la estructura Android, **sin compilar el APK hasta autorización**.
 
-No duplicar datos por versión: GitHub Web, Hostinger Web y Android apuntan al mismo proyecto Supabase **dentro del entorno**; Pruebas y Producción son proyectos distintos.
+## Dos entornos, una base por entorno
+
+Web GitHub, web Hostinger y Android se conectarán al **mismo proyecto Supabase de Pruebas** mientras se desarrolla. Los tres compartirán el mismo proyecto de Producción cuando se publique. Nunca incluir credenciales privadas en el repositorio ni en la APK.

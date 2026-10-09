@@ -1,7 +1,5 @@
-# Android — estructura nativa pendiente
+# Plataforma Android (Capacitor)
 
-El objetivo es compilar el mismo código web de GymLog para Android mediante Capacitor.
+Este directorio es **reservado**. No contiene aún el proyecto Android generado porque el usuario solicitó NO compilar. Una vez se instalen dependencias, `npm run android:init` generará el proyecto Gradle nativo aquí. Esto **no compila una APK**. Posteriormente, `npm run android:sync` copiará la web empaquetada y abrir Android Studio será una etapa independiente.
 
-La carpeta nativa Gradle será generada con `npm run android:init` después de instalar dependencias y copiar la fuente `web/` desde el paquete inicial. **No se ha ejecutado ningún comando de compilación**.
-
-Identificador de paquete Android: `com.datapublicm.gymlog`.
+**No editar `site/` en el repositorio original**. Los despliegues web GitHub Pages y Hostinger usarán `dist/` de la misma fuente `web/`.
