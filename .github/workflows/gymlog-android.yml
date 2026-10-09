@@ -80,8 +80,8 @@ jobs:
           import re
           path=Path('android/app/build.gradle')
           contents=path.read_text()
-          contents,n1=re.subn(r'\\bversionCode\\s+\\d+', 'versionCode 102',contents)
-          contents,n2=re.subn(r'\\bversionName\\s+["\\x27][^"\\x27]+["\\x27]', 'versionName "01.02"',contents)
+          contents,n1=re.subn(r'\bversionCode\s+\d+', 'versionCode 102',contents)
+          contents,n2=re.subn(r'\bversionName\s+["\x27][^"\x27]+["\x27]', 'versionName "01.02"',contents)
           assert n1==1 and n2==1,(n1,n2)
           path.write_text(contents)
           PY
@@ -94,15 +94,15 @@ jobs:
         run: |
           mkdir -p artifacts
           cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/GymLog_01.02_Pruebas.apk
-          test -s artifacts/GymLog_Pruebas_Debug.apk
+          test -s artifacts/GymLog_01.02_Pruebas.apk
           # Verify the actual modern Android signing methods, not only JAR signatures
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose artifacts/GymLog_Pruebas_Debug.apk
-          unzip -p artifacts/GymLog_Pruebas_Debug.apk res/mipmap-hdpi-v4/ic_launcher.png >/dev/null
-          sha256sum artifacts/GymLog_Pruebas_Debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose artifacts/GymLog_01.02_Pruebas.apk
+          unzip -p artifacts/GymLog_01.02_Pruebas.apk res/mipmap-hdpi-v4/ic_launcher.png >/dev/null
+          sha256sum artifacts/GymLog_01.02_Pruebas.apk
       - name: Publicar APK como artefacto
         uses: actions/upload-artifact@v4
         with:
           name: GymLog-01.02-Pruebas-APK
-          path: gymlog/artifacts/GymLog_Pruebas_Debug.apk
+          path: gymlog/artifacts/GymLog_01.02_Pruebas.apk
           if-no-files-found: error
           retention-days: 14
