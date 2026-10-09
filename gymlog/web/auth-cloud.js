@@ -91,26 +91,21 @@ const cloud={
  async deleteSeries(id){if(!owns())throw Error('Sin sesión');must(null,(await db.from('tbl_series').delete().eq('id',id).eq('user_id',signedIn.id)).error);},
  async loadHistory(){
   if(!owns())return [];
-  const user_id=signedIn.id;
-  const tables=['tbl_reportes','tbl_series','tbl_ejercicios','tbl_gimnasios','tbl_sedes'];
-  const results=await Promise.all(tables.map(t=>{
-   const q=db.from(t).select('*');return t==='tbl_ejercicios'?q:q.eq('user_id',user_id);
-  }));
-  results.forEach(r=>must(r.data,r.error));
-  const [reportes,series,ejercicios,gimnasios,sedes]=results.map(r=>r.data||[]);
-  const index=values=>new Map(values.map(v=>[v.id,v]));
-  const rm=index(reportes),em=index(ejercicios),gm=index(gimnasios),sm=index(sedes);
-  return series.flatMap(s=>{
-   const r=rm.get(s.reporte_id);if(!r)return [];
-   const e=em.get(r.ejercicio_id),gym=gm.get(r.gimnasio_id),sede=sm.get(r.sede_id);
-   return [{id:s.id,date:r.fecha,gym:gym?.nombre||'',sede:sede?.nombre||'',
-    zone:e?.zona_entrenamiento||'',type:e?.tipo_equipo||'',equipment:e?.instrumento||'',
-    accessory:e?.accesorio||'',grip:e?.agarre||'',exercise:e?.nombre||'Ejercicio',
-    technique:r.tecnica_registrada||e?.tecnica_actualizada||'',
-    series:'Serie '+s.numero_serie,subdivision:s.subdivision||'-',unit:s.unidad,
-    weight:Number(s.peso||0),reps:Number(s.repeticiones||0),assistance:s.asistencias,
-    notes:r.observaciones||'',createdAt:s.created_at}];
-  });
+  // Evitar el límite de 1.000 filas por petición de la Data API.
+  // Vista security_invoker: RLS del esquema restringe las series al usuario autenticado.
+  const pageSize=700,all=[];
+  for(let offset=0;;offset+=pageSize){
+    const {data,error}=await db.from('vw_historial_series')
+      .select('*').eq('user_id',signedIn.id)
+      .order('date',{ascending:false}).order('id',{ascending:true})
+      .range(offset,offset+pageSize-1);
+    must(data,error);
+    const batch=data||[];
+    all.push(...batch.map(r=>({...r,weight:Number(r.weight||0),
+      reps:Number(r.reps||0),assistance:Number(r.assistance||0)})));
+    if(batch.length<pageSize)break;
+  }
+  return all;
  },
  async loadInitialCatalog(){
   if(!owns())return [];
