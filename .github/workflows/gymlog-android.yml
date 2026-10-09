@@ -73,6 +73,18 @@ jobs:
           npx cap sync android
       - name: Incorporar icono nativo y pantalla inicial
         run: python tools/brand_assets.py --android
+      - name: Asignar version interna GymLog 01.02
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          path=Path('android/app/build.gradle')
+          contents=path.read_text()
+          contents,n1=re.subn(r'\\bversionCode\\s+\\d+', 'versionCode 102',contents)
+          contents,n2=re.subn(r'\\bversionName\\s+["\\x27][^"\\x27]+["\\x27]', 'versionName "01.02"',contents)
+          assert n1==1 and n2==1,(n1,n2)
+          path.write_text(contents)
+          PY
       - name: Compilar APK Android debug
         run: |
           cd android
@@ -81,7 +93,7 @@ jobs:
       - name: Preparar APK instalable
         run: |
           mkdir -p artifacts
-          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/GymLog_Pruebas_Debug.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/GymLog_01.02_Pruebas.apk
           test -s artifacts/GymLog_Pruebas_Debug.apk
           # Verify the actual modern Android signing methods, not only JAR signatures
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose artifacts/GymLog_Pruebas_Debug.apk
@@ -90,7 +102,7 @@ jobs:
       - name: Publicar APK como artefacto
         uses: actions/upload-artifact@v4
         with:
-          name: GymLog-Pruebas-APK
+          name: GymLog-01.02-Pruebas-APK
           path: gymlog/artifacts/GymLog_Pruebas_Debug.apk
           if-no-files-found: error
           retention-days: 14

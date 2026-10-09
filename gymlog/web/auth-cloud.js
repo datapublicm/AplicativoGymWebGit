@@ -245,8 +245,12 @@ $('authForm').addEventListener('submit',async event=>{
   $('authSubmit').disabled=true;
   try{
     const identifier=$('authEmail').value.trim();const password=$('authPassword').value;
+    setStatus('Verificando acceso seguro…');
+    let session=null;
     if(identifier.includes('@')){
-      must(null,(await client.auth.signInWithPassword({email:identifier,password})).error);
+      const result=await client.auth.signInWithPassword({email:identifier,password});
+      must(null,result.error);
+      session=result.data.session;
     }else{
       const {data,error}=await client.functions.invoke('gymlog-login-usuario',{
         body:{username:identifier,password}
@@ -258,10 +262,15 @@ $('authForm').addEventListener('submit',async event=>{
       }
       if(data?.error||!data?.access_token||!data?.refresh_token)
         throw new Error(data?.error||'No se pudo iniciar sesión con el usuario.');
-      must(null,(await client.auth.setSession({
+      const result=await client.auth.setSession({
         access_token:data.access_token,refresh_token:data.refresh_token
-      })).error);
+      });
+      must(null,result.error);
+      session=result.data.session;
     }
+    if(!session?.user)throw new Error('Supabase no devolvió una sesión válida.');
+    await updateState(session);
+    if(!owns())throw new Error('Se autenticó la identidad, pero no se pudo verificar su perfil GymLog. Revisa el acceso a la base de datos.');
     $('authPassword').value='';
   }catch(error){setStatus('No fue posible iniciar sesión: '+error.message);}
   finally{$('authSubmit').disabled=false;}
@@ -286,6 +295,6 @@ if(client){
   client.auth.onAuthStateChange((_,session)=>{queueMicrotask(()=>updateState(session));});
   client.auth.getSession().then(({data})=>{
     updateState(data.session);
-    if(!data.session) setStatus('Introduce tu usuario o correo y contraseña.');
+    if(!data.session) setStatus('Introduce tu correo o usuario y contraseña.');
   }).catch(e=>setStatus('Error de conexión con Supabase: '+e.message));
 }else {setStatus('Proyecto preparado. Configura URL y clave publicable de Supabase para iniciar sesión.');updateState(null);}

@@ -1,6 +1,6 @@
 {
   "name": "gymlog",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "GymLog Web + Hostinger + APK; Supabase compartido por entorno.",
