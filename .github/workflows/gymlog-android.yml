@@ -34,8 +34,13 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Preparar Android SDK disponible en GitHub
+        run: |
+          test -n "${ANDROID_HOME:-}"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
       - name: Pruebas iniciales de la fuente
         run: npm run test:static
       - name: Instalar dependencias Node y Capacitor
