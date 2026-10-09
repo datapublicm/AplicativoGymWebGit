@@ -149,3 +149,8 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 .catalog-row{display:flex;flex-direction:column;gap:3px;border-top:1px solid #273e5a;padding:12px 3px}
 .catalog-row small,.anatomy-cloud-state{font-size:.8rem;color:#96bad1}
 @media(max-width:580px){.catalog-form{grid-template-columns:1fr}}
+
+/* GymLog logo: shared by GitHub Web, Hostinger, and the future Android APK */
+.brand-logo{width:46px;height:46px;border-radius:12px;display:block;object-fit:cover;box-shadow:0 0 18px #26d5ff40}
+.auth-logo{width:76px;height:76px;display:block;object-fit:contain;margin:auto;border-radius:16px}
+.auth-symbol{display:grid;place-items:center;min-width:88px;min-height:88px;max-width:88px;margin:0 auto 8px}

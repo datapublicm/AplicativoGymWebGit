@@ -41,6 +41,10 @@ jobs:
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
+      - name: Preparar logo de GymLog para Web y Android
+        run: |
+          python -m pip install Pillow==11.3.0
+          python tools/brand_assets.py
       - name: Pruebas iniciales de la fuente
         run: npm run test:static
       - name: Instalar dependencias Node y Capacitor
@@ -67,6 +71,8 @@ jobs:
           fi
           npx cap add android
           npx cap sync android
+      - name: Incorporar icono nativo y pantalla inicial
+        run: python tools/brand_assets.py --android
       - name: Compilar APK Android debug
         run: |
           cd android
@@ -77,6 +83,9 @@ jobs:
           mkdir -p artifacts
           cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/GymLog_Pruebas_Debug.apk
           test -s artifacts/GymLog_Pruebas_Debug.apk
+          # Verify the actual modern Android signing methods, not only JAR signatures
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose artifacts/GymLog_Pruebas_Debug.apk
+          unzip -p artifacts/GymLog_Pruebas_Debug.apk res/mipmap-hdpi-v4/ic_launcher.png >/dev/null
           sha256sum artifacts/GymLog_Pruebas_Debug.apk
       - name: Publicar APK como artefacto
         uses: actions/upload-artifact@v4
