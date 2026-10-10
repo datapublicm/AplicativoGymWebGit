@@ -58,11 +58,12 @@ test('Eliminar en la misma sesión recarga el historial correctamente',async()=>
 function photoFixture({mode='equipo',pendingCanvas=false,pendingUpload=false}={}){
  const script=mode==='anatomia'?anatomy:upload;
  const code=`
-let session='A',resolveCanvas,resolveUpload,uploads=0,draws=0;
+let session='A',resolveCanvas,resolveUpload,uploadStarted,uploads=0,draws=0;
+const uploadRequested=new Promise(resolve=>uploadStarted=resolve);
 const messages=[],model={photos:{persisted:'B'}};
 const window={GymCloud:{
  canWrite:()=>true,getSessionStamp:()=>session,
- uploadUserPhoto:async()=>{uploads++;if(${pendingUpload})await new Promise(r=>resolveUpload=r)}
+ uploadUserPhoto:async()=>{uploads++;uploadStarted();if(${pendingUpload})await new Promise(r=>resolveUpload=r)}
 }};
 const chosenRow=()=>({g:'Pruebas',s:'Centro',i:'Equipo',e:'Ejercicio'});
 const getValue=()=> 'Base',gymlyticsAnatomySide='frontal';
@@ -75,7 +76,7 @@ ${script}
  const result=${mode==='anatomia'?'gymlyticsAnatomyUpload':'uploadPhoto'}({target});
  return {result,target};
  },switchAccount:()=>{session='B';model.photos={persisted:'B'}},
- releaseCanvas:()=>resolveCanvas?.(),releaseUpload:()=>resolveUpload?.(),
+ releaseCanvas:()=>resolveCanvas?.(),releaseUpload:()=>resolveUpload?.(),waitUpload:()=>uploadRequested,
  state:()=>({photos:model.photos,uploads,draws,messages})});
 `;
  return runInNewContext(code);
@@ -88,7 +89,7 @@ test('Foto: cambio de sesión durante el redimensionado impide subir imagen',asy
 });
 test('Foto: respuesta de subida anterior no modifica previsualizaciones de B',async()=>{
  const h=photoFixture({pendingUpload:true}),{result}=h.run();
- await Promise.resolve();
+ await h.waitUpload();
  h.switchAccount();h.releaseUpload();await result;
  assert.equal(h.state().uploads,1);
  assert.equal(h.state().draws,0);
@@ -96,7 +97,7 @@ test('Foto: respuesta de subida anterior no modifica previsualizaciones de B',as
 });
 test('Foto anatómica: respuesta anterior no cambia la vista de B',async()=>{
  const h=photoFixture({mode:'anatomia',pendingUpload:true}),{result}=h.run();
- await Promise.resolve();
+ await h.waitUpload();
  h.switchAccount();h.releaseUpload();await result;
  assert.equal(h.state().draws,0);
  assert.equal(h.state().photos.persisted,'B');
