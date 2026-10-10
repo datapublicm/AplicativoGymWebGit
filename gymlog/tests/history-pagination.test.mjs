@@ -28,27 +28,29 @@ const recordHtml=r=>'<article>'+r.id+'</article>';
   assert.match(m.els.historyPageInfo.textContent,/100 series/);
 });
 
-function workoutHarness({failSave=false,failRefresh=false}={}){
+function workoutHarness({failSave=false,failRefresh=false,deferSave=false}={}){
  const start=app.indexOf('async function saveSeries(){'),end=app.indexOf('function recordHtml(',start);
  assert.ok(start>=0&&end>start);
  const code=app.slice(start,end);
  const fixture=`
 const messages=[];
-let calls=0,cleared=false;
+let calls=0,cleared=false,finishSave;
+let activeDraftId='tab1';
+const draftTabs=[{id:'tab1',rows:[{weight:'10',reps:'10'}],notes:'nota'},{id:'tab2',rows:[{weight:'20',reps:'8'}],notes:'nota martillo'}];
 const window={GymCloud:{canWrite:()=>true,
- saveWorkout:async()=>{calls++;if(${failSave})throw Error('falló guardado')},
+ saveWorkout:async()=>{calls++;if(${deferSave})await new Promise(resolve=>finishSave=resolve);if(${failSave})throw Error('falló guardado')},
  loadHistory:async()=>{if(${failRefresh})throw Error('falló descarga');return [{id:1}]}}};
 const model={records:[]};
 const elements={fecha:{value:'2026-10-10'},observaciones:{value:'nota'},saveRecords:{disabled:false,textContent:'Guardar series'},saveFeedback:{hidden:true,textContent:''}};
 const $=id=>elements[id];
-const chosenRow=()=>({g:'Pruebas',e:'Curl bíceps',t:['Base']});
+const chosenRow=()=>({g:'Pruebas',e:activeDraftId==='tab1'?'Curl bíceps':'Curl martillo',t:['Base']});
 const getValue=()=> 'Base';
-const getEntries=()=>[{weight:'10',reps:'10',assistance:'0',series:'Serie 1',sub:'-',unit:'kg'}];
+const getEntries=()=>[{weight:activeDraftId==='tab1'?'10':'20',reps:activeDraftId==='tab1'?'10':'8',assistance:'0',series:'Serie 1',sub:'-',unit:'kg'}];
 const toast=msg=>messages.push(msg);
 const renderSeries=()=>{cleared=true};
 function drawRecent(){};function drawHistory(){};function drawReports(){};
 `;
- return runInNewContext(fixture+code+`({run:saveSeries,messages,values:()=>({calls,cleared,records:model.records,button:elements.saveRecords})})`);
+ return runInNewContext(fixture+code+`({run:saveSeries,messages,finish:()=>finishSave?.(),switchTab:id=>{activeDraftId=id;elements.observaciones.value='nota martillo'},values:()=>({calls,cleared,records:model.records,button:elements.saveRecords,tabs:draftTabs,feedback:elements.saveFeedback})})`);
 }
 test('Guardado confirmado: un error al descargar no induce a duplicar series',async()=>{
  const m=workoutHarness({failRefresh:true});
@@ -67,4 +69,17 @@ test('Error de guardado real: se mantienen las series sin borrar',async()=>{
  assert.equal(m.values().cleared,false);
  assert.ok(m.messages.some(x=>x.startsWith('No se guardó:')));
  assert.equal(m.values().button.disabled,false);
+});
+
+test('Una respuesta tardía de Supabase nunca borra las series de otra pestaña',async()=>{
+ const m=workoutHarness({deferSave:true});
+ const saving=m.run();
+ m.switchTab('tab2');
+ m.finish();
+ await saving;
+ assert.equal(m.values().cleared,false);
+ assert.equal(m.values().tabs[0].rows.length,0);
+ assert.equal(m.values().tabs[1].rows[0].weight,'20');
+ assert.equal(m.values().tabs[1].notes,'nota martillo');
+ assert.equal(m.values().calls,1);
 });
