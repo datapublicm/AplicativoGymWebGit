@@ -52,7 +52,76 @@ function detailOpen(){const r=chosenRow();if(!r||!getValue('t'))return;const tec
  }).catch(e=>{if(token===anatomyRequestId&&status)status.textContent='No se pudo consultar Supabase: '+e.message;});}
 function showPage(page){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+page));document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));if(page==='tablas')drawHistory();if(page==='dashboard')drawReports();window.scrollTo({top:0,behavior:'instant'})}
 function setMobileStep(step){const target=step==='series'?'series':'context';$('page-registro').classList.toggle('step-context',target==='context');$('page-registro').classList.toggle('step-series',target==='series');document.querySelectorAll('[data-mobile-step]').forEach(b=>{const selected=b.dataset.mobileStep===target;b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected))});window.scrollTo({top:0,behavior:'instant'});}
+
+/* Pestañas de ejercicios independientes, como en un navegador. Los borradores
+   se conservan en memoria hasta que el usuario los guarde en Supabase. */
+let draftTabs=[],activeDraftId=null,draftSeq=0;
+function snapshotExerciseRows(){return [...$('seriesRows').querySelectorAll('tr')].map(row=>({
+ series:row.dataset.serie,sub:row.dataset.sub,unit:row.querySelector('select').value,
+ weight:row.querySelector('.weight').value,reps:row.querySelector('.reps').value,help:row.querySelector('.help').value
+}));}
+function storeActiveDraft(){
+ const tab=draftTabs.find(x=>x.id===activeDraftId);if(!tab)return;
+ tab.values=Object.fromEntries(FLOW.map(([key])=>[key,getValue(key)]));
+ tab.date=$('fecha').value;tab.notes=$('observaciones').value;
+ tab.seriesMode=seriesMode;tab.seriesGroups=seriesGroups;tab.seriesCustomized=seriesCustomized;
+ tab.rows=snapshotExerciseRows();
+ tab.stage=$('page-registro').classList.contains('step-series')?'series':'context';
+ tab.title=getValue('e')||tab.title;
+}
+function showDraftTabs(){
+ $('exerciseTabs').innerHTML=draftTabs.map(tab=>`<span class="exercise-tab-item"><button type="button" role="tab" aria-selected="${tab.id===activeDraftId}" data-exercise-switch="${esc(tab.id)}" class="${tab.id===activeDraftId?'selected':''}" title="${esc(tab.title)}">${esc(tab.title)}</button>${draftTabs.length>1?`<button type="button" class="exercise-tab-close" aria-label="Cerrar ${esc(tab.title)}" data-exercise-close="${esc(tab.id)}">×</button>`:''}</span>`).join('');
+}
+function openDraft(id,saveCurrent=true){
+ if(saveCurrent)storeActiveDraft();
+ const tab=draftTabs.find(x=>x.id===id);if(!tab)return;
+ activeDraftId=tab.id;
+ cascade(0,tab.values);
+ $('fecha').value=tab.date||dateNow();$('observaciones').value=tab.notes||'';
+ seriesMode=tab.seriesMode;seriesGroups=tab.seriesGroups;seriesCustomized=tab.seriesCustomized;
+ renderSeries();
+ const rows=new Map((tab.rows||[]).map(x=>[x.series+'|'+x.sub,x]));
+ for(const row of $('seriesRows').querySelectorAll('tr')){
+  const v=rows.get(row.dataset.serie+'|'+row.dataset.sub);if(!v)continue;
+  row.querySelector('select').value=v.unit;row.querySelector('.weight').value=v.weight;
+  row.querySelector('.reps').value=v.reps;row.querySelector('.help').value=v.help;
+ }
+ updateSeriesCount();showDraftTabs();
+ setMobileStep(tab.stage||'context');
+}
+function newDraft(saveCurrent=true){
+ if(saveCurrent)storeActiveDraft();
+ const first=allCatalog()[0], values=first?{g:first.g,s:first.s,z:first.z,kind:first.kind,i:first.i,a:first.a,gr:first.gr,e:first.e,t:first.t?.[0]}:{...INITIAL};
+ const tab={id:'e'+(++draftSeq),title:'Ejercicio '+draftSeq,values,date:$('fecha').value||dateNow(),notes:'',seriesMode:'normal',seriesGroups:4,seriesCustomized:false,rows:[],stage:'context'};
+ draftTabs.push(tab);openDraft(tab.id,false);
+}
+function closeDraft(id){
+ const tab=draftTabs.find(t=>t.id===id);if(!tab||draftTabs.length<=1)return;
+ if(id===activeDraftId)storeActiveDraft();
+ if(tab.rows?.some(row=>row.weight||row.reps||row.help)&&!confirm('Este ejercicio tiene series sin guardar. ¿Cerrar su pestaña y descartarlas?'))return;
+ const idx=draftTabs.indexOf(tab);draftTabs.splice(idx,1);
+ if(id===activeDraftId)openDraft(draftTabs[Math.max(0,idx-1)].id,false);
+ else showDraftTabs();
+}
+function refreshActiveDraftTitle(){const tab=draftTabs.find(t=>t.id===activeDraftId);if(!tab)return;tab.title=getValue('e')||tab.title;showDraftTabs();}
+function resetExerciseTabs(){draftTabs=[];activeDraftId=null;draftSeq=0;newDraft(false);}
 function hasSeriesData(){return getEntries().length>0}
+function renderIndependentCatalog(){
+ const entities=window.GymEntities||{gyms:[],sites:[],machines:[]};
+ function selectOptions(id,values){const el=$(id),old=el.value;el.replaceChildren();if(!values.length){el.add(new Option('Primero registra un gimnasio',''));el.disabled=true;return;}el.disabled=false;for(const item of values)el.add(new Option(item.label,item.value));el.value=values.some(x=>x.value===old)?old:values[0].value;}
+ const gymOptions=entities.gyms.map(g=>({value:g.id,label:g.nombre}));
+ selectOptions('siteGymSelect',gymOptions);
+ selectOptions('exerciseGymSelect',entities.gyms.map(g=>({value:g.nombre,label:g.nombre})));
+ renderExerciseSiteOptions();
+ $('gymMachineOptions').replaceChildren(...entities.machines.map(m=>{const option=document.createElement('option');option.value=m.nombre;return option;}));
+}
+function renderExerciseSiteOptions(){
+ const entities=window.GymEntities||{gyms:[],sites:[],machines:[]},gym=entities.gyms.find(g=>g.nombre===$('exerciseGymSelect').value);
+ const sites=entities.sites.filter(s=>s.gimnasio_id===gym?.id),el=$('exerciseSiteSelect'),old=el.value;
+ el.replaceChildren();if(!sites.length){el.add(new Option('Primero registra una sede',''));el.disabled=true;return;}
+ el.disabled=false;for(const item of sites)el.add(new Option(item.nombre,item.nombre));
+ if(sites.some(x=>x.nombre===old))el.value=old;
+}
 function renderOwnCatalog(){
  const list=document.getElementById('catalogEntries');if(!list)return;
  const records=window.GymCustomCatalog||[];
@@ -133,8 +202,8 @@ function photoCanvas(file,maxSize){
 }
 
 function detailOpenAfterUpload(type){const r=chosenRow(),[src,available]=photoFor(type,r);$(type==='equipo'?'detailEquipmentImg':'detailExerciseImg').src=src;$(type==='equipo'?'equipmentNoPhoto':'exerciseNoPhoto').hidden=available}
-function install(){for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>cascade(i+1)))}else $(id).addEventListener('change',()=>cascade(i+1))}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('historySearch').addEventListener('input',drawHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(b)deleteRecord(b.dataset.delete)})}
-$('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);install();drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+function install(){$('exerciseGymSelect').addEventListener('change',renderExerciseSiteOptions);$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>cascade(i+1))}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('historySearch').addEventListener('input',drawHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(b)deleteRecord(b.dataset.delete)})}
+$('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();install();drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
 // Vista anatómica 2D; visor 3D reservado hasta conectar un modelo real.
