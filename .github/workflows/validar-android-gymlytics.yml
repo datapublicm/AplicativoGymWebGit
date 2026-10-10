@@ -1,7 +1,7 @@
 name: Gymlytics - pruebas estáticas (sin APK)
 on:
   push:
-    branches: [Android-GymLog, Android-Gymlytics]
+    branches: [Android-Gymlytics]
   workflow_dispatch:
 permissions:
   contents: read
