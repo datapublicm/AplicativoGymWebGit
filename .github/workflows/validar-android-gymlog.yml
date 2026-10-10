@@ -1,0 +1,30 @@
+name: Android-GymLog - pruebas estáticas (sin APK)
+on:
+  push:
+    branches: [Android-GymLog]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validar-android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Android-GymLog
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar sintaxis JS
+        run: |
+          node --check web/app.js
+          node --check web/auth-cloud.js
+          node --check vite.config.js
+      - name: Verificar pruebas del proyecto
+        run: npm run test:static
+      - name: No se han compilado artefactos
+        run: |
+          test ! -d android/app
+          test ! -d dist
+          test ! -d node_modules
