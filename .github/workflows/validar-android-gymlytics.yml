@@ -21,6 +21,7 @@ jobs:
           node --check web/app.js
           node --check web/auth-cloud.js
           node --check vite.config.js
+          node --check tools/validar-data-api.mjs
       - name: Verificar pruebas del proyecto
         run: npm run test:static
       - name: No se han compilado artefactos
