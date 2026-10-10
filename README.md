@@ -1,10 +1,12 @@
-# Gymlytics — aplicación de entrenamiento (desarrollo Android)
+# Gymlytics — proyecto Android
 
-**Nombre comercial:** Gymlytics (antes GymLog). Rama y carpeta de origen `Android-GymLog`, conservadas provisionalmente para no duplicar ni reemplazar ramas.
+Proyecto Gymlytics (antes GymLog), desarrollo 01.04. Esta rama de GitHub aún se identifica como `Android-GymLog` y su carpeta con ese mismo nombre: no se renombraron los refs Git por limitaciones de la integración disponible.
 
-- Nombre visible: Gymlytics en la interfaz, manifest y Capacitor.
-- Identificador Android `com.datapublicm.gymlog` se mantiene por compatibilidad.
-- Backend Supabase Pruebas `ProyectosPrueba` (compartido con otros sistemas), esquema `sch_android_gymlog` y claves `VITE_GYMLOG_*` se mantienen como identificadores técnicos. Renombrarlos requiere migración coordinada: no confundir identidad de marca con identidad de base de datos.
-- Para las pruebas: `cd Android-GymLog && npm run test:static`.
-- Pendientes: inicio de sesión real, catálogos e historial desde Android.
-- No hay APK compilada, ni despliegues, ni cambios de datos de Supabase ni modificaciones de `main`.
+- Aplicación: **Gymlytics** · `com.datapublicm.gymlytics` (identificador Capacitor).
+- Supabase Pruebas compartido `ProyectosPrueba`: esquema `sch_android_gymlytics`, registro `app_core.apps.slug='gymlytics'`.
+- API de usuario: función Edge `gymlytics-login-usuario` y funciones SQL internas Gymlytics.
+- Buckets de almacenamiento conservados: `gymlog-usuarios` y `gymlog-anatomia`; no se cambiaron sus políticas ni se trasladaron objetos (ambos vacíos al verificar).
+- Historial: 18.526 series y 6.218 reportes conservados en Supabase Pruebas.
+- Validación del proyecto: `cd Android-GymLog && npm run test:static`.
+- No se compila la APK; autenticación y recuperación del historial desde Android siguen sin prueba real con credenciales.
+- La rama `main` y los datos de Producción siguen intactos.
