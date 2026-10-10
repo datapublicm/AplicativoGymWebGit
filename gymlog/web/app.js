@@ -113,7 +113,7 @@ function renderIndependentCatalog(){
  selectOptions('siteGymSelect',gymOptions);
  selectOptions('exerciseGymSelect',entities.gyms.map(g=>({value:g.nombre,label:g.nombre})));
  renderExerciseSiteOptions();
- $('gymMachineOptions').replaceChildren(...entities.machines.map(m=>{const option=document.createElement('option');option.value=m.nombre;return option;}));
+ renderExerciseMachineOptions();
 }
 function renderExerciseSiteOptions(){
  const entities=window.GymEntities||{gyms:[],sites:[],machines:[]},gym=entities.gyms.find(g=>g.nombre===$('exerciseGymSelect').value);
@@ -121,6 +121,17 @@ function renderExerciseSiteOptions(){
  el.replaceChildren();if(!sites.length){el.add(new Option('Primero registra una sede',''));el.disabled=true;return;}
  el.disabled=false;for(const item of sites)el.add(new Option(item.nombre,item.nombre));
  if(sites.some(x=>x.nombre===old))el.value=old;
+}
+function renderExerciseMachineOptions(){
+ const items=window.GymEntities?.machines||[];
+ const form=$('catalogForm'),kind=form.elements.namedItem('kind').value;
+ const el=$('exerciseMachineSelect'),previous=el.value;
+ const machines=items.filter(m=>m.tipo_equipo===kind);
+ el.replaceChildren();
+ if(!machines.length){el.add(new Option('Registra antes un equipo de este tipo',''));el.disabled=true;return;}
+ el.disabled=false;
+ for(const m of machines)el.add(new Option(m.nombre,m.nombre));
+ if(machines.some(m=>m.nombre===previous))el.value=previous;
 }
 function renderOwnCatalog(){
  const list=document.getElementById('catalogEntries');if(!list)return;
@@ -202,7 +213,7 @@ function photoCanvas(file,maxSize){
 }
 
 function detailOpenAfterUpload(type){const r=chosenRow(),[src,available]=photoFor(type,r);$(type==='equipo'?'detailEquipmentImg':'detailExerciseImg').src=src;$(type==='equipo'?'equipmentNoPhoto':'exerciseNoPhoto').hidden=available}
-function install(){$('exerciseGymSelect').addEventListener('change',renderExerciseSiteOptions);$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('historySearch').addEventListener('input',drawHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(b)deleteRecord(b.dataset.delete)})}
+function install(){$('exerciseGymSelect').addEventListener('change',renderExerciseSiteOptions);$('catalogForm').elements.namedItem('kind').addEventListener('change',renderExerciseMachineOptions);$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('historySearch').addEventListener('input',drawHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(b)deleteRecord(b.dataset.delete)})}
 $('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();install();drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
