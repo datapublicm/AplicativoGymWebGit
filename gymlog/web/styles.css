@@ -223,3 +223,8 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 .password-reset-panel form{display:grid;gap:12px}
 .password-reset-panel input{width:100%;min-height:44px}
 .password-reset-panel button{white-space:normal}
+
+/* Etiquetas de catálogos personalizados independientes */
+.catalog-options-list{display:flex;gap:7px;flex-wrap:wrap;padding:4px 0 18px}
+.catalog-option-pill{padding:7px 10px;border-radius:9px;border:1px solid #28688c;background:#09283f;color:#c4eafd;font-size:12px}
+.catalog-option-pill strong{color:#79dff3}
