@@ -1,10 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
+import { resolveRecoveryUrl } from './recovery-url.js';
 
 const config = {
   url: import.meta.env.VITE_SUPABASE_URL,
   key: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
   schema: import.meta.env.VITE_SUPABASE_SCHEMA || 'sch_android_gymlog',
-  environment: import.meta.env.VITE_GYMLOG_ENVIRONMENT || 'pruebas'
+  environment: import.meta.env.VITE_GYMLOG_ENVIRONMENT || 'pruebas',
+  recoveryUrl: import.meta.env.VITE_GYMLOG_RECOVERY_URL || ''
 };
 const ready = !!config.url && !!config.key && !config.key.includes('COLOCA_AQUI');
 const client = ready ? createClient(config.url, config.key, {
@@ -425,15 +427,12 @@ $('authRecovery').addEventListener('click',async()=>{
  const email=$('authEmail').value.trim();
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
   return setStatus('Introduce el correo electrónico de tu cuenta para crear o recuperar tu contraseña.');
- // La URL de Capacitor (https://localhost) no es un destino válido para un correo.
- const location=window.location;
- if(location.protocol!=='https:'||['localhost','127.0.0.1'].includes(location.hostname)){
-  return setStatus('Para recuperar la contraseña, abre la versión web HTTPS de GymLog en tu navegador. El enlace no puede regresar a la APK sin configurar un enlace de aplicación.');
- }
+ // El destino lo configura el despliegue, nunca el usuario ni window.location.
+ const redirectTo=resolveRecoveryUrl(config.recoveryUrl);
+ if(!redirectTo)return setStatus('La recuperación por correo aún no está configurada. Falta autorizar una URL HTTPS de GymLog; no se envió ningún enlace.');
  const button=$('authRecovery');
  button.disabled=true;
  try{
-  const redirectTo=location.origin+location.pathname;
   const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo});
   if(error)throw error;
   setStatus('Si el correo corresponde a una cuenta, recibirás un enlace para establecer una contraseña. Revisa también el correo no deseado.');
