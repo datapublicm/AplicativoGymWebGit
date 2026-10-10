@@ -60,7 +60,8 @@ test('01.04: catálogo descargado tras login, nunca embebido en la APK',()=>{
  assert.doesNotMatch(read('vite.config.js'),/['"]catalogo\.js['"]/);
  assert.doesNotMatch(read('web/sw.js'),/['"]\.\/catalogo\.js['"]/);
  assert.match(app,/const base=window\.GymBaseCatalog\|\|\[\]/);
- assert.ok(auth.includes('await cloud.loadInitialCatalog()'));
+ assert.ok(auth.includes('cloud.loadInitialCatalog()'));
+ assert.ok(auth.includes('cloud.loadOwnCatalog()'));
 });
 test('01.04: safe areas y CSS de pestañas',()=>{
  const css=read('web/styles.css');
