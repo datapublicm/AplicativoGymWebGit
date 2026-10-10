@@ -201,3 +201,10 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
  border:1px solid #29749d;border-radius:11px;font-size:13px;line-height:1.45}
 .sync-banner[hidden]{display:none!important}
 @media(max-width:760px){.sync-banner{margin:4px 0 10px;font-size:12px}}
+
+/* GymLog 01.04 Rev05: listado progresivo para más de 9000 series */
+.history-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;padding:13px 2px;border-top:1px solid #284563}
+.history-pagination[hidden]{display:none!important}
+.history-pagination span{color:#a0c8e2;font-size:12px;font-weight:600}
+.history-pagination button{white-space:normal;min-width:140px}
+@media(max-width:760px){.history-pagination{flex-direction:column}.history-pagination button{width:100%;min-height:44px}}
