@@ -144,7 +144,10 @@ const cloud={
   return {user_id,gimnasio_id,sede_id,ejercicio_id,maquina_id};
  },
  async saveWorkout({exercise,date,technique,notes,entries}) {
+  if(!owns())throw Error('Inicia sesión antes de guardar');
+  const uid=signedIn.id,epoch=authEpoch;
   const ids=await this.ensureExercise(exercise,technique);
+  assertCurrentSession(uid,epoch);
   const p_series=entries.map(x=>({
    numero_serie:Number(x.series.match(/\d+/)?.[0]||0),
    subdivision:x.sub==='-'?null:x.sub,unidad:x.unit,
@@ -154,16 +157,17 @@ const cloud={
    p_fecha:date,p_gimnasio_id:ids.gimnasio_id,p_sede_id:ids.sede_id,
    p_ejercicio_id:ids.ejercicio_id,p_tecnica:technique,p_observaciones:notes,p_series
   })).error);
+  assertCurrentSession(uid,epoch);
  },
  async deleteSeries(id){if(!owns())throw Error('Sin sesión');must(null,(await db.from('tbl_series').delete().eq('id',id).eq('user_id',signedIn.id)).error);},
  async loadHistory(){
   if(!owns())return [];
-  const uid=signedIn.id, pageSize=700, parallel=4;
+  const uid=signedIn.id,epoch=authEpoch,pageSize=700,parallel=4;
   // Cargar todo el historial, sin tope de 1.000 filas del REST de Supabase.
   const {count,error:countError}=await db.from('vw_historial_series')
     .select('*',{count:'exact',head:true}).eq('user_id',uid);
   must(null,countError);
-  if(!owns()||signedIn.id!==uid)throw Error('La sesión cambió durante la consulta');
+  assertCurrentSession(uid,epoch);
   const rows=[];
   for(let start=0;start<(count||0);start+=pageSize*parallel){
     const offsets=Array.from({length:parallel},(_,i)=>start+i*pageSize)
@@ -175,7 +179,7 @@ const cloud={
       must(data,error);
       return data||[];
     }));
-    if(!owns()||signedIn.id!==uid)throw Error('La sesión cambió durante la carga');
+    assertCurrentSession(uid,epoch);
     for(const batch of batches)rows.push(...batch.map(r=>({...r,
       weight:Number(r.weight||0),reps:Number(r.reps||0),
       assistance:Number(r.assistance||0)})));
