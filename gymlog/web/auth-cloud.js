@@ -75,13 +75,14 @@ const cloud={
   const user_id=signedIn.id;
   const gimnasio_id=await findOrCreate('tbl_gimnasios',{user_id,nombre:exercise.g});
   const sede_id=await findOrCreate('tbl_sedes',{user_id,gimnasio_id,nombre:exercise.s});
-  if(exercise.i)await findOrCreate('tbl_maquinas',{user_id,nombre:exercise.i},{tipo_equipo:exercise.kind||'Otro'});
+  const maquina_id=exercise.i?await findOrCreate('tbl_maquinas',{user_id,nombre:exercise.i},{tipo_equipo:exercise.kind||'Otro'}):null;
   const fields={user_id,origen:'usuario',gimnasio_id,sede_id,nombre:exercise.e,
     instrumento:exercise.i,tecnica_actualizada:technique||exercise.t?.[0]||'Ejecución base'};
   const ejercicio_id=await findOrCreate('tbl_ejercicios',fields,{
-    tipo_equipo:exercise.kind||'Otro',zona_entrenamiento:exercise.z||'',accesorio:exercise.a||'',
+    maquina_id,tipo_equipo:exercise.kind||'Otro',zona_entrenamiento:exercise.z||'',accesorio:exercise.a||'',
     agarre:exercise.gr||'',implemento:exercise.a||''});
-  return {user_id,gimnasio_id,sede_id,ejercicio_id};
+  if(maquina_id){const {error}=await db.from('tbl_ejercicios').update({maquina_id}).eq('id',ejercicio_id).eq('user_id',user_id);must(null,error);}
+  return {user_id,gimnasio_id,sede_id,ejercicio_id,maquina_id};
  },
  async saveWorkout({exercise,date,technique,notes,entries}) {
   const ids=await this.ensureExercise(exercise,technique);
@@ -180,6 +181,12 @@ const cloud={
  },
  async saveCustomExercise(values){
   if(!owns())throw Error('Inicia sesión para editar tu catálogo');
+  const data=window.GymEntities||{gyms:[],sites:[],machines:[]};
+  const gym=data.gyms.find(x=>x.nombre===values.g);
+  const site=data.sites.find(x=>x.gimnasio_id===gym?.id&&x.nombre===values.s);
+  const machine=data.machines.find(x=>x.nombre===values.i&&x.tipo_equipo===values.kind);
+  if(!gym||!site)throw Error('Selecciona un gimnasio y una sede previamente registrados');
+  if(!machine)throw Error('Primero registra la máquina o equipo en su catálogo independiente');
   const value={...values,t:[values.tecnica]};
   await this.ensureExercise(value,values.tecnica);
   return this.loadOwnCatalog();
@@ -278,6 +285,7 @@ $('catalogForm')?.addEventListener('submit',async event=>{
    if(typeof renderOwnCatalog==='function')renderOwnCatalog();
    await cloud.loadCatalogStats();
    event.currentTarget.reset();
+   if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
    $('catalogFeedback').textContent='Ejercicio guardado en tu catálogo de Supabase.';
   }catch(error){$('catalogFeedback').textContent='No se pudo guardar: '+error.message;}
   finally{button.disabled=false;}
