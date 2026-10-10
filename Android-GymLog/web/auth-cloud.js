@@ -4,9 +4,9 @@ import { resolveRecoveryUrl } from './recovery-url.js';
 const config = {
   url: import.meta.env.VITE_SUPABASE_URL,
   key: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-  schema: import.meta.env.VITE_SUPABASE_SCHEMA || 'sch_android_gymlog',
-  environment: import.meta.env.VITE_GYMLOG_ENVIRONMENT || 'pruebas',
-  recoveryUrl: import.meta.env.VITE_GYMLOG_RECOVERY_URL || ''
+  schema: import.meta.env.VITE_SUPABASE_SCHEMA || 'sch_android_gymlytics',
+  environment: import.meta.env.VITE_GYMLYTICS_ENVIRONMENT || 'pruebas',
+  recoveryUrl: import.meta.env.VITE_GYMLYTICS_RECOVERY_URL || ''
 };
 const ready = !!config.url && !!config.key && !config.key.includes('COLOCA_AQUI');
 const client = ready ? createClient(config.url, config.key, {
@@ -27,7 +27,7 @@ const setStatus = message => {
 const must = (data,error) => { if(error) throw error; return data; };
 const owns = () => !!signedIn?.id;
 
-async function assertGymLogAccess(user) {
+async function assertGymlyticsAccess(user) {
   const {data,error} = await db.from('tbl_usuarios').select('id,usuario,nombre,rol,activo').eq('id',user.id).maybeSingle();
   if(error) throw new Error('Gymlytics no está disponible en la API del proyecto: '+error.message);
   if(!data?.activo) throw new Error('Tu cuenta no tiene acceso activo a Gymlytics.');
@@ -53,9 +53,9 @@ async function applyState(session,epoch) {
   let accessError=null;
   if(user){
     try {
-      const profile=await assertGymLogAccess(user);
+      const profile=await assertGymlyticsAccess(user);
       if(epoch!==authEpoch)return;
-      signedIn={...user,gymlog:profile};
+      signedIn={...user,gymlytics:profile};
     }catch(error){accessError=error;}
   }
   if(epoch!==authEpoch)return;
@@ -77,7 +77,7 @@ async function applyState(session,epoch) {
     showPage('sesion');
     return;
   }
-  $('loggedUser').textContent=signedIn.gymlog.nombre||signedIn.gymlog.usuario;
+  $('loggedUser').textContent=signedIn.gymlytics.nombre||signedIn.gymlytics.usuario;
   $('loggedEmail').textContent=signedIn.email;
   setStatus('Cargando catálogos desde Supabase…');
   try{
@@ -319,7 +319,7 @@ const cloud={
   const {error}=await client.storage.from('gymlog-usuarios').upload(path,blob,{contentType:'image/jpeg',upsert:false});
   if(error)throw error;
   const saved=await db.from('tbl_fotos').insert({user_id:signedIn.id,ejercicio_id,
-   storage_path:path,tipo_referencia:type,vista:side||null,descripcion:'Fotografía GymLog'});
+   storage_path:path,tipo_referencia:type,vista:side||null,descripcion:'Fotografía Gymlytics'});
   if(saved.error){await client.storage.from('gymlog-usuarios').remove([path]);throw saved.error;}
   return path;
  }
@@ -360,7 +360,7 @@ $('catalogForm')?.addEventListener('submit',async event=>{
 // Bloquear navegación antes de que cualquier controlador del mockup la procese.
 document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',event=>{
   if(b.dataset.page!=='sesion'&&!owns()){
-    event.stopImmediatePropagation();event.preventDefault();setStatus('Inicia sesión para acceder a GymLog');showPage('sesion');
+    event.stopImmediatePropagation();event.preventDefault();setStatus('Inicia sesión para acceder a Gymlytics');showPage('sesion');
   }
 },true));
 $('authForm').addEventListener('submit',async event=>{
@@ -376,7 +376,7 @@ $('authForm').addEventListener('submit',async event=>{
       must(null,result.error);
       session=result.data.session;
     }else{
-      const {data,error}=await client.functions.invoke('gymlog-login-usuario',{
+      const {data,error}=await client.functions.invoke('gymlytics-login-usuario',{
         body:{username:identifier,password}
       });
       if(error){
@@ -394,7 +394,7 @@ $('authForm').addEventListener('submit',async event=>{
     }
     if(!session?.user)throw new Error('Supabase no devolvió una sesión válida.');
     await updateState(session);
-    if(!owns())throw new Error('Se autenticó la identidad, pero no se pudo verificar su perfil GymLog. Revisa el acceso a la base de datos.');
+    if(!owns())throw new Error('Se autenticó la identidad, pero no se pudo verificar su perfil Gymlytics. Revisa el acceso a la base de datos.');
     $('authPassword').value='';
   }catch(error){setStatus('No fue posible iniciar sesión: '+error.message);}
   finally{$('authSubmit').disabled=false;}
@@ -405,7 +405,7 @@ $('authRegister').addEventListener('click',async()=>{
   if(!email.includes('@')||password.length<6)return setStatus('Para crear una cuenta personal necesitas un correo real y una contraseña válida. Para prueba, utiliza Ingresar.');
   const {data,error}=await client.auth.signUp({email,password});
   if(error)return setStatus(error.message);
-  setStatus(data.session?'Sesión iniciada; un administrador debe habilitar tu acceso a GymLog.':'Revisa tu correo para confirmar la cuenta. Un administrador deberá habilitar tu acceso a GymLog.');
+  setStatus(data.session?'Sesión iniciada; un administrador debe habilitar tu acceso a Gymlytics.':'Revisa tu correo para confirmar la cuenta. Un administrador deberá habilitar tu acceso a Gymlytics.');
 });
 let recoveryMode=false;
 function enterPasswordResetMode(){
@@ -433,7 +433,7 @@ $('authRecovery').addEventListener('click',async()=>{
   return setStatus('Introduce el correo electrónico de tu cuenta para crear o recuperar tu contraseña.');
  // El destino lo configura el despliegue, nunca el usuario ni window.location.
  const redirectTo=resolveRecoveryUrl(config.recoveryUrl);
- if(!redirectTo)return setStatus('La recuperación por correo aún no está configurada. Falta autorizar una URL HTTPS de GymLog; no se envió ningún enlace.');
+ if(!redirectTo)return setStatus('La recuperación por correo aún no está configurada. Falta autorizar una URL HTTPS de Gymlytics; no se envió ningún enlace.');
  const button=$('authRecovery');
  button.disabled=true;
  try{

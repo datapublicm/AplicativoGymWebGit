@@ -5,7 +5,7 @@ import path from 'node:path';
 const dir=new URL('../',import.meta.url);
 const read=f=>fs.readFileSync(new URL(f,dir),'utf8');
 const html=read('web/index.html'),app=read('web/app.js'),auth=read('web/auth-cloud.js');
-const schema='sch_android_gymlog';
+const schema='sch_android_gymlytics';
 test('Cinco pestañas del proyecto',()=>{
  for(const page of ['sesion','catalogos','registro','tablas','dashboard']){
   assert.match(html,new RegExp('id="page-'+page+'"'));
@@ -16,7 +16,7 @@ test('Visor anatómico con dos formatos y marcadores vacíos',()=>{
  for(const id of ['anatomyPhotosTab','anatomy3dTab','anatomyCloudState','anatomy3dPlaceholder','anatomyPrimary','anatomySecondary'])
   assert.ok(html.includes('id="'+id+'"'),id);
 });
-test('Las tablas y bucket privados de GymLog están referenciados',()=>{
+test('Las tablas y bucket privados de Gymlytics están referenciados',()=>{
  for(const table of ['tbl_usuarios','vw_historial_series','tbl_ejercicio_musculos','tbl_musculos','tbl_musculo_imagenes','tbl_musculo_zonas3d','tbl_fotos'])
   assert.ok(auth.includes(table),table);
  assert.ok(auth.includes('gymlog-usuarios'));
@@ -25,14 +25,14 @@ test('Las tablas y bucket privados de GymLog están referenciados',()=>{
  assert.ok(read('.env.example').includes(schema));
 });
 test('La navegación se bloquea sin sesión; catálogo personal presente',()=>{
- assert.ok(auth.includes('assertGymLogAccess'));
+ assert.ok(auth.includes('assertGymlyticsAccess'));
  assert.ok(auth.includes('signedIn'));
  assert.ok(html.includes('id="catalogForm"'));
  assert.ok(app.includes('allCatalog()'));
 });
 test('Estructura Android preparada, sin binarios generados',()=>{
  const config=JSON.parse(read('capacitor.config.json'));
- assert.equal(config.appName,'Gymlytics');assert.equal(config.appId,'com.datapublicm.gymlog');
+ assert.equal(config.appName,'Gymlytics');assert.equal(config.appId,'com.datapublicm.gymlytics');
  assert.ok(!fs.existsSync(new URL('android/app/',dir)));
  assert.ok(!fs.existsSync(new URL('dist/',dir)));
  assert.ok(!fs.existsSync(new URL('node_modules/',dir)));

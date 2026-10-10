@@ -71,7 +71,7 @@ function picturePlaceholder(text){return 'data:image/svg+xml;charset=UTF-8,'+enc
 function photoFor(type,r){const key=type==='equipo'?`${r.g}|${r.s}|${r.i}`:`${r.g}|${r.s}|${r.i}|${r.e}`;if(model.photos[type+':'+key])return [model.photos[type+':'+key],true];if(type==='equipo'&&r.i==='Máquina de polea alta')return ['./assets/polea-alta.webp',true];if(type==='ejercicio'&&r.e==='Jalón al pecho')return ['./assets/jalon-pecho.webp',true];return [picturePlaceholder(type==='equipo'?'Equipo':'Ejercicio'),false]}
 function detailOpen(){const r=chosenRow();if(!r||!getValue('t'))return;const tec=getValue('t');$('detailTitle').textContent=r.e;$('detailDesc').textContent=`${r.e} en ${r.i.toLowerCase()}, con trabajo orientado a ${r.z.toLowerCase()}. Accesorio/implemento: ${r.a}. Agarre: ${r.gr}. Esta ficha resume el contexto registrado; no sustituye instrucciones técnicas individuales.`;$('detailMainMuscle').textContent=r.m;$('detailOtherMuscle').textContent=r.ms;$('detailTechnique').textContent=`${tec}. ${techniqueDescription(tec)} (interpretación del nombre, no descripción clínica validada).`;$('detailHistory').textContent=`Historial de referencia: ${r.n} filas de entrenamiento en el Excel v2.5${r.last?' · Último registro: '+r.last[0]+' · '+r.last[1]+' (unidad de peso no indicada) · '+r.last[2]+' repeticiones':''}.`;
  for(const type of ['equipo','ejercicio']){const [src,hasPhoto]=photoFor(type,r);$(type==='equipo'?'detailEquipmentImg':'detailExerciseImg').src=src;$(type==='equipo'?'equipmentNoPhoto':'exerciseNoPhoto').hidden=hasPhoto}
- anatomyData=null;gymlogAnatomyView('frontal');$('detailModal').showModal();
+ anatomyData=null;gymlyticsAnatomyView('frontal');$('detailModal').showModal();
  const token=++anatomyRequestId;
  const status=$('anatomyCloudState');if(status)status.textContent='Consultando relaciones musculares en Supabase…';
  window.GymCloud?.loadAnatomy?.(r)?.then(data=>{
@@ -90,7 +90,7 @@ function detailOpen(){const r=chosenRow();if(!r||!getValue('t'))return;const tec
    if(url){const key=type==='equipo'?`${r.g}|${r.s}|${r.i}`:`${r.g}|${r.s}|${r.i}|${r.e}`;
     model.photos[type+':'+key]=url;detailOpenAfterUpload(type);}
   }
-  gymlogAnatomyDraw();
+  gymlyticsAnatomyDraw();
  }).catch(e=>{if(token===anatomyRequestId&&status)status.textContent='No se pudo consultar Supabase: '+e.message;});}
 function showPage(page){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+page));document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));if(page==='tablas')drawHistory();if(page==='dashboard')drawReports();window.scrollTo({top:0,behavior:'instant'})}
 function setMobileStep(step){const target=step==='series'?'series':'context';$('page-registro').classList.toggle('step-context',target==='context');$('page-registro').classList.toggle('step-series',target==='series');document.querySelectorAll('[data-mobile-step]').forEach(b=>{const selected=b.dataset.mobileStep===target;b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected))});window.scrollTo({top:0,behavior:'instant'});}
@@ -289,19 +289,19 @@ $('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs()
 
 
 // Vista anatómica 2D; visor 3D reservado hasta conectar un modelo real.
-let gymlogAnatomySide='frontal';
+let gymlyticsAnatomySide='frontal';
 let anatomyData=null,anatomyRequestId=0;
-function gymlogAnatomyDraw(){
+function gymlyticsAnatomyDraw(){
  const r=chosenRow();if(!r)return;
  $('anatomyPrimary').textContent=anatomyData?.primary.length?anatomyData.primary.join(', '):(r.m||'Pendiente');$('anatomySecondary').textContent=anatomyData?.secondary.length?anatomyData.secondary.join(', '):(r.ms||'Pendiente');
- document.querySelectorAll('[data-anatomy-side]').forEach(b=>{let on=b.dataset.anatomySide===gymlogAnatomySide;b.classList.toggle('selected',on);b.setAttribute('aria-pressed',String(on))});
- const key='anatomia:'+gymlogAnatomySide+':'+r.e;
- const src=model.photos[key]||anatomyData?.photos['musculos:'+gymlogAnatomySide]||anatomyData?.images[gymlogAnatomySide];$('anatomyPhoto').hidden=!src;$('anatomyPhoto').removeAttribute('src');if(src)$('anatomyPhoto').src=src;
+ document.querySelectorAll('[data-anatomy-side]').forEach(b=>{let on=b.dataset.anatomySide===gymlyticsAnatomySide;b.classList.toggle('selected',on);b.setAttribute('aria-pressed',String(on))});
+ const key='anatomia:'+gymlyticsAnatomySide+':'+r.e;
+ const src=model.photos[key]||anatomyData?.photos['musculos:'+gymlyticsAnatomySide]||anatomyData?.images[gymlyticsAnatomySide];$('anatomyPhoto').hidden=!src;$('anatomyPhoto').removeAttribute('src');if(src)$('anatomyPhoto').src=src;
  $('anatomyEmpty').hidden=Boolean(src);
 }
-function gymlogAnatomyView(side){gymlogAnatomySide=side;gymlogAnatomyDraw()}
-async function gymlogAnatomyUpload(event){
- const file=event.target.files?.[0],r=chosenRow(),side=gymlogAnatomySide;
+function gymlyticsAnatomyView(side){gymlyticsAnatomySide=side;gymlyticsAnatomyDraw()}
+async function gymlyticsAnatomyUpload(event){
+ const file=event.target.files?.[0],r=chosenRow(),side=gymlyticsAnatomySide;
  if(!file||!r)return;
  if(!file.type.startsWith('image/')){toast('Selecciona una imagen válida');return;}
  try{
@@ -311,13 +311,13 @@ async function gymlogAnatomyUpload(event){
   if(!window.GymCloud?.canWrite())throw Error('Inicia sesión para subir fotografías');
   await window.GymCloud.uploadUserPhoto({exercise:r,technique:getValue('t'),type:'musculos',side,blob});
   model.photos['anatomia:'+side+':'+r.e]=canvas.toDataURL('image/jpeg',.78);
-  gymlogAnatomyDraw();toast('Foto anatómica guardada en Supabase ✓');
+  gymlyticsAnatomyDraw();toast('Foto anatómica guardada en Supabase ✓');
  }catch(error){toast('Error al guardar foto: '+error.message.slice(0,110));}
  finally{event.target.value='';}
 }
 
-document.querySelectorAll('[data-anatomy-side]').forEach(b=>b.addEventListener('click',()=>gymlogAnatomyView(b.dataset.anatomySide)));
-$('anatomyUpload').addEventListener('change',gymlogAnatomyUpload);
+document.querySelectorAll('[data-anatomy-side]').forEach(b=>b.addEventListener('click',()=>gymlyticsAnatomyView(b.dataset.anatomySide)));
+$('anatomyUpload').addEventListener('change',gymlyticsAnatomyUpload);
 
 // 2D / 3D always visible. 3D data source: tbl_musculo_zonas3d (empty until uploaded).
 let currentAnatomyTab='photos';
