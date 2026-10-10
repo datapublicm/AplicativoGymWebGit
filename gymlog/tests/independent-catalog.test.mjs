@@ -19,7 +19,9 @@ const window={
  GymCustomCatalog:[],
  GymEntities:{gyms:[{id:'g-1',nombre:'Gimnasio nuevo'}],
  sites:[{gimnasio_id:'g-1',nombre:'Sede nueva'}],
- machines:[{tipo_equipo:'Máquina',nombre:'Máquina nueva'}]},
+ machines:[{tipo_equipo:'Máquina',nombre:'Máquina nueva'}],
+ options:[{tipo:'zona',nombre:'Zona adicional'},{tipo:'accesorio',nombre:'Accesorio nuevo'},
+ {tipo:'agarre',nombre:'Agarre nuevo'},{tipo:'tecnica',nombre:'Técnica nueva'}]},
  GymExerciseLibrary:[{nombre:'Ejercicio nuevo',zona_entrenamiento:'Brazo',
  tecnica_actualizada:'Ejecución base',musculos_principales:[],musculos_secundarios:[]}]
 };
@@ -39,6 +41,11 @@ const updateDetailState=()=>{};
   assert.equal(v.e,'Ejercicio nuevo');
   assert.equal(v.z,'Brazo');
   assert.ok(m.available.e.includes('Ejercicio nuevo'));
+  m.cascade(0,{g:'Gimnasio nuevo',s:'Sede nueva',z:'Zona adicional',kind:'Máquina',
+    i:'Máquina nueva',a:'Accesorio nuevo',gr:'Agarre nuevo',e:'Ejercicio nuevo',t:'Técnica nueva'});
+  assert.equal(m.chosenRow().a,'Accesorio nuevo');
+  assert.equal(m.chosenRow().gr,'Agarre nuevo');
+  assert.equal(m.chosenRow().t[0],'Técnica nueva');
 });
 test('El usuario puede seleccionar sede No registrado sin crearla en Catálogos',()=>{
  const a=app.indexOf('function allCatalog(){');
