@@ -9,8 +9,9 @@ if(host!==endpoint)throw Error('Bloqueado: únicamente se permite ProyectosPrueb
 if(!key || !(/^(sb_publishable_|eyJ)/.test(key)))throw Error('Falta clave publicable de Pruebas');
 if(process.env.VITE_SUPABASE_SCHEMA && process.env.VITE_SUPABASE_SCHEMA!==schema)throw Error('Esquema incorrecto');
 
-async function request(path,{method='GET',token=key,body,profile=false,preferCount=false}={}){
- const headers={apikey:key,Authorization:'Bearer '+token,'Content-Type':'application/json'};
+async function request(path,{method='GET',token=null,body,profile=false,preferCount=false}={}){
+ const headers={apikey:key,'Content-Type':'application/json'};
+ if(token)headers.Authorization='Bearer '+token;
  if(profile)headers['Accept-Profile']=schema;
  if(preferCount)headers.Prefer='count=exact';
  const response=await fetch(endpoint+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(15000)});
