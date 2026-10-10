@@ -1,6 +1,6 @@
 {
   "appId": "com.datapublicm.gymlog",
-  "appName": "GymLog",
+  "appName": "Gymlytics",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

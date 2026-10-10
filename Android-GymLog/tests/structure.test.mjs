@@ -32,7 +32,7 @@ test('La navegación se bloquea sin sesión; catálogo personal presente',()=>{
 });
 test('Estructura Android preparada, sin binarios generados',()=>{
  const config=JSON.parse(read('capacitor.config.json'));
- assert.equal(config.appName,'GymLog');assert.equal(config.appId,'com.datapublicm.gymlog');
+ assert.equal(config.appName,'Gymlytics');assert.equal(config.appId,'com.datapublicm.gymlog');
  assert.ok(!fs.existsSync(new URL('android/app/',dir)));
  assert.ok(!fs.existsSync(new URL('dist/',dir)));
  assert.ok(!fs.existsSync(new URL('node_modules/',dir)));
@@ -85,4 +85,11 @@ test('01.04 revisión 03: historial completo paginado y catálogo ampliable',()=
  assert.ok(auth.includes("offset+pageSize-1"));
  assert.ok(auth.includes("const all=[],pageSize=700;"));
  assert.doesNotMatch(auth,/\.limit\(1000\)/);
+});
+
+test('Marca Gymlytics en la aplicación, manifest y Capacitor',()=>{
+ const manifest=JSON.parse(read('web/manifest.webmanifest'));
+ assert.equal(manifest.name,'Gymlytics');assert.equal(manifest.short_name,'Gymlytics');
+ assert.match(html,/<title>Gymlytics · Pruebas Android<\/title>/);
+ assert.match(html,/<strong>Gymlytics<\/strong>/);
 });

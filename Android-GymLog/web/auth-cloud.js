@@ -29,8 +29,8 @@ const owns = () => !!signedIn?.id;
 
 async function assertGymLogAccess(user) {
   const {data,error} = await db.from('tbl_usuarios').select('id,usuario,nombre,rol,activo').eq('id',user.id).maybeSingle();
-  if(error) throw new Error('GymLog no está disponible en la API del proyecto: '+error.message);
-  if(!data?.activo) throw new Error('Tu cuenta no tiene acceso activo a GymLog.');
+  if(error) throw new Error('Gymlytics no está disponible en la API del proyecto: '+error.message);
+  if(!data?.activo) throw new Error('Tu cuenta no tiene acceso activo a Gymlytics.');
   return data;
 }
 let authEpoch=0, pendingAuthId=null, pendingAuthPromise=null;

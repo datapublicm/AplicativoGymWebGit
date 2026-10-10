@@ -1,11 +1,10 @@
-# Android-GymLog — rama independiente
+# Gymlytics — aplicación de entrenamiento (desarrollo Android)
 
-Rama `Android-GymLog`: solo contiene el proyecto `Android-GymLog/`, este README y el workflow de pruebas de Android.
+**Nombre comercial:** Gymlytics (antes GymLog). Rama y carpeta de origen `Android-GymLog`, conservadas provisionalmente para no duplicar ni reemplazar ramas.
 
-- Carpeta de desarrollo: `Android-GymLog/`. Contiene interfaz, Capacitor, catálogos, autenticación, historial y pruebas de GymLog 01.04.
-- Pruebas estáticas: `cd Android-GymLog && npm run test:static` (no compila APK).
-- Aún no se ha probado una APK real, ni el inicio de sesión ni la recuperación del historial desde la app.
-- Supabase Producción, cuentas, contraseñas e historiales quedan intactos. No enviar correos de recuperación automáticamente.
-- La compilación de la APK permanece desautorizada hasta autorización expresa.
-
-La rama de respaldo `feature/organizacion-web-android` conserva las dos carpetas juntas; aquí se separó el árbol de trabajo sin reescribir el historial Git.
+- Nombre visible: Gymlytics en la interfaz, manifest y Capacitor.
+- Identificador Android `com.datapublicm.gymlog` se mantiene por compatibilidad.
+- Backend Supabase Pruebas `ProyectosPrueba` (compartido con otros sistemas), esquema `sch_android_gymlog` y claves `VITE_GYMLOG_*` se mantienen como identificadores técnicos. Renombrarlos requiere migración coordinada: no confundir identidad de marca con identidad de base de datos.
+- Para las pruebas: `cd Android-GymLog && npm run test:static`.
+- Pendientes: inicio de sesión real, catálogos e historial desde Android.
+- No hay APK compilada, ni despliegues, ni cambios de datos de Supabase ni modificaciones de `main`.
