@@ -1,4 +1,4 @@
-name: Android-GymLog - pruebas estáticas (sin APK)
+name: Gymlytics - pruebas estáticas (sin APK)
 on:
   push:
     branches: [Android-GymLog]

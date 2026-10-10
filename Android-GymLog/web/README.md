@@ -1,5 +1,3 @@
-# Fuente compartida de GymLog
+# Gymlytics — fuente de la interfaz
 
-La carpeta `web/` del paquete `GymLog_APK_Inicio_Sin_Compilar.zip` contiene el prototipo móvil v4 adaptado con 5 pestañas y la integración inicial Supabase Auth. Será la **única** fuente de interfaz para Web GitHub, Web Hostinger y APK.
-
-Pendiente incorporar los archivos web completos aquí en la fase de integración. Evitar publicar parcialmente: la rama actual es de desarrollo y no cambia `main/site`.
+Código web integrado en Gymlytics 01.04 para Android. El backend de Pruebas usa `sch_android_gymlytics`; los identificadores de los dos buckets de Storage continúan siendo `gymlog-usuarios` y `gymlog-anatomia` por compatibilidad con las políticas existentes. No hay APK compilada.
