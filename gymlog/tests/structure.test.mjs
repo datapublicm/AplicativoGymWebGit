@@ -48,18 +48,20 @@ test('01.04: pestañas por ejercicio con borradores separados',()=>{
  for(const operation of ['storeActiveDraft','openDraft','newDraft','closeDraft','snapshotExerciseRows'])assert.ok(app.includes('function '+operation+'('),operation);
  for(const field of ['weight','reps','help','seriesMode','seriesGroups'])assert.ok(app.includes(field),field);
 });
-test('01.04: formularios independientes y máquina existente',()=>{
- for(const id of ['addGymForm','addSiteForm','addMachineForm','exerciseMachineSelect'])assert.ok(html.includes('id="'+id+'"'),id);
+test('01.04: gimnasios, sedes, máquinas y ejercicios se crean independientemente',()=>{
+ for(const id of ['addGymForm','addSiteForm','addMachineForm','catalogForm'])assert.ok(html.includes('id="'+id+'"'),id);
+ const exerciseForm=html.split('id="catalogForm"')[1]?.split('</form>')[0]||'';
+ assert.doesNotMatch(exerciseForm,/name="g"|name="s"|name="i"/);
  assert.ok(auth.includes("async addIndependentItem("));
+ assert.ok(auth.includes("gimnasio_id:null,sede_id:null"));
  assert.ok(auth.includes("maquina_id"));
- assert.ok(auth.includes('Primero registra la máquina'));
- assert.ok(app.includes('function renderExerciseMachineOptions()'));
+ assert.ok(app.includes("window.GymExerciseLibrary||[]"));
 });
 test('01.04: catálogo descargado tras login, nunca embebido en la APK',()=>{
  assert.doesNotMatch(html,/catalogo\.js/);
  assert.doesNotMatch(read('vite.config.js'),/['"]catalogo\.js['"]/);
  assert.doesNotMatch(read('web/sw.js'),/['"]\.\/catalogo\.js['"]/);
- assert.match(app,/const base=window\.GymBaseCatalog\|\|\[\]/);
+ assert.ok(app.includes('window.GymBaseCatalog||[]'));
  assert.ok(auth.includes('cloud.loadInitialCatalog()'));
  assert.ok(auth.includes('cloud.loadOwnCatalog()'));
 });
