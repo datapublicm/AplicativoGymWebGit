@@ -18,7 +18,8 @@ function fillSelect(id,choices,preferred){const el=$(id),old=el.value,selection=
 function fillTypes(choices,preferred){const valid=new Set(choices);const old=getValue('kind');const chosen=[preferred,old,'Máquina',...choices].find(v=>valid.has(v));document.querySelectorAll('input[name="tipo"]').forEach(r=>{r.disabled=!valid.has(r.value);r.checked=r.value===chosen})}
 function allCatalog(){return [...(window.GymBaseCatalog||[]),...(window.GymCustomCatalog||[])].filter(r=>r.g&&r.s&&r.e)}
 function cascade(start=0,preferred={}){
- const all=allCatalog(),ent=window.GymEntities||{gyms:[],sites:[],machines:[]},lib=window.GymExerciseLibrary||[];
+ const all=allCatalog(),ent=window.GymEntities||{gyms:[],sites:[],machines:[],options:[]},lib=window.GymExerciseLibrary||[];
+ const extras=type=>(ent.options||[]).filter(x=>x.tipo===type).map(x=>x.nombre);
  let related=all;
  for(let n=0;n<FLOW.length;n++){
   const [key,id]=FLOW[n];
@@ -29,17 +30,17 @@ function cascade(start=0,preferred={}){
    const ownGym=ent.gyms.find(g=>g.nombre===getValue('g'));
    const ownSites=ent.sites.filter(site=>site.gimnasio_id===ownGym?.id).map(s=>s.nombre);
    choices=uniq([...related.map(r=>r.s),...ownSites,'No registrado']);
-  }else if(key==='z')choices=uniq([...related.map(r=>r.z),...all.map(r=>r.z),...lib.map(r=>r.zona_entrenamiento),'Sin clasificar']);
+  }else if(key==='z')choices=uniq([...related.map(r=>r.z),...all.map(r=>r.z),...lib.map(r=>r.zona_entrenamiento),...extras('zona'),'Sin clasificar']);
   else if(key==='kind')choices=uniq([...related.map(r=>r.kind),...all.map(r=>r.kind),...ent.machines.map(m=>m.tipo_equipo)]);
   else if(key==='i')choices=uniq([...related.map(r=>r.i),
    ...all.filter(r=>r.kind===getValue('kind')).map(r=>r.i),
    ...ent.machines.filter(m=>m.tipo_equipo===getValue('kind')).map(m=>m.nombre)]);
-  else if(key==='a'||key==='gr')choices=uniq([...related.map(r=>r[key]),...all.map(r=>r[key]),'No especificado']);
+  else if(key==='a'||key==='gr')choices=uniq([...related.map(r=>r[key]),...all.map(r=>r[key]),...extras(key==='a'?'accesorio':'agarre'),'No especificado']);
   else if(key==='e')choices=uniq([...related.map(r=>r.e),...all.map(r=>r.e),...lib.map(r=>r.nombre)]);
   else choices=uniq([...related.flatMap(r=>r.t||[]),
    ...all.filter(r=>r.e===getValue('e')).flatMap(r=>r.t||[]),
    ...lib.filter(r=>r.nombre===getValue('e')).map(r=>r.tecnica_actualizada),
-   'Ejecución base']);
+   ...extras('tecnica'),'Ejecución base']);
   if(n>=start){
    if(key==='kind')fillTypes(choices,preferred[key]);
    else fillSelect(id,choices,preferred[key]);
@@ -148,7 +149,7 @@ function refreshActiveDraftTitle(){const tab=draftTabs.find(t=>t.id===activeDraf
 function resetExerciseTabs(){draftTabs=[];activeDraftId=null;draftSeq=0;newDraft(false);}
 function hasSeriesData(){return getEntries().length>0}
 function renderIndependentCatalog(){
- const entities=window.GymEntities||{gyms:[],sites:[],machines:[]};
+ const entities=window.GymEntities||{gyms:[],sites:[],machines:[],options:[]};
  const el=$('siteGymSelect'),previous=el.value;
  el.replaceChildren();
  if(!entities.gyms.length){el.add(new Option('Primero registra un gimnasio',''));el.disabled=true;}
@@ -157,6 +158,11 @@ function renderIndependentCatalog(){
   for(const gym of entities.gyms)el.add(new Option(gym.nombre,gym.id));
   if(entities.gyms.some(g=>g.id===previous))el.value=previous;
  }
+ const entries=$('customCatalogItems');
+ entries.innerHTML=(entities.options||[]).length?
+  '<div class="catalog-options-list">'+entities.options.map(x=>
+   '<span class="catalog-option-pill"><strong>'+esc(({zona:'Zona',accesorio:'Accesorio',agarre:'Agarre',tecnica:'Técnica'})[x.tipo]||x.tipo)+'</strong> · '+esc(x.nombre)+'</span>'
+  ).join('')+'</div>':'';
  if(window.GymBaseCatalog?.length||window.GymCustomCatalog?.length) cascade(0);
 }
 function renderOwnCatalog(){
