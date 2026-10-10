@@ -20,7 +20,17 @@ Supabase Pruebas</div></aside>
 <form id="addGymForm" class="catalog-form"><h3 class="full">Gimnasios</h3><label>Nuevo gimnasio<input name="nombre" required maxlength="120" placeholder="Nombre del gimnasio" /></label><button class="primary-btn" type="submit">+ Agregar gimnasio</button><p class="full" id="gymFeedback" role="status"></p></form>
 <form id="addSiteForm" class="catalog-form"><h3 class="full">Sedes</h3><label>Gimnasio asociado<select name="gimnasio_id" id="siteGymSelect" required></select></label><label>Nombre de la sede<input name="nombre" required maxlength="120" placeholder="Nombre de la sede" /></label><button class="primary-btn full" type="submit">+ Agregar sede</button><p class="full" id="siteFeedback" role="status"></p></form>
 <form id="addMachineForm" class="catalog-form"><h3 class="full">Máquinas y equipos</h3><label>Nuevo equipo<input name="nombre" required maxlength="120" placeholder="Nombre de la máquina" /></label><label>Tipo<select name="tipo_equipo"><option>Máquina</option><option>Implemento libre</option><option>Peso corporal</option><option>Otro</option></select></label><button class="primary-btn full" type="submit">+ Agregar equipo</button><p class="full" id="machineFeedback" role="status"></p></form>
-</div>
+<form id="addOptionForm" class="catalog-form"><h3 class="full">Otras listas independientes</h3>
+<label>Tipo de lista<select name="tipo" required>
+<option value="zona">Zona de entrenamiento</option>
+<option value="accesorio">Accesorio / implemento</option>
+<option value="agarre">Agarre</option>
+<option value="tecnica">Técnica</option>
+</select></label>
+<label>Nuevo valor<input name="nombre" maxlength="120" required placeholder="Nombre para la lista desplegable" /></label>
+<button class="primary-btn full" type="submit">+ Agregar a mi catálogo</button>
+<p class="full" id="optionFeedback" role="status"></p></form>
+</div><div id="customCatalogItems"></div>
 <h3>➕ Ejercicios independientes</h3>
 <p>Registra un ejercicio sin seleccionar gimnasio, sede, máquina ni agarre. Relacionarás estos elementos al crear el entrenamiento en Registro.</p>
 <form id="catalogForm" class="catalog-form">
