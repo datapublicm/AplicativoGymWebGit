@@ -39,7 +39,7 @@ const window={GymCloud:{canWrite:()=>true,
  saveWorkout:async()=>{calls++;if(${failSave})throw Error('falló guardado')},
  loadHistory:async()=>{if(${failRefresh})throw Error('falló descarga');return [{id:1}]}}};
 const model={records:[]};
-const elements={fecha:{value:'2026-10-10'},observaciones:{value:'nota'},saveRecords:{disabled:false,textContent:'Guardar series'}};
+const elements={fecha:{value:'2026-10-10'},observaciones:{value:'nota'},saveRecords:{disabled:false,textContent:'Guardar series'},saveFeedback:{hidden:true,textContent:''}};
 const $=id=>elements[id];
 const chosenRow=()=>({g:'Pruebas',e:'Curl bíceps',t:['Base']});
 const getValue=()=> 'Base';
@@ -56,6 +56,7 @@ test('Guardado confirmado: un error al descargar no induce a duplicar series',as
  assert.equal(m.values().calls,1);
  assert.equal(m.values().cleared,true);
  assert.ok(m.messages.some(x=>x.includes('GUARDADAS')));
+ assert.match(m.values().button.textContent,/Guardar series/);
  assert.equal(m.values().button.disabled,false);
  assert.ok(m.messages.every(x=>!x.startsWith('No se guardó:')));
 });
