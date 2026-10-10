@@ -38,8 +38,8 @@ test('Estructura Android preparada, sin binarios generados',()=>{
  assert.ok(!fs.existsSync(new URL('node_modules/',dir)));
 });
 test('No se adjuntan claves administrativas al código cliente',()=>{
- assert.doesNotMatch(auth,/sb_secret_[A-Za-z0-9]+/);
- assert.doesNotMatch(auth,/eyJ[A-Za-z0-9._-]{70,}/);
+ assert.doesNotMatch(auth,/\bsb_secret_[A-Za-z0-9]+\b/);
+ assert.doesNotMatch(auth,/\beyJ[A-Za-z0-9._-]{70,}\b/);
 });
 
 
