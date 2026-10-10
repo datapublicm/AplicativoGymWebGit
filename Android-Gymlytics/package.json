@@ -10,7 +10,8 @@
     "android:init": "npx cap add android",
     "android:sync": "npm run build:web && npx cap sync android",
     "android:open": "npx cap open android",
-    "test:static": "node --test tests/*.test.mjs"
+    "test:static": "node --test tests/*.test.mjs",
+    "test:integration": "node tools/validar-data-api.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^7.4.4",
