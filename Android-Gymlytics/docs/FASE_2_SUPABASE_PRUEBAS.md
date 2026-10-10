@@ -68,3 +68,19 @@ Se reforzó el aislamiento por sesión en el cliente de **Android-Gymlytics** y 
 **Limitación importante:** Si la sesión cambia exactamente después de que Storage acepta un archivo y antes de que se inserte su metadato, se evita asociar la foto a la cuenta equivocada, pero podría quedar un archivo huérfano bajo la carpeta privada del propietario original. No se ha validado una rutina de limpieza de esos casos. No supone que se hayan creado archivos en esta revisión (la tabla de fotos permanece vacía).
 
 **Sigue pendiente:** comprobación HTTPS autenticada con tokens reales de dos cuentas de prueba; revisión en móvil/emulador de sesión, teclado, tablas, imágenes y safe areas; pruebas de escritura controladas con datos ficticios; recuperación de contraseña autorizada; y visor 3D. No se ha generado APK ni proyecto Gradle.
+
+
+## Continuación — sesión, decimales y caché móvil (10/10/2026)
+
+- **Paginación privada:** `cloud.loadHistory()` comprueba `uid` y `authEpoch` después del conteo y después de cada lote. Una descarga iniciada en una sesión antigua se descarta incluso cuando se vuelve a iniciar sesión con el mismo usuario.
+- **Guardado:** `cloud.saveWorkout()` comprueba la sesión antes de invocar `guardar_entrenamiento` y después de obtener su respuesta. Si una sesión cambia mientras la operación está en curso, la respuesta no se presenta como éxito de la sesión nueva; en ese caso, el resultado final de la escritura debe comprobarse con un historial actualizado de la cuenta original.
+- **Formulario de series:** peso, repeticiones y asistencias permiten valores decimales mediante `step="any"` y `inputmode="decimal"`. SQL confirmó `numeric(12,2)` para peso, `numeric(10,2)` para repeticiones y asistencias.
+- **Compatibilidad con historial:** en las 18.526 series actuales existen **2.272 pesos fraccionarios**, **1.550 repeticiones fraccionarias** y **2 asistencias fraccionarias** (lectura agregada; no se expusieron datos individuales).
+- **Service worker:** la versión `gymlytics-mobile-v0.4-20261010` elimina únicamente versiones previas con prefijo `gymlytics-mobile-`. No borra cachés de otras apps del mismo origen. La interceptación y persistencia se restringieron a un inventario explícito de archivos estáticos y no comprenden URLs de recuperación con parámetros ni llamadas de API.
+- **Pruebas agregadas:** `save-workout-epoch.test.mjs`, caso adicional en `history-cloud-isolation.test.mjs` y `service-worker-isolation.test.mjs`.
+- **Evidencia CI:** ejecución [38083367124](https://github.com/datapublicm/AplicativoGymWebGit/actions/runs/38083367124): **66 pruebas aprobadas, 0 fallidas**, junto a validación de sintaxis y ausencia de artefactos.
+- **Conservación de datos:** tras estos cambios continúan **2 usuarios, 18.526 series, 6.218 reportes y 0 fotos** en ProyectosPrueba. `main` no se editó y no se hizo build ni APK.
+
+### Límites de lo validado
+
+Estas pruebas de Node y la auditoría SQL no equivalen a ensayos de inicio de sesión real o verificación en hardware Android. Todavía se necesita la prueba de HTTPS con JWT de ambas cuentas, control de escritura con datos ficticios, retorno autorizado de recuperación de contraseña y ensayo real del diseño móvil. También está pendiente una solución robusta para recuperar archivos huérfanos si Storage completa una subida exactamente cuando cambia la sesión.
