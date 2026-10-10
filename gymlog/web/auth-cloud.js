@@ -401,18 +401,77 @@ $('authRegister').addEventListener('click',async()=>{
   if(error)return setStatus(error.message);
   setStatus(data.session?'Sesión iniciada; un administrador debe habilitar tu acceso a GymLog.':'Revisa tu correo para confirmar la cuenta. Un administrador deberá habilitar tu acceso a GymLog.');
 });
+let recoveryMode=false;
+function enterPasswordResetMode(){
+ recoveryMode=true;
+ ++authEpoch;
+ signedIn=null;
+ document.body.classList.add('auth-locked');
+ document.querySelectorAll('[data-page]').forEach(button=>{
+  if(button.dataset.page!=='sesion'){button.disabled=true;button.setAttribute('aria-disabled','true');}
+ });
+ $('authForm').hidden=true;
+ $('authRegister').hidden=true;
+ $('authRecovery').hidden=true;
+ $('authProfile').hidden=true;
+ $('passwordResetPanel').hidden=false;
+ $('passwordResetStatus').textContent='';
+ setStatus('Verifica el enlace de recuperación y establece tu nueva contraseña.');
+ showPage('sesion');
+}
 $('authRecovery').addEventListener('click',async()=>{
-  if(!client)return setStatus('Configura Supabase antes de recuperar acceso.');
-  const email=$('authEmail').value.trim();
-  if(!email.includes('@'))return setStatus('Para recuperar acceso debes introducir tu correo real. La cuenta prueba no usa correo de recuperación.');
-  const {error}=await client.auth.resetPasswordForEmail(email);
-  setStatus(error?'No se pudo enviar la solicitud: '+error.message:'Si existe una cuenta, recibirás las instrucciones de recuperación.');
+ if(!client)return setStatus('Configura Supabase antes de recuperar acceso.');
+ const email=$('authEmail').value.trim();
+ if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))
+  return setStatus('Introduce el correo electrónico de tu cuenta para crear o recuperar tu contraseña.');
+ // La URL de Capacitor (https://localhost) no es un destino válido para un correo.
+ const location=window.location;
+ if(location.protocol!=='https:'||['localhost','127.0.0.1'].includes(location.hostname)){
+  return setStatus('Para recuperar la contraseña, abre la versión web HTTPS de GymLog en tu navegador. El enlace no puede regresar a la APK sin configurar un enlace de aplicación.');
+ }
+ const button=$('authRecovery');
+ button.disabled=true;
+ try{
+  const redirectTo=location.origin+location.pathname;
+  const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo});
+  if(error)throw error;
+  setStatus('Si el correo corresponde a una cuenta, recibirás un enlace para establecer una contraseña. Revisa también el correo no deseado.');
+ }catch(error){setStatus('No se pudo solicitar la recuperación: '+error.message);}
+ finally{button.disabled=false;}
+});
+$('passwordResetForm').addEventListener('submit',async event=>{
+ event.preventDefault();
+ if(!client||!recoveryMode)return;
+ const password=$('passwordResetNew').value,confirmation=$('passwordResetConfirm').value;
+ if(password.length<10)return $('passwordResetStatus').textContent='Utiliza una contraseña de 10 caracteres como mínimo.';
+ if(password!==confirmation)return $('passwordResetStatus').textContent='Las contraseñas no coinciden.';
+ const button=$('passwordResetSubmit');
+ button.disabled=true;
+ try{
+  const {error}=await client.auth.updateUser({password});
+  if(error)throw error;
+  $('passwordResetNew').value='';
+  $('passwordResetConfirm').value='';
+  $('passwordResetPanel').hidden=true;
+  recoveryMode=false;
+  const {data,error:sessionError}=await client.auth.getSession();
+  if(sessionError)throw sessionError;
+  await updateState(data.session);
+  setStatus('Contraseña creada correctamente. Puedes iniciar sesión con tu correo o usuario.');
+ }catch(error){$('passwordResetStatus').textContent='No se pudo establecer la contraseña: '+error.message;}
+ finally{button.disabled=false;}
 });
 $('authLogout').addEventListener('click',async()=>{if(client)await client.auth.signOut();});
 if(client){
-  client.auth.onAuthStateChange((_,session)=>{queueMicrotask(()=>updateState(session));});
-  client.auth.getSession().then(({data})=>{
-    updateState(data.session);
-    if(!data.session) setStatus('Introduce tu correo o usuario y contraseña.');
-  }).catch(e=>setStatus('Error de conexión con Supabase: '+e.message));
-}else {setStatus('Proyecto preparado. Configura URL y clave publicable de Supabase para iniciar sesión.');updateState(null);}
+ client.auth.onAuthStateChange((event,session)=>{
+  queueMicrotask(()=>{
+   if(event==='PASSWORD_RECOVERY'){enterPasswordResetMode();return;}
+   if(!recoveryMode)void updateState(session);
+  });
+ });
+ client.auth.getSession().then(({data})=>{
+  if(recoveryMode)return;
+  updateState(data.session);
+  if(!data.session)setStatus('Introduce tu correo o usuario y contraseña.');
+ }).catch(error=>setStatus('Error de conexión con Supabase: '+error.message));
+}else{setStatus('Proyecto preparado. Configura URL y clave publicable de Supabase para iniciar sesión.');updateState(null);}
