@@ -138,30 +138,44 @@ const cloud={
  async deleteSeries(id){if(!owns())throw Error('Sin sesión');must(null,(await db.from('tbl_series').delete().eq('id',id).eq('user_id',signedIn.id)).error);},
  async loadHistory(){
   if(!owns())return [];
-  // Evitar el límite de 1.000 filas por petición de la Data API.
-  // Vista security_invoker: RLS del esquema restringe las series al usuario autenticado.
-  const pageSize=700,all=[],userId=signedIn.id;
-  for(let offset=0;;offset+=pageSize){
-    const {data,error}=await db.from('vw_historial_series')
-      .select('*').eq('user_id',userId)
-      .order('date',{ascending:false}).order('id',{ascending:true})
-      .range(offset,offset+pageSize-1);
-    must(data,error);
-    if(!owns()||signedIn.id!==userId)throw Error('La sesión cambió mientras se cargaba el historial');
-    const batch=data||[];
-    all.push(...batch.map(r=>({...r,weight:Number(r.weight||0),
-      reps:Number(r.reps||0),assistance:Number(r.assistance||0)})));
-    if(batch.length<pageSize)break;
+  const uid=signedIn.id, pageSize=700, parallel=4;
+  // Cargar todo el historial, sin tope de 1.000 filas del REST de Supabase.
+  const {count,error:countError}=await db.from('vw_historial_series')
+    .select('*',{count:'exact',head:true}).eq('user_id',uid);
+  must(null,countError);
+  if(!owns()||signedIn.id!==uid)throw Error('La sesión cambió durante la consulta');
+  const rows=[];
+  for(let start=0;start<(count||0);start+=pageSize*parallel){
+    const offsets=Array.from({length:parallel},(_,i)=>start+i*pageSize)
+      .filter(offset=>offset<(count||0));
+    const batches=await Promise.all(offsets.map(async offset=>{
+      const {data,error}=await db.from('vw_historial_series').select('*')
+        .eq('user_id',uid).order('date',{ascending:false})
+        .order('id',{ascending:true}).range(offset,offset+pageSize-1);
+      must(data,error);
+      return data||[];
+    }));
+    if(!owns()||signedIn.id!==uid)throw Error('La sesión cambió durante la carga');
+    for(const batch of batches)rows.push(...batch.map(r=>({...r,
+      weight:Number(r.weight||0),reps:Number(r.reps||0),
+      assistance:Number(r.assistance||0)})));
   }
-  return all;
+  return rows;
  },
  async loadInitialCatalog(){
   if(!owns())return [];
-  const {data,error}=await db.from('tbl_catalogo_predeterminado')
-    .select('id,gimnasio,sede,anotacion,zona_entrenamiento,instrumento,ejercicio,accesorio_implemento,tecnica_actualizada,musculos_principales,musculos_secundarios')
-    .eq('activo',true).order('fila_origen',{ascending:true}).limit(1000);
-  must(data,error);
-  return (data||[]).map(x=>{
+  const all=[],pageSize=700;
+  for(let offset=0;;offset+=pageSize){
+    const {data,error}=await db.from('tbl_catalogo_predeterminado')
+      .select('id,gimnasio,sede,anotacion,zona_entrenamiento,instrumento,ejercicio,accesorio_implemento,tecnica_actualizada,musculos_principales,musculos_secundarios')
+      .eq('activo',true).order('fila_origen',{ascending:true})
+      .range(offset,offset+pageSize-1);
+    must(data,error);
+    const batch=data||[];
+    all.push(...batch);
+    if(batch.length<pageSize)break;
+  }
+  return all.map(x=>{
     const equipment=x.instrumento||'';
     const kind=/máquina|maquina|freemotion|estación|polea|hack|peck deck/i.test(equipment)?'Máquina':
       /mancuerna|barra|disco|banca/i.test(equipment)?'Implemento libre':'Otro';
