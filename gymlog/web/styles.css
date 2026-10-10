@@ -213,3 +213,13 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 .save-feedback{margin:0 17px 14px;padding:12px 13px;border:1px solid #34779a;border-radius:10px;background:#0c3047;color:#b4f2ff;font-size:12px;line-height:1.6}
 .save-feedback[hidden]{display:none!important}
 @media(max-width:760px){.save-feedback{margin:0 12px 12px}}
+
+/* Recuperación de acceso desde enlace seguro de Supabase Auth */
+.password-reset-panel{margin:18px 0 0;padding:18px;border-radius:12px;
+ border:1px solid #2b759d;background:#0f2842;color:#e6f6ff}
+.password-reset-panel[hidden]{display:none!important}
+.password-reset-panel h3{font-size:18px;margin:0 0 8px;color:#9defff}
+.password-reset-panel p{font-size:12px;line-height:1.6;color:#a4c8dd}
+.password-reset-panel form{display:grid;gap:12px}
+.password-reset-panel input{width:100%;min-height:44px}
+.password-reset-panel button{white-space:normal}
