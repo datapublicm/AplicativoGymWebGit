@@ -14,15 +14,21 @@ Supabase Pruebas</div></aside>
 <div class="auth-profile" hidden="" id="authProfile"><strong id="loggedUser">—</strong><small id="loggedEmail">—</small><button class="outline-btn" id="authLogout" type="button">Cerrar sesión</button></div>
 <p class="auth-hint">Para acceder a Catálogos, Registro, Tablas y Dashboard primero debes iniciar sesión.</p>
 </div></section><section class="page" id="page-catalogos"><div class="page-title"><div><div class="eyebrow">PERSONALIZACIÓN</div><h1>Catálogos</h1><p>Gimnasios, sedes, ejercicios, técnicas y músculos asociados a tu cuenta.</p></div></div><div class="panel catalog-initial"><h2>Catálogo de entrenamiento</h2><p>El catálogo inicial del Excel está disponible en la pantalla Registro. Aquí aparecerán los catálogos individuales obtenidos de Supabase y podrás ampliarlos en una próxima etapa.</p><div class="catalog-grid"><div><strong>Gimnasios</strong><span id="gymCount">Pendiente</span></div><div><strong>Ejercicios propios</strong><span id="exerciseCount">Pendiente</span></div><div><strong>Músculos</strong><span id="muscleCount">Pendiente</span></div></div><button class="primary-btn" data-page="registro" type="button">Ir a Registro →</button></div>
-<div class="panel catalog-create"><h2>➕ Añadir ejercicio a mi catálogo</h2>
-<p>Se guarda únicamente en tu cuenta. Los músculos y las referencias 2D/3D se vincularán por sus ID cuando existan.</p>
+<div class="panel catalog-create"><h2>➕ Administrar mis catálogos por separado</h2>
+<p>Cada elemento se agrega independientemente y pertenece a tu cuenta. Primero puedes registrar el gimnasio y después sus sedes, máquinas y ejercicios.</p>
+<div class="catalog-independent">
+<form id="addGymForm" class="catalog-form"><h3 class="full">Gimnasios</h3><label>Nuevo gimnasio<input name="nombre" required maxlength="120" placeholder="Nombre del gimnasio" /></label><button class="primary-btn" type="submit">+ Agregar gimnasio</button><p class="full" id="gymFeedback" role="status"></p></form>
+<form id="addSiteForm" class="catalog-form"><h3 class="full">Sedes</h3><label>Gimnasio asociado<select name="gimnasio_id" id="siteGymSelect" required></select></label><label>Nombre de la sede<input name="nombre" required maxlength="120" placeholder="Nombre de la sede" /></label><button class="primary-btn full" type="submit">+ Agregar sede</button><p class="full" id="siteFeedback" role="status"></p></form>
+<form id="addMachineForm" class="catalog-form"><h3 class="full">Máquinas y equipos</h3><label>Nuevo equipo<input name="nombre" required maxlength="120" placeholder="Nombre de la máquina" /></label><label>Tipo<select name="tipo_equipo"><option>Máquina</option><option>Implemento libre</option><option>Peso corporal</option><option>Otro</option></select></label><button class="primary-btn full" type="submit">+ Agregar equipo</button><p class="full" id="machineFeedback" role="status"></p></form>
+</div>
+<h3>➕ Añadir ejercicio</h3><p>Selecciona un gimnasio y una sede previamente registrados. Solo esta operación necesita asociar sus elementos.</p>
 <form id="catalogForm" class="catalog-form">
-<label>Gimnasio<input name="g" required placeholder="Nombre de gimnasio" /></label>
-<label>Sede<input name="s" required placeholder="Nombre de sede" /></label>
+<label>Gimnasio<select name="g" id="exerciseGymSelect" required></select></label>
+<label>Sede<select name="s" id="exerciseSiteSelect" required></select></label>
 <label>Ejercicio<input name="e" required placeholder="Nombre del ejercicio" /></label>
 <label>Zona de entrenamiento<input name="z" required placeholder="Espalda, piernas, etc." /></label>
 <label>Tipo de equipo<select name="kind"><option>Máquina</option><option>Implemento libre</option><option>Peso corporal</option><option>Otro</option></select></label>
-<label>Máquina / equipo<input name="i" required placeholder="Equipo o implemento" /></label>
+<label>Máquina / equipo<input name="i" list="gymMachineOptions" required placeholder="Elige o escribe un equipo" /><datalist id="gymMachineOptions"></datalist></label>
 <label>Accesorio / implemento<input name="a" placeholder="No especificado" value="No especificado" /></label>
 <label>Agarre<input name="gr" placeholder="No especificado" value="No especificado" /></label>
 <label class="full">Técnica<input name="tecnica" required placeholder="01 - Ejecución base" /></label>
@@ -33,6 +39,7 @@ Supabase Pruebas</div></aside>
 <section class="page step-context" id="page-registro"><div class="page-title"><div><div class="eyebrow">ENTRENAMIENTO</div><h1>Nuevo registro</h1><p>Selecciona el contexto del ejercicio y registra tus series.</p></div><label class="date-label">Fecha <input id="fecha" required="" type="date"/></label></div>
 
 
+<div class="exercise-tabs-wrap"><div class="exercise-tabs" id="exerciseTabs" role="tablist" aria-label="Ejercicios abiertos"></div><button type="button" class="exercise-tab-add" id="addExerciseTab" title="Abrir otro ejercicio" aria-label="Nueva pestaña de ejercicio">＋</button></div>
 <div class="top-grid"><section class="panel context-panel"><div class="section-head"><span class="number">01</span><h2>Contexto del entrenamiento</h2></div>
 <div class="fields-grid"><label class="field"><span>Gimnasio <em>*</em></span><select id="gimnasio"></select></label><label class="field"><span>Sede <em>*</em></span><select id="sede"></select></label><label class="field full"><span>Zona de entrenamiento <em>*</em></span><select id="zona" title="Columna de origen: AnotaciónV2"></select></label></div>
 <div class="field type-block"><span>Tipo de equipo <em>*</em></span><div class="type-options" id="typeOptions"><label><input name="tipo" type="radio" value="Máquina"/><span>Máquina</span></label><label><input name="tipo" type="radio" value="Implemento libre"/><span>Implemento libre</span></label><label><input name="tipo" type="radio" value="Peso corporal"/><span>Peso corporal</span></label><label><input name="tipo" type="radio" value="Otro"/><span>Otro</span></label></div></div>
