@@ -154,7 +154,7 @@ async function saveSeries(){
   toast('Revisa peso, repeticiones y asistencias.');return;
  }
  if(!window.GymCloud?.canWrite()){toast('Inicia sesión para guardar en Supabase.');return}
- const btn=$('saveRecords');btn.disabled=true;btn.textContent='Guardando en Supabase…';
+ const btn=$('saveRecords'),feedback=$('saveFeedback');feedback.hidden=true;feedback.textContent='';btn.disabled=true;btn.textContent='Guardando en Supabase…';
  try{
   await window.GymCloud.saveWorkout({exercise:r,date,technique:tech,notes:$('observaciones').value.trim(),entries});
  }catch(err){
@@ -169,6 +169,7 @@ async function saveSeries(){
   drawRecent();drawHistory(true);drawReports();
   toast('Series guardadas en Supabase ✓');
  }catch(err){
+  feedback.textContent='✅ Series guardadas en Supabase. No se pudo actualizar el historial: no vuelvas a guardar estas mismas series.';feedback.hidden=false;
   toast('Series GUARDADAS; no se pudo actualizar el historial. No las guardes otra vez.');
  }
  finally{btn.disabled=false;btn.textContent='Guardar series'}
