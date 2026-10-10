@@ -4,7 +4,7 @@
 <div class="layout">
 <aside class="sidebar"><div class="brand"><img class="brand-logo" src="./assets/gymlog-logo.png" alt="GymLog" /><div><strong>GymLog</strong><small>Salud Deporte · v4</small></div></div><nav aria-label="Menú principal" class="side-nav"><button class="nav-item active" data-page="sesion" type="button"><span>♙</span> Sesión</button><button class="nav-item" data-page="catalogos" type="button"><span>▦</span> Catálogos</button><button class="nav-item" data-page="registro" type="button"><span>✚</span> Registro</button><button class="nav-item" data-page="tablas" type="button"><span>▥</span> Tablas</button><button class="nav-item" data-page="dashboard" type="button"><span>◈</span> Dashboard</button></nav><div class="side-footer">GymLog · Desarrollo Android
 Supabase Pruebas</div></aside>
-<main class="content"><section class="page active" id="page-sesion">
+<main class="content"><div class="sync-banner" id="syncBanner" role="status" hidden></div><section class="page active" id="page-sesion">
 <div class="page-title"><div><div class="eyebrow">ACCESO SEGURO · PRUEBAS</div><h1>Tu sesión GymLog</h1><p>Un usuario, todos tus entrenamientos en web y Android.</p></div></div>
 <div class="panel auth-panel"><div class="auth-symbol"><img src="./assets/gymlog-logo.png" class="auth-logo" alt="GymLog" /></div><h2>Iniciar sesión</h2><p class="auth-status" id="authStatus" role="status">Comprobando configuración de Supabase…</p>
 <form autocomplete="on" id="authForm"><label class="field"><span>Correo o usuario</span><input autocomplete="username" autocapitalize="off" spellcheck="false" id="authEmail" placeholder="" required="" type="text"/></label>
