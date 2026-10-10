@@ -292,19 +292,22 @@ const cloud={
  async loadAnatomy(exercise){
   const result={id:null,primary:[],secondary:[],images:{},zones3d:[],photos:{}};
   if(!owns())return result;
+  const uid=signedIn.id,epoch=authEpoch;
   let record=null;
   if(exercise.cloud_id){const r=await db.from('tbl_ejercicios').select('id').eq('id',exercise.cloud_id).maybeSingle();
    record=must(r.data,r.error);}
   if(!record){const r=await db.from('tbl_ejercicios').select('id')
-   .eq('user_id',signedIn.id).eq('nombre',exercise.e).eq('instrumento',exercise.i)
+   .eq('user_id',uid).eq('nombre',exercise.e).eq('instrumento',exercise.i)
    .limit(1).maybeSingle();record=must(r.data,r.error);}
   if(!record){const r=await db.from('tbl_ejercicios').select('id')
    .eq('origen','base').eq('nombre',exercise.e).limit(1).maybeSingle();record=must(r.data,r.error);}
+  assertCurrentSession(uid,epoch);
   if(!record)return result;
   result.id=record.id;
   const {data:rel,error:e}=await db.from('tbl_ejercicio_musculos')
    .select('musculo_id,tipo,lado,tbl_musculos(id,nombre,grupo_muscular)').eq('ejercicio_id',record.id);
   must(rel,e);
+  assertCurrentSession(uid,epoch);
   for(const r of rel){const name=r.tbl_musculos?.nombre;if(name)result[r.tipo==='principal'?'primary':'secondary'].push(name);}
   const ids=[...new Set(rel.map(r=>r.musculo_id))];
   if(ids.length){
@@ -313,17 +316,20 @@ const cloud={
     db.from('tbl_musculo_zonas3d').select('musculo_id,modelo_codigo,modelo_path,parte_id,vista_preferida').in('musculo_id',ids)
    ]);
    must(imageRows.data,imageRows.error);must(zones.data,zones.error);
+   assertCurrentSession(uid,epoch);
    result.zones3d=zones.data||[];
    for(const row of imageRows.data||[]){
     if(!result.images[row.vista])result.images[row.vista]=await this.signedPath('gymlog-anatomia',row.imagen_path);
    }
   }
   const personal=await db.from('tbl_fotos').select('tipo_referencia,vista,storage_path,created_at')
-   .eq('user_id',signedIn.id).eq('ejercicio_id',record.id).order('created_at',{ascending:false});
+   .eq('user_id',uid).eq('ejercicio_id',record.id).order('created_at',{ascending:false});
   must(personal.data,personal.error);
+  assertCurrentSession(uid,epoch);
   for(const row of personal.data||[]){const key=row.tipo_referencia+':'+(row.vista||'general');
    if(!result.photos[key])result.photos[key]=await this.signedPath('gymlog-usuarios',row.storage_path);
   }
+  assertCurrentSession(uid,epoch);
   return result;
  },
  async uploadUserPhoto({exercise,technique,type,side,blob}){
