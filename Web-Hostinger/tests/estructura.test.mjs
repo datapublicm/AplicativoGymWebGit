@@ -26,7 +26,7 @@ test('Todos los imports relativos JavaScript resuelven dentro del proyecto web',
     for(const match of src.matchAll(re)){
       const relative=(match[1]||match[2]).split(/[?#]/)[0];
       const target=fileURLToPath(new URL(relative,pathToFileURL(file)));
-      assert.ok(target.startsWith(root+path.sep),'Import fuera de Web-Hostinger: '+relative);
+      assert.ok(target.startsWith(path.resolve(root)+path.sep),'Import fuera de Web-Hostinger: '+relative);
       assert.ok(existsSync(target),'Import ausente: '+path.relative(root,file)+' => '+relative);
       checked++;
     }
