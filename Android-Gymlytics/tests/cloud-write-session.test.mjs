@@ -26,10 +26,14 @@ const findOrCreate=async(table,fields)=>{
  if(table==='tbl_gimnasios'){notifyGym();if(${delayGym})await new Promise(r=>releaseGym=r)}
  return table+'-id';
 };
-const db={from(table){return {
- update(){return this},eq(){return Promise.resolve({error:null})},
- insert(value){inserted.push({table,value});return Promise.resolve({error:null})}
-}}};
+const db={from(table){
+ const query={
+  update(){return query},eq(){return query},
+  then(ok,fail){return Promise.resolve({error:null}).then(ok,fail)},
+  insert(value){inserted.push({table,value});return Promise.resolve({error:null})}
+ };
+ return query;
+}};
 const client={storage:{from(bucket){return {
  upload:async(path)=>{uploads.push({bucket,path});notifyUpload();
   if(${delayUpload})await new Promise(r=>releaseUpload=r);return {error:null}},
