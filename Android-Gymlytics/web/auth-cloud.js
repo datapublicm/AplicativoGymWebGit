@@ -26,6 +26,10 @@ const setStatus = message => {
 };
 const must = (data,error) => { if(error) throw error; return data; };
 const owns = () => !!signedIn?.id;
+// Las solicitudes iniciadas en una cuenta no pueden actualizar la vista de otra.
+const assertCurrentSession = (uid, epoch) => {
+ if(!owns() || signedIn.id!==uid || authEpoch!==epoch) throw Error('La sesión cambió durante la carga de datos.');
+};
 
 async function assertGymlyticsAccess(user) {
   const {data,error} = await db.from('tbl_usuarios').select('id,usuario,nombre,rol,activo').eq('id',user.id).maybeSingle();
@@ -196,13 +200,14 @@ const cloud={
  },
  async loadOwnCatalog(){
   if(!owns())return [];
-  const uid=signedIn.id;
+  const uid=signedIn.id, epoch=authEpoch;
   const [ex,gy,sd]=await Promise.all([
    db.from('tbl_ejercicios').select('*').eq('user_id',uid),
    db.from('tbl_gimnasios').select('id,nombre').eq('user_id',uid),
    db.from('tbl_sedes').select('id,nombre').eq('user_id',uid)
   ]);
   [ex,gy,sd].forEach(x=>must(x.data,x.error));
+  assertCurrentSession(uid,epoch);
   window.GymExerciseLibrary=ex.data.filter(x=>!x.gimnasio_id&&x.origen==='usuario');
   const g=new Map(gy.data.map(x=>[x.id,x.nombre])),s=new Map(sd.data.map(x=>[x.id,x.nombre]));
   return ex.data.filter(x=>x.gimnasio_id&&x.sede_id).map(x=>({
@@ -215,7 +220,7 @@ const cloud={
  },
  async loadIndependentCatalog(){
   if(!owns()){window.GymEntities={gyms:[],sites:[],machines:[],options:[]};return window.GymEntities;}
-  const uid=signedIn.id;
+  const uid=signedIn.id, epoch=authEpoch;
   const [gy,sd,mc,op]=await Promise.all([
     db.from('tbl_gimnasios').select('id,nombre').eq('user_id',uid).order('nombre'),
     db.from('tbl_sedes').select('id,gimnasio_id,nombre').eq('user_id',uid).order('nombre'),
@@ -223,6 +228,7 @@ const cloud={
     db.from('tbl_opciones_personales').select('id,tipo,nombre').eq('user_id',uid).eq('activo',true).order('nombre')
   ]);
   for(const x of [gy,sd,mc,op])must(x.data,x.error);
+  assertCurrentSession(uid,epoch);
   window.GymEntities={gyms:gy.data||[],sites:sd.data||[],machines:mc.data||[],options:op.data||[]};
   if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
   return window.GymEntities;
@@ -262,10 +268,12 @@ const cloud={
  },
  async loadCatalogStats(){
   if(!owns())return;
+  const uid=signedIn.id, epoch=authEpoch;
   for(const [t,id] of [['tbl_gimnasios','gymCount'],['tbl_ejercicios','exerciseCount'],['tbl_musculos','muscleCount']]){
    let q=db.from(t).select('*',{head:true,count:'exact'});
-   if(t!=='tbl_musculos')q=q.eq('user_id',signedIn.id);
+   if(t!=='tbl_musculos')q=q.eq('user_id',uid);
    const {count,error}=await q;
+   assertCurrentSession(uid,epoch);
    $(id).textContent=error?'Sin conexión':String(count??0);
   }
  },
