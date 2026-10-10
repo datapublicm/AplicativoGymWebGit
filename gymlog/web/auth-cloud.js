@@ -422,7 +422,7 @@ function enterPasswordResetMode(){
 $('authRecovery').addEventListener('click',async()=>{
  if(!client)return setStatus('Configura Supabase antes de recuperar acceso.');
  const email=$('authEmail').value.trim();
- if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
   return setStatus('Introduce el correo electrónico de tu cuenta para crear o recuperar tu contraseña.');
  // La URL de Capacitor (https://localhost) no es un destino válido para un correo.
  const location=window.location;
