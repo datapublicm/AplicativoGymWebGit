@@ -41,3 +41,30 @@ test('No se adjuntan claves administrativas al código cliente',()=>{
  assert.doesNotMatch(auth,/sb_secret_[A-Za-z0-9]+/);
  assert.doesNotMatch(auth,/eyJ[A-Za-z0-9._-]{70,}/);
 });
+
+
+test('01.04: pestañas por ejercicio con borradores separados',()=>{
+ for(const id of ['exerciseTabs','addExerciseTab'])assert.ok(html.includes('id="'+id+'"'),id);
+ for(const operation of ['storeActiveDraft','openDraft','newDraft','closeDraft','snapshotExerciseRows'])assert.ok(app.includes('function '+operation+'('),operation);
+ for(const field of ['weight','reps','help','seriesMode','seriesGroups'])assert.ok(app.includes(field),field);
+});
+test('01.04: formularios independientes y máquina existente',()=>{
+ for(const id of ['addGymForm','addSiteForm','addMachineForm','exerciseMachineSelect'])assert.ok(html.includes('id="'+id+'"'),id);
+ assert.ok(auth.includes("async addIndependentItem("));
+ assert.ok(auth.includes("maquina_id"));
+ assert.ok(auth.includes('Primero registra la máquina'));
+ assert.ok(app.includes('function renderExerciseMachineOptions()'));
+});
+test('01.04: catálogo descargado tras login, nunca embebido en la APK',()=>{
+ assert.doesNotMatch(html,/catalogo\.js/);
+ assert.doesNotMatch(read('vite.config.js'),/['"]catalogo\.js['"]/);
+ assert.doesNotMatch(read('web/sw.js'),/['"]\.\/catalogo\.js['"]/);
+ assert.match(app,/const base=window\.GymBaseCatalog\|\|\[\]/);
+ assert.ok(auth.includes('await cloud.loadInitialCatalog()'));
+});
+test('01.04: safe areas y CSS de pestañas',()=>{
+ const css=read('web/styles.css');
+ assert.ok(css.includes('safe-area-inset-top'));
+ assert.ok(css.includes('safe-area-inset-bottom'));
+ assert.ok(css.includes('.exercise-tabs-wrap'));
+});
