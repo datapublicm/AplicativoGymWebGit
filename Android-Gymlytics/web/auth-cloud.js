@@ -126,16 +126,21 @@ const cloud={
  getSessionStamp:()=>owns()?signedIn.id+':'+authEpoch:null,
  async ensureExercise(exercise,technique=''){
   if(!owns())throw Error('La sesión no está autorizada');
-  const user_id=signedIn.id;
+  const user_id=signedIn.id,epoch=authEpoch;
   const gimnasio_id=await findOrCreate('tbl_gimnasios',{user_id,nombre:exercise.g});
+  assertCurrentSession(user_id,epoch);
   const sede_id=await findOrCreate('tbl_sedes',{user_id,gimnasio_id,nombre:exercise.s});
+  assertCurrentSession(user_id,epoch);
   const maquina_id=exercise.i?await findOrCreate('tbl_maquinas',{user_id,nombre:exercise.i},{tipo_equipo:exercise.kind||'Otro'}):null;
+  assertCurrentSession(user_id,epoch);
   const fields={user_id,origen:'usuario',gimnasio_id,sede_id,nombre:exercise.e,
     instrumento:exercise.i,tecnica_actualizada:technique||exercise.t?.[0]||'Ejecución base'};
   const ejercicio_id=await findOrCreate('tbl_ejercicios',fields,{
     maquina_id,tipo_equipo:exercise.kind||'Otro',zona_entrenamiento:exercise.z||'',accesorio:exercise.a||'',
     agarre:exercise.gr||'',implemento:exercise.a||''});
+  assertCurrentSession(user_id,epoch);
   if(maquina_id){const {error}=await db.from('tbl_ejercicios').update({maquina_id}).eq('id',ejercicio_id).eq('user_id',user_id);must(null,error);}
+  assertCurrentSession(user_id,epoch);
   return {user_id,gimnasio_id,sede_id,ejercicio_id,maquina_id};
  },
  async saveWorkout({exercise,date,technique,notes,entries}) {
