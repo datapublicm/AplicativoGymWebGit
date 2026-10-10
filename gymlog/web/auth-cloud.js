@@ -68,7 +68,7 @@ async function applyState(session,epoch) {
   $('authProfile').hidden=!logged;
   if(!logged){
     window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
-    window.GymEntities={gyms:[],sites:[],machines:[]};
+    window.GymEntities={gyms:[],sites:[],machines:[],options:[]};
     if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
     model.records=[];model.photos={};
     if(lastDraftOwner!==null){lastDraftOwner=null;if(typeof resetExerciseTabs==='function')resetExerciseTabs();}
@@ -214,15 +214,16 @@ const cloud={
   }));
  },
  async loadIndependentCatalog(){
-  if(!owns()){window.GymEntities={gyms:[],sites:[],machines:[]};return window.GymEntities;}
+  if(!owns()){window.GymEntities={gyms:[],sites:[],machines:[],options:[]};return window.GymEntities;}
   const uid=signedIn.id;
-  const [gy,sd,mc]=await Promise.all([
+  const [gy,sd,mc,op]=await Promise.all([
     db.from('tbl_gimnasios').select('id,nombre').eq('user_id',uid).order('nombre'),
     db.from('tbl_sedes').select('id,gimnasio_id,nombre').eq('user_id',uid).order('nombre'),
-    db.from('tbl_maquinas').select('id,nombre,tipo_equipo').eq('user_id',uid).order('nombre')
+    db.from('tbl_maquinas').select('id,nombre,tipo_equipo').eq('user_id',uid).order('nombre'),
+    db.from('tbl_opciones_personales').select('id,tipo,nombre').eq('user_id',uid).eq('activo',true).order('nombre')
   ]);
-  for(const x of [gy,sd,mc])must(x.data,x.error);
-  window.GymEntities={gyms:gy.data||[],sites:sd.data||[],machines:mc.data||[]};
+  for(const x of [gy,sd,mc,op])must(x.data,x.error);
+  window.GymEntities={gyms:gy.data||[],sites:sd.data||[],machines:mc.data||[],options:op.data||[]};
   if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
   return window.GymEntities;
  },
@@ -239,6 +240,9 @@ const cloud={
    const tipo_equipo=values.tipo_equipo||'Máquina';
    if(!['Máquina','Implemento libre','Peso corporal','Otro'].includes(tipo_equipo))throw Error('Tipo de equipo incorrecto');
    await findOrCreate('tbl_maquinas',{user_id,nombre},{tipo_equipo});
+  }else if(kind==='option'){
+   if(!['zona','accesorio','agarre','tecnica'].includes(values.tipo))throw Error('Tipo de opción no válido');
+   await findOrCreate('tbl_opciones_personales',{user_id,tipo:values.tipo,nombre});
   }else throw Error('Tipo de catálogo no reconocido');
   await this.loadIndependentCatalog();
   await this.loadCatalogStats();
@@ -322,7 +326,7 @@ const cloud={
 };
 window.GymCloud=cloud;
 for(const [formId,kind,feedbackId] of [
- ['addGymForm','gym','gymFeedback'],['addSiteForm','site','siteFeedback'],['addMachineForm','machine','machineFeedback']
+ ['addGymForm','gym','gymFeedback'],['addSiteForm','site','siteFeedback'],['addMachineForm','machine','machineFeedback'],['addOptionForm','option','optionFeedback']
 ]){
  $(formId)?.addEventListener('submit',async event=>{
   event.preventDefault();
