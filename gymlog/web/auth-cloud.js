@@ -12,6 +12,7 @@ const client = ready ? createClient(config.url, config.key, {
 }) : null;
 const db = client?.schema(config.schema);
 let signedIn = null;
+let lastDraftOwner = null;
 const $ = id => document.getElementById(id);
 const setStatus = message => { $('authStatus').textContent = message; };
 const must = (data,error) => { if(error) throw error; return data; };
@@ -45,12 +46,16 @@ async function updateState(session) {
       window.GymCustomCatalog=await cloud.loadOwnCatalog();
       await cloud.loadIndependentCatalog();
       if(typeof cascade==='function')cascade(0);
+      if(lastDraftOwner!==signedIn.id){
+        if(typeof resetExerciseTabs==='function')resetExerciseTabs();
+        lastDraftOwner=signedIn.id;
+      }
       if(typeof renderOwnCatalog==='function')renderOwnCatalog();
       model.records=await cloud.loadHistory();drawRecent();drawHistory();drawReports();
       await cloud.loadCatalogStats();
     }
     catch(error){setStatus('Sesión activa; error al cargar datos: '+error.message);}
-  } else {window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymEntities={gyms:[],sites:[],machines:[]};if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();model.records=[];model.photos={};drawRecent();drawHistory();drawReports();}
+  } else {window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymEntities={gyms:[],sites:[],machines:[]};if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();model.records=[];model.photos={};if(lastDraftOwner!==null){lastDraftOwner=null;if(typeof resetExerciseTabs==='function')resetExerciseTabs();}drawRecent();drawHistory();drawReports();}
   showPage('sesion');
 }
 async function findOrCreate(table,fields,insertExtra={}) {
