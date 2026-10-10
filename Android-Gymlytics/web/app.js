@@ -248,16 +248,21 @@ function drawHistory(reset=false){
 }
 async function deleteRecord(id){
  if(!window.GymCloud?.canWrite())return;
- const row=model.records.find(x=>x.id===id);if(!row||!confirm(`¿Eliminar ${row.series} de ${row.exercise}?`))return;
+ const stamp=window.GymCloud.getSessionStamp?.();
+ const current=()=>stamp===window.GymCloud.getSessionStamp?.()&&window.GymCloud.canWrite();
+ const row=model.records.find(x=>x.id===id);
+ if(!row||!confirm(`¿Eliminar ${row.series} de ${row.exercise}?`)||!current())return;
  try{await window.GymCloud.deleteSeries(id)}
- catch(err){toast('No se pudo eliminar: '+String(err.message||err).slice(0,90));return}
+ catch(err){if(current())toast('No se pudo eliminar: '+String(err.message||err).slice(0,90));return}
+ if(!current())return;
  model.records=model.records.filter(x=>x.id!==id);
  drawRecent();drawHistory();drawReports();
  try{
-  model.records=await window.GymCloud.loadHistory();
-  drawRecent();drawHistory();drawReports();
+  const latest=await window.GymCloud.loadHistory();
+  if(!current())return;
+  model.records=latest;drawRecent();drawHistory();drawReports();
   toast('Serie eliminada de Supabase');
- }catch(err){toast('Serie ELIMINADA; no se pudo actualizar el historial.');}
+ }catch(err){if(current())toast('Serie ELIMINADA; no se pudo actualizar el historial.');}
 }
 function drawReports(){const rows=model.records,days=new Set(rows.map(r=>r.date)).size,vol=rows.reduce((v,r)=>v+r.weight*(r.unit==='lb'?0.45359237:1)*r.reps,0);$('reportStats').innerHTML=`<div class="stat"><strong>${rows.length}</strong><small>Series guardadas</small></div><div class="stat"><strong>${days}</strong><small>Días con registros</small></div><div class="stat"><strong>${Math.round(vol).toLocaleString('es-PE')}</strong><small>Volumen en kg</small></div>`;const counts={};rows.forEach(r=>counts[r.exercise]=(counts[r.exercise]||0)+1);$('frequentExercises').innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([name,n])=>`<div class="freq"><span>${esc(name)}</span><strong>${n}</strong></div>`).join('')||'<div class="empty">Sin ejercicios todavía.</div>';}
 function download(name,content,mime){const blob=new Blob([content],{type:mime}),a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
@@ -268,19 +273,23 @@ async function uploadPhoto(event){
  const file=event.target.files?.[0],type=event.target.dataset.upload,r=chosenRow();
  if(!r||!file)return;
  if(!file.type.startsWith('image/')){toast('Selecciona una imagen válida');return;}
+ const stamp=window.GymCloud?.getSessionStamp?.();
+ const current=()=>stamp===window.GymCloud?.getSessionStamp?.()&&!!window.GymCloud?.canWrite();
  const key=type==='equipo'?`${r.g}|${r.s}|${r.i}`:`${r.g}|${r.s}|${r.i}|${r.e}`;
  try{
   const canvas=await photoCanvas(file,820);
+  if(!current())return;
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.78));
   if(!blob)throw Error('No se pudo procesar la fotografía');
   const url=canvas.toDataURL('image/jpeg',.78);
-  if(!window.GymCloud?.canWrite())throw Error('Inicia sesión para subir fotos');
+  if(!current())return;
   await window.GymCloud.uploadUserPhoto({exercise:r,technique:getValue('t'),
    type:type==='equipo'?'maquina':'ejercicio',side:null,blob});
+  if(!current())return;
   model.photos[type+':'+key]=url;
   detailOpenAfterUpload(type);
   toast('Fotografía guardada en Supabase ✓');
- }catch(error){toast('Error de fotografía: '+error.message.slice(0,110));}
+ }catch(error){if(current())toast('Error de fotografía: '+error.message.slice(0,110));}
  finally{event.target.value='';}
 }
 function photoCanvas(file,maxSize){
@@ -319,15 +328,19 @@ async function gymlyticsAnatomyUpload(event){
  const file=event.target.files?.[0],r=chosenRow(),side=gymlyticsAnatomySide;
  if(!file||!r)return;
  if(!file.type.startsWith('image/')){toast('Selecciona una imagen válida');return;}
+ const stamp=window.GymCloud?.getSessionStamp?.();
+ const current=()=>stamp===window.GymCloud?.getSessionStamp?.()&&!!window.GymCloud?.canWrite();
  try{
   const canvas=await photoCanvas(file,750);
+  if(!current())return;
   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.78));
   if(!blob)throw Error('No se pudo procesar la imagen');
-  if(!window.GymCloud?.canWrite())throw Error('Inicia sesión para subir fotografías');
+  if(!current())return;
   await window.GymCloud.uploadUserPhoto({exercise:r,technique:getValue('t'),type:'musculos',side,blob});
+  if(!current())return;
   model.photos['anatomia:'+side+':'+r.e]=canvas.toDataURL('image/jpeg',.78);
   gymlyticsAnatomyDraw();toast('Foto anatómica guardada en Supabase ✓');
- }catch(error){toast('Error al guardar foto: '+error.message.slice(0,110));}
+ }catch(error){if(current())toast('Error al guardar foto: '+error.message.slice(0,110));}
  finally{event.target.value='';}
 }
 
