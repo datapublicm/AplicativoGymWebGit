@@ -405,6 +405,7 @@ let recoveryMode=false;
 function enterPasswordResetMode(){
  recoveryMode=true;
  ++authEpoch;
+ pendingAuthId=null;pendingAuthPromise=null;
  signedIn=null;
  document.body.classList.add('auth-locked');
  document.querySelectorAll('[data-page]').forEach(button=>{
