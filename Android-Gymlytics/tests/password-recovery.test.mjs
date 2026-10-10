@@ -12,6 +12,8 @@ function harness({native=false}={}){
  const setup=`
 let authEpoch=7,pendingAuthId='old',pendingAuthPromise=Promise.resolve(),signedIn={id:'old'};
 let emailCalls=[],passwordCalls=[],statuses=[],pages=[],resumed=0;
+const model={records:[{id:'old'}],photos:{old:'photo'}};
+const drawRecent=()=>{},drawHistory=()=>{},drawReports=()=>{};
 const listeners={};
 const elements={};
 const $=id=>(elements[id]??=( {hidden:false,disabled:false,value:'',
