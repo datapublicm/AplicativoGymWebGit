@@ -154,15 +154,28 @@ async function saveSeries(){
   toast('Revisa peso, repeticiones y asistencias.');return;
  }
  if(!window.GymCloud?.canWrite()){toast('Inicia sesión para guardar en Supabase.');return}
+ const savedDraftId=activeDraftId;
+ const payload={exercise:r,date,technique:tech,notes:$('observaciones').value.trim(),entries};
+ const rowSignature=()=>JSON.stringify({date:$('fecha').value,tech:getValue('t'),exercise:chosenRow()?.e,
+   notes:$('observaciones').value.trim(),entries:getEntries().map(({el,...entry})=>entry)});
+ const submittedSignature=rowSignature();
  const btn=$('saveRecords'),feedback=$('saveFeedback');feedback.hidden=true;feedback.textContent='';btn.disabled=true;btn.textContent='Guardando en Supabase…';
  try{
-  await window.GymCloud.saveWorkout({exercise:r,date,technique:tech,notes:$('observaciones').value.trim(),entries});
+  await window.GymCloud.saveWorkout(payload);
  }catch(err){
   toast('No se guardó: '+String(err.message||err).slice(0,140));
   btn.disabled=false;btn.textContent='Guardar series';return;
  }
  // El guardado ya se confirmó: un error de lectura posterior no debe invitar a guardar de nuevo.
- renderSeries();$('observaciones').value='';
+ const origin=draftTabs.find(tab=>tab.id===savedDraftId);
+ if(activeDraftId===savedDraftId&&rowSignature()===submittedSignature){
+  renderSeries();$('observaciones').value='';
+ }else if(origin&&activeDraftId!==savedDraftId){
+  origin.rows=[];origin.notes='';
+ }else{
+  feedback.textContent='✅ Series guardadas. Detectamos cambios durante el guardado; revisa las series que siguen visibles antes de guardar nuevamente.';
+  feedback.hidden=false;
+ }
  btn.textContent='Actualizando historial…';
  try{
   model.records=await window.GymCloud.loadHistory();
