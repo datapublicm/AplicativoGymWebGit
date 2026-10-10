@@ -73,9 +73,11 @@ function detailOpen(){const r=chosenRow();if(!r||!getValue('t'))return;const tec
  for(const type of ['equipo','ejercicio']){const [src,hasPhoto]=photoFor(type,r);$(type==='equipo'?'detailEquipmentImg':'detailExerciseImg').src=src;$(type==='equipo'?'equipmentNoPhoto':'exerciseNoPhoto').hidden=hasPhoto}
  anatomyData=null;gymlyticsAnatomyView('frontal');$('detailModal').showModal();
  const token=++anatomyRequestId;
+ const sessionStamp=window.GymCloud?.getSessionStamp?.();
+ const current=()=>token===anatomyRequestId&&sessionStamp===window.GymCloud?.getSessionStamp?.()&&!!window.GymCloud?.canWrite();
  const status=$('anatomyCloudState');if(status)status.textContent='Consultando relaciones musculares en Supabase…';
  window.GymCloud?.loadAnatomy?.(r)?.then(data=>{
-  if(token!==anatomyRequestId)return;
+  if(!current())return;
   anatomyData=data;
   if(status)status.textContent=data.id?
    (data.primary.length+data.secondary.length?'Relaciones musculares vinculadas por ID.':'Ejercicio vinculado; asignación de músculos pendiente.'):
@@ -91,7 +93,7 @@ function detailOpen(){const r=chosenRow();if(!r||!getValue('t'))return;const tec
     model.photos[type+':'+key]=url;detailOpenAfterUpload(type);}
   }
   gymlyticsAnatomyDraw();
- }).catch(e=>{if(token===anatomyRequestId&&status)status.textContent='No se pudo consultar Supabase: '+e.message;});}
+ }).catch(e=>{if(current()&&status)status.textContent='No se pudo consultar Supabase: '+e.message;});}
 function showPage(page){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+page));document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));if(page==='tablas')drawHistory();if(page==='dashboard')drawReports();window.scrollTo({top:0,behavior:'instant'})}
 function setMobileStep(step){const target=step==='series'?'series':'context';$('page-registro').classList.toggle('step-context',target==='context');$('page-registro').classList.toggle('step-series',target==='series');document.querySelectorAll('[data-mobile-step]').forEach(b=>{const selected=b.dataset.mobileStep===target;b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected))});window.scrollTo({top:0,behavior:'instant'});}
 
