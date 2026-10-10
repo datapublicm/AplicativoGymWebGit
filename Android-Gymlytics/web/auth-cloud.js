@@ -329,13 +329,17 @@ const cloud={
  async uploadUserPhoto({exercise,technique,type,side,blob}){
   if(!owns())throw Error('Necesitas iniciar sesión para añadir fotografías');
   if(!['maquina','ejercicio','musculos'].includes(type))throw Error('Tipo de foto incorrecto');
+  const uid=signedIn.id,epoch=authEpoch;
   const {ejercicio_id}=await this.ensureExercise(exercise,technique);
-  const path=signedIn.id+'/'+crypto.randomUUID()+'.jpg';
+  assertCurrentSession(uid,epoch);
+  const path=uid+'/'+crypto.randomUUID()+'.jpg';
   const {error}=await client.storage.from('gymlog-usuarios').upload(path,blob,{contentType:'image/jpeg',upsert:false});
   if(error)throw error;
-  const saved=await db.from('tbl_fotos').insert({user_id:signedIn.id,ejercicio_id,
+  assertCurrentSession(uid,epoch);
+  const saved=await db.from('tbl_fotos').insert({user_id:uid,ejercicio_id,
    storage_path:path,tipo_referencia:type,vista:side||null,descripcion:'Fotografía Gymlytics'});
   if(saved.error){await client.storage.from('gymlog-usuarios').remove([path]);throw saved.error;}
+  assertCurrentSession(uid,epoch);
   return path;
  }
 };
