@@ -16,7 +16,7 @@ function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('sho
 function getValue(key){if(key==='kind')return document.querySelector('input[name="tipo"]:checked')?.value||'';return $(FLOW.find(x=>x[0]===key)[1]).value}
 function fillSelect(id,choices,preferred){const el=$(id),old=el.value,selection=[preferred,old,choices[0]].find(v=>choices.includes(v))||'';el.replaceChildren();if(!choices.length){el.add(new Option('Sin opciones para esta selección',''));el.disabled=true;return}el.disabled=false;for(const value of choices)el.add(new Option(value,value));el.value=selection}
 function fillTypes(choices,preferred){const valid=new Set(choices);const old=getValue('kind');const chosen=[preferred,old,'Máquina',...choices].find(v=>valid.has(v));document.querySelectorAll('input[name="tipo"]').forEach(r=>{r.disabled=!valid.has(r.value);r.checked=r.value===chosen})}
-function allCatalog(){const base=window.GymBaseCatalog?.length?window.GymBaseCatalog:CATALOG;return [...base,...(window.GymCustomCatalog||[])].filter(r=>r.g&&r.s&&r.e)}
+function allCatalog(){const base=window.GymBaseCatalog||[];return [...base,...(window.GymCustomCatalog||[])].filter(r=>r.g&&r.s&&r.e)}
 function cascade(start=0,preferred={}){let rows=allCatalog();for(let n=0;n<FLOW.length;n++){
  const [key,id]=FLOW[n];
  if(n>=start){const choices=key==='t'?uniq(rows.flatMap(r=>r.t)):uniq(rows.map(r=>r[key]));if(key==='kind')fillTypes(choices,preferred[key]);else fillSelect(id,choices,preferred[key]);}
