@@ -24,39 +24,78 @@ async function assertGymLogAccess(user) {
   if(!data?.activo) throw new Error('Tu cuenta no tiene acceso activo a GymLog.');
   return data;
 }
-async function updateState(session) {
-  const user=session?.user || null;
-  signedIn = null;
-  if(user) {
-    try { const profile=await assertGymLogAccess(user); signedIn={...user,gymlog:profile}; }
-    catch(error){setStatus(error.message);}
+let authEpoch=0, pendingAuthId=null, pendingAuthPromise=null;
+function updateState(session) {
+  const id=session?.user?.id||null;
+  // Restauración de sesión y evento de SIGNED_IN pueden llegar juntos.
+  if(id&&pendingAuthPromise&&pendingAuthId===id)return pendingAuthPromise;
+  if(id&&signedIn?.id===id)return Promise.resolve();
+  const epoch=++authEpoch;
+  pendingAuthId=id;
+  const promise=applyState(session,epoch);
+  pendingAuthPromise=promise.finally(()=>{
+    if(epoch===authEpoch){pendingAuthId=null;pendingAuthPromise=null;}
+  });
+  return pendingAuthPromise;
+}
+async function applyState(session,epoch) {
+  const user=session?.user||null;
+  signedIn=null;
+  let accessError=null;
+  if(user){
+    try {
+      const profile=await assertGymLogAccess(user);
+      if(epoch!==authEpoch)return;
+      signedIn={...user,gymlog:profile};
+    }catch(error){accessError=error;}
   }
+  if(epoch!==authEpoch)return;
   document.body.classList.toggle('auth-locked',!owns());
   document.querySelectorAll('[data-page]').forEach(b=>{
     if(b.dataset.page!=='sesion'){b.disabled=!owns();b.setAttribute('aria-disabled',String(!owns()));}
   });
-  const logged=owns();$('authForm').hidden=logged;$('authRegister').hidden=logged;$('authRecovery').hidden=logged;
+  const logged=owns();
+  $('authForm').hidden=logged;$('authRegister').hidden=logged;$('authRecovery').hidden=logged;
   $('authProfile').hidden=!logged;
-  if(logged){
-    $('loggedUser').textContent=signedIn.gymlog.nombre||signedIn.gymlog.usuario;
-    $('loggedEmail').textContent=signedIn.email;
-    setStatus('Sesión activa · Supabase '+config.environment);
-    try {
-      window.GymBaseCatalog=await cloud.loadInitialCatalog();
-      window.GymCustomCatalog=await cloud.loadOwnCatalog();
-      await cloud.loadIndependentCatalog();
-      if(typeof cascade==='function')cascade(0);
-      if(lastDraftOwner!==signedIn.id){
-        if(typeof resetExerciseTabs==='function')resetExerciseTabs();
-        lastDraftOwner=signedIn.id;
-      }
-      if(typeof renderOwnCatalog==='function')renderOwnCatalog();
-      model.records=await cloud.loadHistory();drawRecent();drawHistory();drawReports();
-      await cloud.loadCatalogStats();
+  if(!logged){
+    window.GymBaseCatalog=[];window.GymCustomCatalog=[];
+    window.GymEntities={gyms:[],sites:[],machines:[]};
+    if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
+    model.records=[];model.photos={};
+    if(lastDraftOwner!==null){lastDraftOwner=null;if(typeof resetExerciseTabs==='function')resetExerciseTabs();}
+    drawRecent();drawHistory();drawReports();
+    if(accessError)setStatus(accessError.message);
+    showPage('sesion');
+    return;
+  }
+  $('loggedUser').textContent=signedIn.gymlog.nombre||signedIn.gymlog.usuario;
+  $('loggedEmail').textContent=signedIn.email;
+  setStatus('Cargando catálogos desde Supabase…');
+  try{
+    const [base,custom]=await Promise.all([cloud.loadInitialCatalog(),cloud.loadOwnCatalog()]);
+    if(epoch!==authEpoch)return;
+    window.GymBaseCatalog=base;
+    window.GymCustomCatalog=custom;
+    await cloud.loadIndependentCatalog();
+    if(epoch!==authEpoch)return;
+    if(typeof cascade==='function')cascade(0);
+    if(lastDraftOwner!==signedIn.id){
+      if(typeof resetExerciseTabs==='function')resetExerciseTabs();
+      lastDraftOwner=signedIn.id;
     }
-    catch(error){setStatus('Sesión activa; error al cargar datos: '+error.message);}
-  } else {window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymEntities={gyms:[],sites:[],machines:[]};if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();model.records=[];model.photos={};if(lastDraftOwner!==null){lastDraftOwner=null;if(typeof resetExerciseTabs==='function')resetExerciseTabs();}drawRecent();drawHistory();drawReports();}
-  showPage('sesion');
+    if(typeof renderOwnCatalog==='function')renderOwnCatalog();
+    setStatus('Cargando historial de entrenamientos…');
+    const history=await cloud.loadHistory();
+    if(epoch!==authEpoch)return;
+    model.records=history;drawRecent();drawHistory();drawReports();
+    await cloud.loadCatalogStats();
+    if(epoch!==authEpoch)return;
+    setStatus('Sesión activa · '+history.length.toLocaleString('es-PE')+' series cargadas · '+config.environment);
+  }catch(error){
+    if(epoch!==authEpoch)return;
+    setStatus('Sesión activa; error al cargar datos: '+error.message);
+  }
+  if(epoch===authEpoch)showPage('registro');
 }
 async function findOrCreate(table,fields,insertExtra={}) {
   let q=db.from(table).select('id');
@@ -101,13 +140,14 @@ const cloud={
   if(!owns())return [];
   // Evitar el límite de 1.000 filas por petición de la Data API.
   // Vista security_invoker: RLS del esquema restringe las series al usuario autenticado.
-  const pageSize=700,all=[];
+  const pageSize=700,all=[],userId=signedIn.id;
   for(let offset=0;;offset+=pageSize){
     const {data,error}=await db.from('vw_historial_series')
-      .select('*').eq('user_id',signedIn.id)
+      .select('*').eq('user_id',userId)
       .order('date',{ascending:false}).order('id',{ascending:true})
       .range(offset,offset+pageSize-1);
     must(data,error);
+    if(!owns()||signedIn.id!==userId)throw Error('La sesión cambió mientras se cargaba el historial');
     const batch=data||[];
     all.push(...batch.map(r=>({...r,weight:Number(r.weight||0),
       reps:Number(r.reps||0),assistance:Number(r.assistance||0)})));
