@@ -208,3 +208,8 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 .history-pagination span{color:#a0c8e2;font-size:12px;font-weight:600}
 .history-pagination button{white-space:normal;min-width:140px}
 @media(max-width:760px){.history-pagination{flex-direction:column}.history-pagination button{width:100%;min-height:44px}}
+
+/* Confirmación visible: no duplicar series */
+.save-feedback{margin:0 17px 14px;padding:12px 13px;border:1px solid #34779a;border-radius:10px;background:#0c3047;color:#b4f2ff;font-size:12px;line-height:1.6}
+.save-feedback[hidden]{display:none!important}
+@media(max-width:760px){.save-feedback{margin:0 12px 12px}}
