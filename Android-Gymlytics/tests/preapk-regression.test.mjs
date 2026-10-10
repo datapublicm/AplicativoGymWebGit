@@ -42,7 +42,7 @@ test('Renombrado: paquete, identificador, manifest y RPC mantienen Gymlytics', (
 });
 
 test('El CI de la rama Android ejecuta solo pruebas y nunca compila la APK', () => {
-  const workflow = fs.readFileSync(new URL('../../.github/workflows/validar-android-gymlytics.yml', root), 'utf8');
+  const workflow = fs.readFileSync(new URL('../.github/workflows/validar-android-gymlytics.yml', root), 'utf8');
   assert.match(workflow, /branches: \[Android-Gymlytics\]/);
   assert.match(workflow, /npm run test:static/);
   assert.doesNotMatch(workflow, /npx cap|gradlew|assembleDebug|assembleRelease|npm run build:web/);
