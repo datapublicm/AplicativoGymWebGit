@@ -1,0 +1,50 @@
+name: GymLog - validar proyectos por carpetas (sin APK)
+on:
+  push:
+    branches:
+      - feature/organizacion-web-android
+    paths:
+      - 'Web-Hostinger/**'
+      - 'Android-GymLog/**'
+      - '.github/workflows/proyectos-carpetas-checks.yml'
+      - 'ORGANIZACION_GYMLOG.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  web-hostinger:
+    name: Web Hostinger - estructura y sintaxis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probar rutas y archivos de la web
+        run: node --test Web-Hostinger/tests/*.test.mjs
+      - name: Comprobar sintaxis JavaScript de la web
+        run: find Web-Hostinger -type f -name '*.js' -exec node --check '{}' \;
+  android-gymlog:
+    name: Android GymLog - pruebas Node sin APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Android-GymLog
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar sintaxis JavaScript
+        run: |
+          node --check web/app.js
+          node --check web/auth-cloud.js
+          node --check vite.config.js
+      - name: Ejecutar pruebas de GymLog
+        run: npm run test:static
+      - name: Confirmar que se trata solo de pruebas
+        run: |
+          test ! -d android/app
+          test ! -d dist
+          test ! -d node_modules
+          echo "No se instala Android SDK ni se compila APK"
