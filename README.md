@@ -1,12 +1,12 @@
 # Gymlytics — proyecto Android
 
-Proyecto Gymlytics (antes GymLog), desarrollo 01.04. Esta rama de GitHub aún se identifica como `Android-GymLog` y su carpeta con ese mismo nombre: no se renombraron los refs Git por limitaciones de la integración disponible.
+Código de Gymlytics 01.04, separado de la web oficial. La **carpeta ya se llama `Android-Gymlytics/`**, mientras la rama sigue siendo `Android-GymLog` hasta poder renombrarla en GitHub sin crear referencias duplicadas.
 
-- Aplicación: **Gymlytics** · `com.datapublicm.gymlytics` (identificador Capacitor).
-- Supabase Pruebas compartido `ProyectosPrueba`: esquema `sch_android_gymlytics`, registro `app_core.apps.slug='gymlytics'`.
-- API de usuario: función Edge `gymlytics-login-usuario` y funciones SQL internas Gymlytics.
-- Buckets de almacenamiento conservados: `gymlog-usuarios` y `gymlog-anatomia`; no se cambiaron sus políticas ni se trasladaron objetos (ambos vacíos al verificar).
-- Historial: 18.526 series y 6.218 reportes conservados en Supabase Pruebas.
-- Validación del proyecto: `cd Android-GymLog && npm run test:static`.
-- No se compila la APK; autenticación y recuperación del historial desde Android siguen sin prueba real con credenciales.
-- La rama `main` y los datos de Producción siguen intactos.
+- Aplicación: Gymlytics · identificador Capacitor `com.datapublicm.gymlytics`.
+- Supabase Pruebas: proyecto compartido `ProyectosPrueba`, esquema `sch_android_gymlytics`, aplicación `app_core.apps.slug='gymlytics'`.
+- Login por nombre de usuario: función `gymlytics-login-usuario`.
+- Los depósitos de Storage conservan por compatibilidad sus IDs `gymlog-usuarios` y `gymlog-anatomia`. Las políticas siguen sujetas a permisos de propietario.
+- Historial verificado en la base: 18.526 series y 6.218 reportes de dos cuentas.
+- Pruebas estáticas: `cd Android-Gymlytics && npm run test:static`.
+- Las pruebas automatizadas no sustituyen la autenticación ni descarga real de la aplicación.
+- No se ha compilado APK, publicado ni modificado la rama oficial `main`.
