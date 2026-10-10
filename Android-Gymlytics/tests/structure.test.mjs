@@ -80,7 +80,8 @@ test('01.04 revisión 03: sesión sin cargas dobles ni redirecciones en refresh'
  assert.ok(auth.includes("showPage('registro')"));
 });
 test('01.04 revisión 03: historial completo paginado y catálogo ampliable',()=>{
- assert.ok(auth.includes("const uid=signedIn.id, pageSize=700, parallel=4;"));
+ assert.ok(auth.includes("const uid=signedIn.id,epoch=authEpoch,pageSize=700,parallel=4;"));
+ assert.ok(auth.includes("assertCurrentSession(uid,epoch);"));
  assert.ok(auth.includes("count:'exact',head:true"));
  assert.ok(auth.includes("offset+pageSize-1"));
  assert.ok(auth.includes("const all=[],pageSize=700;"));
