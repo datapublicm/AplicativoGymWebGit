@@ -52,3 +52,19 @@ También se ofrece `npm run test:integration` cuando las variables ya estén pre
 - [ ] No compilar APK hasta autorización explícita.
 
 **La ausencia de una prueba HTTP real no debe presentarse como éxito de integración funcional.**
+
+
+## Continuación — validación de operaciones entre sesiones (10/10/2026)
+
+Se reforzó el aislamiento por sesión en el cliente de **Android-Gymlytics** y se ejecutaron pruebas sin paquetes ni compilación.
+
+- `web/app.js`: guardado, eliminación de series, subida de fotografías, vista anatómica y descarga posterior verifican que la sesión actual corresponde a la solicitud que generó la respuesta. Evitan sobrescribir el historial o la previsualización de otra cuenta.
+- `web/auth-cloud.js`: `ensureExercise`, `uploadUserPhoto` y `loadAnatomy` guardan la identidad y época de sesión y las comprueban entre operaciones asíncronas. Las rutas de Storage y los registros de `tbl_fotos` utilizan el identificador fijado al iniciar la subida.
+- Nuevas pruebas: `mutation-session-isolation.test.mjs`, `cloud-write-session.test.mjs` y `anatomy-session-isolation.test.mjs`.
+- **GitHub Actions 38080959688:** **56 pruebas Node aprobadas, 0 fallidas**; comprobación de sintaxis y verificación de ausencia de artefactos completadas.
+- Revisión SQL de solo lectura posterior: **2 usuarios**, **6.218 reportes**, **18.526 series**, **0 fotografías** y **15/15 tablas con RLS**. Sin cambios en tablas ni autenticación.
+- Rama `main` observada sin variación en `7642f8eac9623892e7d292b2b49f81d14d76e2b1`. Las actualizaciones se realizaron únicamente en `Android-Gymlytics`.
+
+**Limitación importante:** Si la sesión cambia exactamente después de que Storage acepta un archivo y antes de que se inserte su metadato, se evita asociar la foto a la cuenta equivocada, pero podría quedar un archivo huérfano bajo la carpeta privada del propietario original. No se ha validado una rutina de limpieza de esos casos. No supone que se hayan creado archivos en esta revisión (la tabla de fotos permanece vacía).
+
+**Sigue pendiente:** comprobación HTTPS autenticada con tokens reales de dos cuentas de prueba; revisión en móvil/emulador de sesión, teclado, tablas, imágenes y safe areas; pruebas de escritura controladas con datos ficticios; recuperación de contraseña autorizada; y visor 3D. No se ha generado APK ni proyecto Gradle.
