@@ -167,3 +167,31 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
   #authForm input{min-width:0;width:100%;box-sizing:border-box}
   .bottom-nav{padding-bottom:max(6px,env(safe-area-inset-bottom,0px))!important}
 }
+
+
+/* GymLog 01.04 · Pestañas tipo navegador y catálogos independientes */
+.exercise-tabs-wrap{display:flex;align-items:stretch;gap:8px;min-width:0;margin:10px 8px 15px}
+.exercise-tabs{display:flex;align-items:stretch;gap:6px;flex:1;min-width:0;max-width:100%;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#35668f transparent;padding-bottom:5px}
+.exercise-tab-item{display:flex;align-items:center;gap:2px;min-width:115px;max-width:225px;flex-shrink:0;border:1px solid #284d76;background:#0b1d34;border-radius:11px;overflow:hidden}
+.exercise-tab-item:has(button.selected){background:#17395c;border-color:#17cdf3;box-shadow:0 0 13px #00d7ff25}
+.exercise-tab-item>button:first-child{border:0;min-width:0;max-width:190px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:12px 9px 12px 13px;background:transparent;color:#a5bdd7;text-align:left;font-weight:700;font-size:13px}
+.exercise-tab-item>button.selected{color:#83eaff}
+.exercise-tab-close{border:0;background:transparent;color:#a1bfd3;font-size:19px;width:30px;min-height:40px;flex-shrink:0}
+.exercise-tab-close:hover{color:#fff;background:#285373}
+.exercise-tab-add{border:1px solid #247b9d;border-radius:11px;background:linear-gradient(135deg,#0d527a,#1654a0);color:#95f3ff;font-size:27px;font-weight:500;min-width:45px;height:44px;flex-shrink:0;box-shadow:0 0 14px #00b8ec2b}
+.exercise-tab-add:hover{background:#127ca4}
+.catalog-independent{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 22px}
+.catalog-independent .catalog-form{display:flex;flex-direction:column;gap:11px;padding:15px;margin:0;border:1px solid #284d72;border-radius:13px;background:#0b203a}
+.catalog-independent .catalog-form h3{margin:0 0 2px;font-size:15px;color:#9deeff}
+.catalog-independent .catalog-form label{min-width:0}
+.catalog-independent .catalog-form button{white-space:normal}
+.catalog-independent .catalog-form p[role=status]{font-size:11px;line-height:1.4;margin:0}
+.catalog-create>h3{font-size:17px;color:#cdeeff;margin-top:20px}
+@media(max-width:1000px){.catalog-independent{grid-template-columns:1fr}}
+@media(max-width:760px){
+ .exercise-tabs-wrap{margin:7px 0 12px;gap:5px}
+ .exercise-tab-item{min-width:105px;max-width:174px}
+ .exercise-tab-item>button:first-child{font-size:12px;padding:12px 7px 12px 10px}
+ .exercise-tab-add{min-width:43px}
+ .catalog-independent .catalog-form{padding:13px}
+}
