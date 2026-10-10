@@ -67,7 +67,7 @@ async function applyState(session,epoch) {
   $('authForm').hidden=logged;$('authRegister').hidden=logged;$('authRecovery').hidden=logged;
   $('authProfile').hidden=!logged;
   if(!logged){
-    window.GymBaseCatalog=[];window.GymCustomCatalog=[];
+    window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
     window.GymEntities={gyms:[],sites:[],machines:[]};
     if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
     model.records=[];model.photos={};
@@ -203,6 +203,7 @@ const cloud={
    db.from('tbl_sedes').select('id,nombre').eq('user_id',uid)
   ]);
   [ex,gy,sd].forEach(x=>must(x.data,x.error));
+  window.GymExerciseLibrary=ex.data.filter(x=>!x.gimnasio_id&&x.origen==='usuario');
   const g=new Map(gy.data.map(x=>[x.id,x.nombre])),s=new Map(sd.data.map(x=>[x.id,x.nombre]));
   return ex.data.filter(x=>x.gimnasio_id&&x.sede_id).map(x=>({
    cloud_id:x.id,g:g.get(x.gimnasio_id)||'',s:s.get(x.sede_id)||'',
@@ -244,14 +245,15 @@ const cloud={
  },
  async saveCustomExercise(values){
   if(!owns())throw Error('Inicia sesión para editar tu catálogo');
-  const data=window.GymEntities||{gyms:[],sites:[],machines:[]};
-  const gym=data.gyms.find(x=>x.nombre===values.g);
-  const site=data.sites.find(x=>x.gimnasio_id===gym?.id&&x.nombre===values.s);
-  const machine=data.machines.find(x=>x.nombre===values.i&&x.tipo_equipo===values.kind);
-  if(!gym||!site)throw Error('Selecciona un gimnasio y una sede previamente registrados');
-  if(!machine)throw Error('Primero registra la máquina o equipo en su catálogo independiente');
-  const value={...values,t:[values.tecnica]};
-  await this.ensureExercise(value,values.tecnica);
+  const user_id=signedIn.id,nombre=String(values.e||'').trim();
+  if(!nombre)throw Error('Introduce un nombre de ejercicio');
+  // No asociar gimnasio, sede ni máquina hasta registrar el entrenamiento.
+  await findOrCreate('tbl_ejercicios',{
+   user_id,origen:'usuario',nombre,gimnasio_id:null,sede_id:null
+  },{
+   zona_entrenamiento:String(values.z||'').trim()||'Sin clasificar',
+   tecnica_actualizada:String(values.tecnica||'').trim()||'Ejecución base'
+  });
   return this.loadOwnCatalog();
  },
  async loadCatalogStats(){
@@ -342,9 +344,7 @@ $('catalogForm')?.addEventListener('submit',async event=>{
   const button=$('catalogSubmit');button.disabled=true;
   try{
    window.GymCustomCatalog=await cloud.saveCustomExercise(values);
-    await cloud.loadIndependentCatalog();
-   if(typeof cascade==='function')cascade(0,{g:values.g,s:values.s,z:values.z,kind:values.kind,
-    i:values.i,a:values.a,gr:values.gr,e:values.e,t:values.tecnica});
+   if(typeof cascade==='function')cascade(0,{e:values.e,z:values.z,t:values.tecnica||'Ejecución base'});
    if(typeof renderOwnCatalog==='function')renderOwnCatalog();
    await cloud.loadCatalogStats();
    event.currentTarget.reset();
