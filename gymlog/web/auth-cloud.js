@@ -14,7 +14,14 @@ const db = client?.schema(config.schema);
 let signedIn = null;
 let lastDraftOwner = null;
 const $ = id => document.getElementById(id);
-const setStatus = message => { $('authStatus').textContent = message; };
+const setStatus = message => {
+ $('authStatus').textContent=message;
+ const banner=$('syncBanner');
+ if(banner){
+  banner.textContent=message;
+  banner.hidden=!owns()||message.startsWith('Sesión activa · ');
+ }
+};
 const must = (data,error) => { if(error) throw error; return data; };
 const owns = () => !!signedIn?.id;
 
