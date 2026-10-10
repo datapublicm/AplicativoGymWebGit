@@ -63,6 +63,7 @@ async function applyState(session,epoch) {
     }catch(error){accessError=error;}
   }
   if(epoch!==authEpoch)return;
+  if(typeof invalidatePendingSave==='function')invalidatePendingSave();
   document.body.classList.toggle('auth-locked',!owns());
   document.querySelectorAll('[data-page]').forEach(b=>{
     if(b.dataset.page!=='sesion'){b.disabled=!owns();b.setAttribute('aria-disabled',String(!owns()));}
@@ -122,6 +123,7 @@ async function findOrCreate(table,fields,insertExtra={}) {
 }
 const cloud={
  canWrite:()=>owns(),
+ getSessionStamp:()=>owns()?signedIn.id+':'+authEpoch:null,
  async ensureExercise(exercise,technique=''){
   if(!owns())throw Error('La sesión no está autorizada');
   const user_id=signedIn.id;
@@ -421,6 +423,8 @@ function enterPasswordResetMode(){
  ++authEpoch;
  pendingAuthId=null;pendingAuthPromise=null;
  signedIn=null;
+ if(typeof invalidatePendingSave==='function')invalidatePendingSave();
+ model.records=[];model.photos={};drawRecent();drawHistory();drawReports();
  document.body.classList.add('auth-locked');
  document.querySelectorAll('[data-page]').forEach(button=>{
   if(button.dataset.page!=='sesion'){button.disabled=true;button.setAttribute('aria-disabled','true');}
