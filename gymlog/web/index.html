@@ -21,18 +21,13 @@ Supabase Pruebas</div></aside>
 <form id="addSiteForm" class="catalog-form"><h3 class="full">Sedes</h3><label>Gimnasio asociado<select name="gimnasio_id" id="siteGymSelect" required></select></label><label>Nombre de la sede<input name="nombre" required maxlength="120" placeholder="Nombre de la sede" /></label><button class="primary-btn full" type="submit">+ Agregar sede</button><p class="full" id="siteFeedback" role="status"></p></form>
 <form id="addMachineForm" class="catalog-form"><h3 class="full">Máquinas y equipos</h3><label>Nuevo equipo<input name="nombre" required maxlength="120" placeholder="Nombre de la máquina" /></label><label>Tipo<select name="tipo_equipo"><option>Máquina</option><option>Implemento libre</option><option>Peso corporal</option><option>Otro</option></select></label><button class="primary-btn full" type="submit">+ Agregar equipo</button><p class="full" id="machineFeedback" role="status"></p></form>
 </div>
-<h3>➕ Añadir ejercicio</h3><p>Selecciona un gimnasio y una sede previamente registrados. Solo esta operación necesita asociar sus elementos.</p>
+<h3>➕ Ejercicios independientes</h3>
+<p>Registra un ejercicio sin seleccionar gimnasio, sede, máquina ni agarre. Relacionarás estos elementos al crear el entrenamiento en Registro.</p>
 <form id="catalogForm" class="catalog-form">
-<label>Gimnasio<select name="g" id="exerciseGymSelect" required></select></label>
-<label>Sede<select name="s" id="exerciseSiteSelect" required></select></label>
-<label>Ejercicio<input name="e" required placeholder="Nombre del ejercicio" /></label>
-<label>Zona de entrenamiento<input name="z" required placeholder="Espalda, piernas, etc." /></label>
-<label>Tipo de equipo<select name="kind"><option>Máquina</option><option>Implemento libre</option><option>Peso corporal</option><option>Otro</option></select></label>
-<label>Máquina / equipo<select name="i" id="exerciseMachineSelect" required></select></label>
-<label>Accesorio / implemento<input name="a" placeholder="No especificado" value="No especificado" /></label>
-<label>Agarre<input name="gr" placeholder="No especificado" value="No especificado" /></label>
-<label class="full">Técnica<input name="tecnica" required placeholder="01 - Ejecución base" /></label>
-<button class="primary-btn full" id="catalogSubmit" type="submit">Guardar ejercicio en Supabase</button>
+<label>Nombre del ejercicio<input name="e" required maxlength="160" placeholder="Por ejemplo: Curl martillo" /></label>
+<label>Zona de entrenamiento<input name="z" placeholder="Por ejemplo: Braquial y antebrazo" /></label>
+<label class="full">Técnica de referencia (opcional)<input name="tecnica" placeholder="Ejecución base" /></label>
+<button class="primary-btn full" id="catalogSubmit" type="submit">+ Agregar ejercicio a mi catálogo</button>
 <p class="full" id="catalogFeedback" role="status"></p>
 </form><div id="catalogEntries"></div>
 </div></section>
