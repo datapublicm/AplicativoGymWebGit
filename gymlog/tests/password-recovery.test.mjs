@@ -19,6 +19,8 @@ const $=id=>(elements[id]??=( {hidden:false,disabled:false,value:'',
 $('authEmail').value='persona@example.test';
 $('passwordResetNew').value='ClaveSuperSegura2026!';
 $('passwordResetConfirm').value='ClaveSuperSegura2026!';
+const config={recoveryUrl:${native?'null':"'https://gym.example.test/app/'"}};
+const resolveRecoveryUrl=v=>v;
 const window={location:{protocol:'https:',hostname:'${native?'localhost':'gym.example.test'}',
  origin:'https://${native?'localhost':'gym.example.test'}',pathname:'/app/'}};
 const client={auth:{
@@ -49,11 +51,11 @@ test('Recuperación web pide enlace al origen HTTPS, sin revelar cuentas',async(
  assert.equal(h.values().emailCalls[0].options.redirectTo,'https://gym.example.test/app/');
  assert.ok(h.values().statuses.at(-1).startsWith('Si el correo corresponde'));
 });
-test('APK localhost no envía enlace que no puede recibir',async()=>{
+test('APK sin URL de retorno HTTPS configurada no envía enlaces',async()=>{
  const h=harness({native:true});
  await h.clickRecovery();
  assert.equal(h.values().emailCalls.length,0);
- assert.ok(h.values().statuses.at(-1).includes('APK'));
+ assert.ok(h.values().statuses.at(-1).includes('aún no está configurada'));
 });
 test('Enlace de recuperación: se valida confirmación antes de cambiar contraseña',async()=>{
  const h=harness();
