@@ -1,0 +1,43 @@
+name: GymLog 01.04 — solo pruebas (sin APK)
+on:
+  push:
+    branches:
+      - feature/gymlog-01-04-registro-tabs-safearea
+    paths:
+      - 'gymlog/**'
+      - '.github/workflows/gymlog-checks-only.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gymlog-static-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-tests:
+    name: Pruebas Node sin compilar
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: gymlog
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar sintaxis JavaScript
+        run: |
+          node --check web/app.js
+          node --check web/auth-cloud.js
+          node --check tests/structure.test.mjs
+      - name: Ejecutar pruebas estáticas
+        run: npm run test:static
+      - name: Comprobar que el catálogo no va en la APK
+        run: |
+          if grep -q 'catalogo.js' web/index.html; then echo 'ERROR: catalogo precargado'; exit 1; fi
+          if grep -q "['\"']catalogo.js['\"']" vite.config.js; then echo 'ERROR: catalogo copiado'; exit 1; fi
+          echo 'Solo pruebas estáticas, sin instalar dependencias ni compilar APK'
