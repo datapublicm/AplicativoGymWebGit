@@ -10,9 +10,9 @@ const end=source.indexOf('async loadInitialCatalog(){',begin);
 assert.ok(begin>=0&&end>begin,'Se encontró loadHistory');
 const method=source.slice(begin,end);
 
-function harness(changeUser=false){
+function harness(changeUser=false,restartSameUser=false){
   const fixture=`
-let signedIn={id:'cuenta-A'};
+let signedIn={id:'cuenta-A'},authEpoch=1;
 const calls=[];
 const users={
  'cuenta-A':Array.from({length:9263},(_,i)=>({id:i+1,user_id:'cuenta-A',date:'2026-10-10',weight:'10',reps:'12',assistance:'0'})),
@@ -20,6 +20,7 @@ const users={
 };
 const owns=()=>!!signedIn?.id;
 const must=(data,error)=>{if(error)throw error;return data};
+const assertCurrentSession=(uid,epoch)=>{if(!owns()||signedIn.id!==uid||authEpoch!==epoch)throw Error('La sesión cambió durante la carga de datos.');};
 const db={from(table){
  if(table!=='vw_historial_series')throw Error('Tabla inesperada');
  return {select(_columns,opts={}){
@@ -29,7 +30,8 @@ const db={from(table){
     return opts.head?Promise.resolve({count:users[uid].length,error:null}):this;},
    order(){return this;},
    async range(start,end){calls.push({uid,start,end});
-    if(${changeUser}&&start===0)signedIn={id:'cuenta-B'};
+    if(${changeUser}&&start===0){signedIn={id:'cuenta-B'};authEpoch++;}
+    if(${restartSameUser}&&start===0)authEpoch++;
     return {data:users[uid].slice(start,end+1),error:null};}
   };
  }};
@@ -54,4 +56,10 @@ test('Rechaza respuesta si cambia la cuenta durante la descarga',async()=>{
  const h=harness(true);
  await assert.rejects(h.run(),/La sesión cambió durante la carga/);
  assert.equal(h.getUser(),'cuenta-B');
+});
+
+test('Rechaza una descarga vieja tras nueva sesión de la MISMA cuenta',async()=>{
+ const h=harness(false,true);
+ await assert.rejects(h.run(),/La sesión cambió durante la carga/);
+ assert.equal(h.getUser(),'cuenta-A');
 });
