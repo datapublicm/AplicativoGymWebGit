@@ -179,6 +179,12 @@ function renderSeries(preserve=false){const retained=preserve?new Map([...$('ser
  document.querySelector('.series-panel').classList.toggle('mode-normal',seriesMode==='normal');updateSeriesCount();}
 function getEntries(){return [...$('seriesRows').querySelectorAll('tr')].map(row=>{const weight=row.querySelector('.weight').value.trim(),reps=row.querySelector('.reps').value.trim(),help=row.querySelector('.help').value.trim();return {el:row,series:row.dataset.serie,sub:row.dataset.sub,unit:row.querySelector('select').value,weight,reps,assistance:help,dirty:!!(weight||reps||help)}}).filter(x=>x.dirty)}
 function updateSeriesCount(){const n=getEntries().length;$('seriesCount').textContent=n===1?'1 fila con datos':`${n} filas con datos`;$('saveSummary').textContent=n?`${n} fila${n!==1?'s':''} por validar y guardar.`:'Introduce al menos una fila con peso y repeticiones.';[...$('seriesRows').querySelectorAll('tr')].forEach(row=>row.classList.toggle('filled',[...row.querySelectorAll('input')].some(i=>i.value.trim())))}
+function invalidatePendingSave(){
+ window.GymSaveAttempt=(window.GymSaveAttempt||0)+1;
+ const button=$('saveRecords'),feedback=$('saveFeedback');
+ if(button){button.disabled=false;button.textContent='Guardar series';}
+ if(feedback){feedback.hidden=true;feedback.textContent='';}
+}
 async function saveSeries(){
  const r=chosenRow(),date=$('fecha').value,tech=getValue('t'),entries=getEntries();
  if(!r||!tech||!date||!entries.length){toast('Completa ejercicio, fecha y al menos una serie.');return}
@@ -187,6 +193,11 @@ async function saveSeries(){
  }
  if(!window.GymCloud?.canWrite()){toast('Inicia sesión para guardar en Supabase.');return}
  const savedDraftId=activeDraftId;
+ const requestId=(window.GymSaveAttempt||0)+1;
+ window.GymSaveAttempt=requestId;
+ const sessionStamp=window.GymCloud.getSessionStamp?.();
+ const current=()=>requestId===window.GymSaveAttempt&&
+  sessionStamp===window.GymCloud.getSessionStamp?.();
  const payload={exercise:r,date,technique:tech,notes:$('observaciones').value.trim(),entries};
  const rowSignature=()=>JSON.stringify({date:$('fecha').value,tech:getValue('t'),exercise:chosenRow()?.e,
    notes:$('observaciones').value.trim(),entries:getEntries().map(({el,...entry})=>entry)});
@@ -195,9 +206,11 @@ async function saveSeries(){
  try{
   await window.GymCloud.saveWorkout(payload);
  }catch(err){
+  if(!current())return;
   toast('No se guardó: '+String(err.message||err).slice(0,140));
   btn.disabled=false;btn.textContent='Guardar series';return;
  }
+ if(!current())return; // No alterar la vista tras cambiar de sesión.
  // El guardado ya se confirmó: un error de lectura posterior no debe invitar a guardar de nuevo.
  const origin=draftTabs.find(tab=>tab.id===savedDraftId);
  if(activeDraftId===savedDraftId&&rowSignature()===submittedSignature){
@@ -210,14 +223,16 @@ async function saveSeries(){
  }
  btn.textContent='Actualizando historial…';
  try{
-  model.records=await window.GymCloud.loadHistory();
-  drawRecent();drawHistory(true);drawReports();
+  const latest=await window.GymCloud.loadHistory();
+  if(!current())return;
+  model.records=latest;drawRecent();drawHistory(true);drawReports();
   toast('Series guardadas en Supabase ✓');
  }catch(err){
+  if(!current())return;
   feedback.textContent='✅ Series guardadas en Supabase. No se pudo actualizar el historial: no vuelvas a guardar estas mismas series.';feedback.hidden=false;
   toast('Series GUARDADAS; no se pudo actualizar el historial. No las guardes otra vez.');
  }
- finally{btn.disabled=false;btn.textContent='Guardar series'}
+ finally{if(current()){btn.disabled=false;btn.textContent='Guardar series'}}
 }
 function recordHtml(r){return `<div class="record-item"><div><strong>${esc(r.exercise)}</strong><p>${esc(fmtDate(r.date))} · ${esc(r.gym)} · ${esc(r.sede)}<br>${esc(r.series)}${r.subdivision!=='-'?' · '+esc(r.subdivision):''} · ${esc(r.technique)}${r.assistance!==null&&r.assistance!==undefined?' · Asist.: '+esc(r.assistance):''}</p></div><aside><strong>${esc(r.weight)} ${esc(r.unit)} × ${esc(r.reps)}</strong><small>repeticiones</small><div class="record-actions"><button type="button" data-delete="${esc(r.id)}" title="Eliminar serie">Eliminar</button></div></aside></div>`}
 function orderedRecords(){return [...model.records].sort((a,b)=>b.date.localeCompare(a.date)||(b.createdAt||'').localeCompare(a.createdAt||''))}
