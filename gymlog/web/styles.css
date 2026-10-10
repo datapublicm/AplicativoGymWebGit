@@ -195,3 +195,9 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
  .exercise-tab-add{min-width:43px}
  .catalog-independent .catalog-form{padding:13px}
 }
+
+/* Sincronización visible sin tapar los formularios */
+.sync-banner{margin:9px 10px 13px;padding:12px 14px;background:#102a47;color:#a3e9ff;
+ border:1px solid #29749d;border-radius:11px;font-size:13px;line-height:1.45}
+.sync-banner[hidden]{display:none!important}
+@media(max-width:760px){.sync-banner{margin:4px 0 10px;font-size:12px}}
