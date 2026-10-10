@@ -26,7 +26,7 @@
 
 - Se incorporó `tests/preapk-regression.test.mjs` para comprobar el contrato de Pruebas, los identificadores, los flujos de login y que CI no incluya compilación.
 - La verificación puntual de **18 condiciones estáticas sobre los archivos de GitHub** devolvió 18/18 correctas.
-- La ejecución del nuevo test mediante Node/GitHub Actions debe verificarse aparte; las afirmaciones anteriores **no equivalen** a un test E2E de Android.
+- **GitHub Actions verificado:** 34 pruebas Node aprobadas, 0 fallidas, en la ejecución [38079413933](https://github.com/datapublicm/AplicativoGymWebGit/actions/runs/38079413933). El workflow validó sintaxis JS y ausencia de artefactos. **No equivale** a una prueba E2E en Android.
 - El workflow `.github/workflows/validar-android-gymlytics.yml` únicamente comprueba sintaxis, ejecuta pruebas Node y verifica ausencia de artefactos.
 - No se instaló ninguna dependencia, no se hizo build web, no se creó proyecto Gradle y **no se compiló APK**.
 
@@ -40,7 +40,7 @@
 - [ ] Probar subida de fotos privadas, URL firmada y bloqueo del acceso cruzado.
 - [ ] Configurar y verificar un retorno HTTPS autorizado para restablecer contraseñas.
 - [ ] Integrar y validar el visor 3D con sus relaciones musculares.
-- [ ] Verificar ejecución de las pruebas Node en CI. No usar un workflow que compile Gradle.
+- [x] Verificar ejecución de las pruebas Node en CI: **34/34 aprobadas**, sin compilar Gradle ni APK.
 - [ ] Antes de instalar paquetes, revisar versiones fijadas y generar un lockfile reproducible.
 
 **Próximo paso permitido:** validación de integración web/Android sin producir una APK y sin escribir en Producción. Los cambios de base de datos, publicación y compilación quedan fuera de esta fase.
