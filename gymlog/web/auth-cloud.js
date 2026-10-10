@@ -43,13 +43,14 @@ async function updateState(session) {
     try {
       window.GymBaseCatalog=await cloud.loadInitialCatalog();
       window.GymCustomCatalog=await cloud.loadOwnCatalog();
+      await cloud.loadIndependentCatalog();
       if(typeof cascade==='function')cascade(0);
       if(typeof renderOwnCatalog==='function')renderOwnCatalog();
       model.records=await cloud.loadHistory();drawRecent();drawHistory();drawReports();
       await cloud.loadCatalogStats();
     }
     catch(error){setStatus('Sesión activa; error al cargar datos: '+error.message);}
-  } else {window.GymBaseCatalog=[];window.GymCustomCatalog=[];model.records=[];model.photos={};drawRecent();drawHistory();drawReports();}
+  } else {window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymEntities={gyms:[],sites:[],machines:[]};if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();model.records=[];model.photos={};drawRecent();drawHistory();drawReports();}
   showPage('sesion');
 }
 async function findOrCreate(table,fields,insertExtra={}) {
@@ -69,6 +70,7 @@ const cloud={
   const user_id=signedIn.id;
   const gimnasio_id=await findOrCreate('tbl_gimnasios',{user_id,nombre:exercise.g});
   const sede_id=await findOrCreate('tbl_sedes',{user_id,gimnasio_id,nombre:exercise.s});
+  if(exercise.i)await findOrCreate('tbl_maquinas',{user_id,nombre:exercise.i},{tipo_equipo:exercise.kind||'Otro'});
   const fields={user_id,origen:'usuario',gimnasio_id,sede_id,nombre:exercise.e,
     instrumento:exercise.i,tecnica_actualizada:technique||exercise.t?.[0]||'Ejecución base'};
   const ejercicio_id=await findOrCreate('tbl_ejercicios',fields,{
@@ -141,6 +143,36 @@ const cloud={
    m:'Pendiente de asignación',ms:'Pendiente de asignación',n:0,last:null
   }));
  },
+ async loadIndependentCatalog(){
+  if(!owns()){window.GymEntities={gyms:[],sites:[],machines:[]};return window.GymEntities;}
+  const uid=signedIn.id;
+  const [gy,sd,mc]=await Promise.all([
+    db.from('tbl_gimnasios').select('id,nombre').eq('user_id',uid).order('nombre'),
+    db.from('tbl_sedes').select('id,gimnasio_id,nombre').eq('user_id',uid).order('nombre'),
+    db.from('tbl_maquinas').select('id,nombre,tipo_equipo').eq('user_id',uid).order('nombre')
+  ]);
+  for(const x of [gy,sd,mc])must(x.data,x.error);
+  window.GymEntities={gyms:gy.data||[],sites:sd.data||[],machines:mc.data||[]};
+  if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
+  return window.GymEntities;
+ },
+ async addIndependentItem(kind,values){
+  if(!owns())throw Error('Inicia sesión antes de agregar elementos');
+  const user_id=signedIn.id, nombre=(values.nombre||'').trim();
+  if(!nombre)throw Error('Introduce un nombre válido');
+  if(kind==='gym')await findOrCreate('tbl_gimnasios',{user_id,nombre});
+  else if(kind==='site'){
+   const gym=(window.GymEntities?.gyms||[]).find(g=>g.id===values.gimnasio_id);
+   if(!gym)throw Error('Selecciona un gimnasio de tu cuenta');
+   await findOrCreate('tbl_sedes',{user_id,gimnasio_id:gym.id,nombre});
+  }else if(kind==='machine'){
+   const tipo_equipo=values.tipo_equipo||'Máquina';
+   if(!['Máquina','Implemento libre','Peso corporal','Otro'].includes(tipo_equipo))throw Error('Tipo de equipo incorrecto');
+   await findOrCreate('tbl_maquinas',{user_id,nombre},{tipo_equipo});
+  }else throw Error('Tipo de catálogo no reconocido');
+  await this.loadIndependentCatalog();
+  await this.loadCatalogStats();
+ },
  async saveCustomExercise(values){
   if(!owns())throw Error('Inicia sesión para editar tu catálogo');
   const value={...values,t:[values.tecnica]};
@@ -212,6 +244,22 @@ const cloud={
  }
 };
 window.GymCloud=cloud;
+for(const [formId,kind,feedbackId] of [
+ ['addGymForm','gym','gymFeedback'],['addSiteForm','site','siteFeedback'],['addMachineForm','machine','machineFeedback']
+]){
+ $(formId)?.addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(!owns())return $('authStatus').textContent='Inicia sesión para editar tu catálogo.';
+  const form=event.currentTarget, button=form.querySelector('[type="submit"]');
+  button.disabled=true;
+  try{
+    await cloud.addIndependentItem(kind,Object.fromEntries(new FormData(form).entries()));
+    form.reset();
+    $(feedbackId).textContent='Elemento guardado en tu cuenta de Supabase.';
+  }catch(error){$(feedbackId).textContent='No se pudo guardar: '+error.message;}
+  finally{button.disabled=false;}
+ });
+}
 $('catalogForm')?.addEventListener('submit',async event=>{
   event.preventDefault();
   if(!owns())return setStatus('Inicia sesión para modificar tu catálogo.');
@@ -219,6 +267,7 @@ $('catalogForm')?.addEventListener('submit',async event=>{
   const button=$('catalogSubmit');button.disabled=true;
   try{
    window.GymCustomCatalog=await cloud.saveCustomExercise(values);
+    await cloud.loadIndependentCatalog();
    if(typeof cascade==='function')cascade(0,{g:values.g,s:values.s,z:values.z,kind:values.kind,
     i:values.i,a:values.a,gr:values.gr,e:values.e,t:values.tecnica});
    if(typeof renderOwnCatalog==='function')renderOwnCatalog();
