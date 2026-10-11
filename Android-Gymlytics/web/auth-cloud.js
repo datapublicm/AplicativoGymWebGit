@@ -269,7 +269,7 @@ const cloud={
  },
  async addIndependentItem(kind,values){
   if(!owns())throw Error('Inicia sesión antes de agregar elementos');
-  const user_id=signedIn.id, nombre=(values.nombre||'').trim();
+  const user_id=signedIn.id,epoch=authEpoch,nombre=(values.nombre||'').trim();
   if(!nombre)throw Error('Introduce un nombre válido');
   if(kind==='gym')await findOrCreate('tbl_gimnasios',{user_id,nombre});
   else if(kind==='site'){
@@ -284,12 +284,15 @@ const cloud={
    if(!['zona','accesorio','agarre','tecnica'].includes(values.tipo))throw Error('Tipo de opción no válido');
    await findOrCreate('tbl_opciones_personales',{user_id,tipo:values.tipo,nombre});
   }else throw Error('Tipo de catálogo no reconocido');
+  assertCurrentSession(user_id,epoch);
   await this.loadIndependentCatalog();
+  assertCurrentSession(user_id,epoch);
   await this.loadCatalogStats();
+  assertCurrentSession(user_id,epoch);
  },
  async saveCustomExercise(values){
   if(!owns())throw Error('Inicia sesión para editar tu catálogo');
-  const user_id=signedIn.id,nombre=String(values.e||'').trim();
+  const user_id=signedIn.id,epoch=authEpoch,nombre=String(values.e||'').trim();
   if(!nombre)throw Error('Introduce un nombre de ejercicio');
   // No asociar gimnasio, sede ni máquina hasta registrar el entrenamiento.
   await findOrCreate('tbl_ejercicios',{
@@ -298,7 +301,10 @@ const cloud={
    zona_entrenamiento:String(values.z||'').trim()||'Sin clasificar',
    tecnica_actualizada:String(values.tecnica||'').trim()||'Ejecución base'
   });
-  return this.loadOwnCatalog();
+  assertCurrentSession(user_id,epoch);
+  const catalog=await this.loadOwnCatalog();
+  assertCurrentSession(user_id,epoch);
+  return catalog;
  },
  async loadCatalogStats(){
   if(!owns())return;
