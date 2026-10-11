@@ -84,3 +84,18 @@ Se reforzó el aislamiento por sesión en el cliente de **Android-Gymlytics** y 
 ### Límites de lo validado
 
 Estas pruebas de Node y la auditoría SQL no equivalen a ensayos de inicio de sesión real o verificación en hardware Android. Todavía se necesita la prueba de HTTPS con JWT de ambas cuentas, control de escritura con datos ficticios, retorno autorizado de recuperación de contraseña y ensayo real del diseño móvil. También está pendiente una solución robusta para recuperar archivos huérfanos si Storage completa una subida exactamente cuando cambia la sesión.
+
+
+## Continuación — integridad de borrado y privacidad de transición
+
+En la rama `Android-Gymlytics` se incorporaron las siguientes correcciones sin compilar la aplicación ni realizar escrituras en Supabase:
+
+- **Borrado verificable**: `GymCloud.deleteSeries` usa la respuesta de `.delete().eq('id',id).eq('user_id',uid).select('id')` y exige una fila eliminada. Un error de RLS o una eliminación de cero filas no produce una confirmación falsa. Se conserva el filtro por propietario y se verifica la versión de sesión.
+- **Respaldo JSON**: se conectó `exportJson` al botón de la pantalla **Tablas**. La exportación incluye el historial que está cargado en memoria; es una copia local descargable, **no** una restauración automática ni una escritura en la base de datos.
+- **Cambio de identidad inmediato**: `applyState` limpia, antes de consultar el perfil nuevo, los registros, fotografías y catálogos cargados del usuario anterior, descarta los borradores, oculta el perfil y cambia a la pantalla Sesión. Si el acceso del nuevo usuario falla, los datos antiguos permanecen ocultos.
+- **Pruebas**: `tests/export-delete-confirmation.test.mjs` y `tests/auth-transition-privacy.test.mjs` comprueban borrado efectivo, borrado inexistente, errores, descarga JSON, transición A→B pendiente y perfil B sin autorización.
+- **Última ejecución**: [GitHub Actions 38102608652](https://github.com/datapublicm/AplicativoGymWebGit/actions/runs/38102608652), **75/75 pruebas aprobadas**, cero fallidas, sintaxis correcta y ausencia de artefactos de compilación.
+- **Lectura SQL posterior**: se mantienen exactamente **2 usuarios**, **6.218 reportes**, **18.526 series**, **0 filas de fotografías** y **15/15 tablas con RLS** en Supabase Pruebas.
+- **Ramas**: `main` sigue en `7642f8eac9623892e7d292b2b49f81d14d76e2b1`; solo se modificó `Android-Gymlytics`.
+
+**Limitaciones:** la validación HTTP autenticada con dos cuentas reales, el flujo en un dispositivo Android, las operaciones de escritura de entrenamiento con datos de ensayo y el manejo definitivo de archivos huérfanos en Storage permanecen sin ejecutar o resolver. Ninguna prueba automatizada reemplaza estas verificaciones.
