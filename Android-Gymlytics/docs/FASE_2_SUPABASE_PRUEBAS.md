@@ -128,3 +128,41 @@ En la rama `Android-Gymlytics` se incorporaron las siguientes correcciones sin c
 - **Supabase Pruebas, comprobación SQL posterior:** 2 cuentas, **18.526 series**, **6.218 reportes**, 0 fotos en `tbl_fotos`, 0 objetos en bucket `gymlog-usuarios`; **15/15 tablas con RLS**. Todas las consultas fueron de lectura.
 
 **Pendientes reales:** prueba HTTPS de extremo a extremo con JWT de dos cuentas autorizadas, escrituras de ensayo controladas y comprobación funcional/visual en Android real. La validación SQL de roles simulados documentada en `VALIDACION_RLS_2026-10-10.md` sigue siendo distinta de una sesión JWT real. No se ha compilado la APK.
+
+
+## Validación funcional de RPC decimal con ROLLBACK
+
+**Fecha en Perú:** 10/10/2026. **Proyecto:** exclusivamente Supabase `ProyectosPrueba` (`jasuqnxrskhqfobsazwd`). No afecta Producción.
+
+### Incidencia confirmada
+
+La versión previa de `sch_android_gymlytics.guardar_entrenamiento` convertía los elementos JSON `repeticiones` y `asistencias` a `INTEGER`, aunque las columnas reales admiten `NUMERIC(10,2)`. El comprobador nativo de PostgreSQL confirmó que los textos `6.5` y `1.25` **no** son aceptados como `integer`, pero sí como `numeric`. Esto hacía fallar los guardados fraccionarios.
+
+### Corrección aplicada y versionada
+
+Se ejecutó en **Supabase Pruebas** la migración `20261011033900_gymlytics_guardar_series_decimales_20261010`: cambia exclusivamente los dos *casts* a `::numeric`, conserva `numero_serie::integer`, `SECURITY INVOKER` (sin `SECURITY DEFINER`), el guard de `auth.uid()` y `usuario_habilitado()`, y el límite de 1–24 filas por llamada. Permisos de ejecución: `authenticated=true`, `anon=false`.
+
+Código reproducible guardado en `supabase/migrations/20261011033900_gymlytics_guardar_series_decimales_20261010.sql`. Se añadieron dos pruebas en `tests/rpc-decimal-migration.test.mjs`.
+
+### Pruebas funcionales con identidad y transacciones
+
+Se invocó el procedimiento existente como rol **`authenticated`**, configurando `auth.uid()` de cada cuenta por separado mediante `SET LOCAL ROLE authenticated` y `request.jwt.claim.sub`. **En ambos casos se utilizó `BEGIN … ROLLBACK`**, de modo que no perduraran datos nuevos.
+
+| Escenario | Peso | Repeticiones | Asistencias | Otro | Resultado |
+|---|---:|---:|---:|---|---|
+| Cuenta A | 25.75 kg | 6.5 | 1.25 | Serie normal | 1 fila provisional; todos los valores exactos; propietario correcto |
+| Cuenta B | 40.25 lb | 8.75 | 0.5 | Subdivisión Derecha | 1 fila provisional; valores, unidad, subdivisión y propietario correctos |
+
+El procedimiento se ejecutó realmente en PostgreSQL; **no** es un mock del código JS ni una prueba ficticia de sintaxis. No se generaron reportes persistentes.
+
+### Integridad posterior
+
+Consulta SQL solo de lectura:
+
+- **2 usuarios, 18.526 series y 6.218 reportes** (recuentos originales intactos).
+- **0** registros de fotos y **0** objetos en Storage `gymlog-usuarios`.
+- **0** reportes cuya técnica empiece por `VALIDACION_TEMPORAL`; el `ROLLBACK` surtió efecto.
+- **15/15** tablas del esquema con RLS activada.
+- GitHub Actions [38109134139](https://github.com/datapublicm/AplicativoGymWebGit/actions/runs/38109134139): **91 de 91 pruebas aprobadas**, 0 fallos, sintaxis correcta, sin artefactos de Android.
+
+**Pendiente:** estas pruebas verifican el RPC real y las restricciones RLS usando identidades simuladas. No prueban login por HTTPS, validación de JWT de cuentas reales ni la interfaz Android. La comprobación HTTP pública de GitHub Actions sigue recibiendo `401` sin `apikey`, que solo acredita que el gateway respondió. No introducir contraseñas, claves privadas ni JWT en el repositorio o el chat.
