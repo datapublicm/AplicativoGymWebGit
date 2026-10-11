@@ -55,7 +55,7 @@ async function check(width,page){
  if(page==='dashboard'){assert.ok(d.chart,'Gráfico no renderizado');assert.match(d.summary,/Último valor/);}
  console.log('OK',width,page,'documento',d.documentWidth);
  if((width===320&&page==='dashboard')||(width===390&&page==='registro-series')){
-  const path=resolve(root,'../.mobile-check');mkdirSync(path,{recursive:true});
+  const path=resolve(root,'../mobile-check');mkdirSync(path,{recursive:true});
   const shot=await request('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
   writeFileSync(join(path,'gymlytics-'+page+'-'+width+'.png'),Buffer.from(shot.data,'base64'));
  }
