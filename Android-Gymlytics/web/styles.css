@@ -289,3 +289,12 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 @media(max-width:380px){
  .catalog-main-actions{grid-template-columns:1fr}
 }
+
+/* Verificación Chrome 390px: la cabecera de Series tenía tres elementos
+   rígidos y «Editar ejercicio» sobresalía 3px del viewport. */
+@media(max-width:760px){
+ .series-head{flex-wrap:wrap;align-items:center;column-gap:8px;row-gap:9px}
+ .series-head>div{flex:1 1 155px;min-width:0}
+ .series-head .count-pill{flex:0 0 auto}
+ .series-head .series-back{max-width:100%;white-space:normal;overflow-wrap:anywhere;flex:0 1 auto}
+}
