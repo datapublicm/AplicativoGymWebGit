@@ -4,6 +4,7 @@ let seriesMode='normal', seriesGroups=4, seriesCustomized=false;
 const FLOW=[['g','gimnasio'],['s','sede'],['z','zona'],['kind','tipo'],['i','instrumento'],['a','implemento'],['gr','agarre'],['e','ejercicio'],['t','tecnica']];
 const INITIAL={g:'Smart Fit',s:'La Rambla Brasil',z:'Espalda lateral',kind:'Máquina',i:'Máquina de polea alta',a:'Cable Pulldown',gr:'No especificado',e:'Jalón al pecho',t:'01 - Ejecución base'};
 let model={records:[],photos:{}},toastTimer;
+let historyReady=false;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const makeId=()=>typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2,9);
@@ -222,6 +223,7 @@ async function saveSeries(){
  }
  if(!current())return; // No alterar la vista tras cambiar de sesión.
  // El guardado ya se confirmó: un error de lectura posterior no debe invitar a guardar de nuevo.
+ setHistoryReady(false);
  const origin=draftTabs.find(tab=>tab.id===savedDraftId);
  if(activeDraftId===savedDraftId&&rowSignature()===submittedSignature){
   renderSeries();$('observaciones').value='';
@@ -236,6 +238,7 @@ async function saveSeries(){
   const latest=await window.GymCloud.loadHistory();
   if(!current())return;
   model.records=latest;drawRecent();drawHistory(true);drawReports();
+  setHistoryReady(true);
   toast('Series guardadas en Supabase ✓');
  }catch(err){
   if(!current())return;
@@ -265,19 +268,49 @@ async function deleteRecord(id){
  try{await window.GymCloud.deleteSeries(id)}
  catch(err){if(current())toast('No se pudo eliminar: '+String(err.message||err).slice(0,90));return}
  if(!current())return;
+ setHistoryReady(false);
  model.records=model.records.filter(x=>x.id!==id);
  drawRecent();drawHistory();drawReports();
  try{
   const latest=await window.GymCloud.loadHistory();
   if(!current())return;
   model.records=latest;drawRecent();drawHistory();drawReports();
+  setHistoryReady(true);
   toast('Serie eliminada de Supabase');
  }catch(err){if(current())toast('Serie ELIMINADA; no se pudo actualizar el historial.');}
 }
 function drawReports(){const rows=model.records,days=new Set(rows.map(r=>r.date)).size,vol=rows.reduce((v,r)=>v+r.weight*(r.unit==='lb'?0.45359237:1)*r.reps,0);$('reportStats').innerHTML=`<div class="stat"><strong>${rows.length}</strong><small>Series guardadas</small></div><div class="stat"><strong>${days}</strong><small>Días con registros</small></div><div class="stat"><strong>${Math.round(vol).toLocaleString('es-PE')}</strong><small>Volumen en kg</small></div>`;const counts={};rows.forEach(r=>counts[r.exercise]=(counts[r.exercise]||0)+1);$('frequentExercises').innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([name,n])=>`<div class="freq"><span>${esc(name)}</span><strong>${n}</strong></div>`).join('')||'<div class="empty">Sin ejercicios todavía.</div>';}
 function download(name,content,mime){const blob=new Blob([content],{type:mime}),a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
-function exportCsv(){const fields=[['date','Fecha'],['gym','Gimnasio'],['sede','Sede'],['zone','Zona de entrenamiento'],['type','Tipo de equipo'],['equipment','Máquina / equipo'],['accessory','Accesorio / implemento'],['grip','Agarre'],['exercise','Ejercicio'],['technique','Técnica de ejecución'],['series','Número de serie'],['subdivision','Subdivisión'],['unit','Unidad'],['weight','Peso'],['reps','Repeticiones'],['assistance','Asistencias'],['notes','Observaciones']];const quote=s=>{const v=String(s??'');return '"'+(/^[\u0000-\u0020]*[=+@-]/.test(v)?"'":'')+v.replace(/"/g,'""')+'"'},lines=[fields.map(x=>quote(x[1])),...orderedRecords().map(r=>fields.map(([k])=>quote(r[k])))].map(x=>x.join(';'));download('Gymlytics_series_'+dateNow()+'.csv','\ufeff'+lines.join('\r\n'),'text/csv;charset=utf-8');toast('CSV exportado')}
-function exportJson(){download('Gymlytics_respaldo_'+dateNow()+'.json',JSON.stringify({version:2,...model},null,2),'application/json');toast('Copia de seguridad exportada')}
+function setHistoryReady(ready){
+ historyReady=!!ready;
+ for(const id of ['exportCsv','exportJson']){
+  const button=$(id);
+  if(button){button.disabled=!historyReady;button.setAttribute('aria-disabled',String(!historyReady));}
+ }
+}
+function canExportHistory(){
+ if(historyReady&&!!window.GymCloud?.canWrite())return true;
+ toast('Primero sincroniza el historial completo de tu cuenta para exportarlo.');
+ return false;
+}
+async function refreshHistory(){
+ if(!window.GymCloud?.canWrite()){toast('Inicia sesión para actualizar el historial.');return;}
+ const stamp=window.GymCloud.getSessionStamp?.();
+ const current=()=>stamp===window.GymCloud?.getSessionStamp?.()&&!!window.GymCloud?.canWrite();
+ const button=$('historyRefresh');button.disabled=true;
+ setHistoryReady(false);
+ try{
+  const latest=await window.GymCloud.loadHistory();
+  if(!current())return;
+  model.records=latest;drawRecent();drawHistory(true);drawReports();
+  setHistoryReady(true);
+  toast('Historial actualizado desde Supabase ✓');
+ }catch(error){
+  if(current())toast('No se pudo actualizar el historial: '+String(error.message||error).slice(0,120));
+ }finally{if(current())button.disabled=false;}
+}
+function exportCsv(){if(!canExportHistory())return;const fields=[['date','Fecha'],['gym','Gimnasio'],['sede','Sede'],['zone','Zona de entrenamiento'],['type','Tipo de equipo'],['equipment','Máquina / equipo'],['accessory','Accesorio / implemento'],['grip','Agarre'],['exercise','Ejercicio'],['technique','Técnica de ejecución'],['series','Número de serie'],['subdivision','Subdivisión'],['unit','Unidad'],['weight','Peso'],['reps','Repeticiones'],['assistance','Asistencias'],['notes','Observaciones']];const quote=s=>{const v=String(s??'');return '"'+(/^[\u0000-\u0020]*[=+@-]/.test(v)?"'":'')+v.replace(/"/g,'""')+'"'},lines=[fields.map(x=>quote(x[1])),...orderedRecords().map(r=>fields.map(([k])=>quote(r[k])))].map(x=>x.join(';'));download('Gymlytics_series_'+dateNow()+'.csv','\ufeff'+lines.join('\r\n'),'text/csv;charset=utf-8');toast('CSV exportado')}
+function exportJson(){if(!canExportHistory())return;download('Gymlytics_respaldo_'+dateNow()+'.json',JSON.stringify({version:2,...model},null,2),'application/json');toast('Copia de seguridad exportada')}
 async function importJson(event){const file=event.target.files?.[0];if(!file)return;try{const parsed=JSON.parse(await file.text());if(!Array.isArray(parsed.records)||!parsed.photos||typeof parsed.photos!=='object')throw Error('Incompatible');if(!confirm(`¿Reemplazar los ${model.records.length} registros locales con ${parsed.records.length} registros del archivo?`))return;const previous=model;model={records:parsed.records,photos:parsed.photos};if(!persist()){model=previous;return}drawRecent();drawHistory();toast('Copia de seguridad restaurada')}catch(e){toast('No se pudo importar. Comprueba el JSON.')}finally{event.target.value=''}}
 async function uploadPhoto(event){
  const file=event.target.files?.[0],type=event.target.dataset.upload,r=chosenRow();
@@ -318,8 +351,8 @@ function photoCanvas(file,maxSize){
 }
 
 function detailOpenAfterUpload(type){const r=chosenRow(),[src,available]=photoFor(type,r);$(type==='equipo'?'detailEquipmentImg':'detailExerciseImg').src=src;$(type==='equipo'?'equipmentNoPhoto':'exerciseNoPhoto').hidden=available}
-function install(){$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('historySearch').addEventListener('input',()=>drawHistory(true));$('historyLoadMore').addEventListener('click',()=>{historyVisible+=60;drawHistory()});$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(b)deleteRecord(b.dataset.delete)})}
-$('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();install();drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+function install(){$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('historySearch').addEventListener('input',()=>drawHistory(true));$('historyLoadMore').addEventListener('click',()=>{historyVisible+=60;drawHistory()});$('historyRefresh').addEventListener('click',refreshHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(b)deleteRecord(b.dataset.delete)})}
+$('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();install();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
 // Vista anatómica 2D; visor 3D reservado hasta conectar un modelo real.
