@@ -12,9 +12,9 @@ function extract(a,b){
 }
 const apply=extract('async function applyState(session,epoch) {','async function findOrCreate(');
 const retry=extract('async refreshCatalog(){','async ensureExercise(');
-function fixture({failCatalog=false,failHistory=false,delayedCatalog=false}={}){
+function fixture({failCatalog=false,failHistory=false,failIndependent=false,delayedCatalog=false}={}){
  const code=[
-  "let signedIn=null,lastDraftOwner=null,authEpoch=1,historyReady=false,failCatalog="+failCatalog+",failHistory="+failHistory+",delayed="+delayedCatalog+",releaseCatalog=null;",
+  "let signedIn=null,lastDraftOwner=null,authEpoch=1,historyReady=false,failCatalog="+failCatalog+",failHistory="+failHistory+",failIndependent="+failIndependent+",delayed="+delayedCatalog+",releaseCatalog=null;",
   "let historyReads=0,profileReads=0,page='',status='',catCount=0;",
   "const model={records:[],photos:{}};",
   "const elements={};",
@@ -31,7 +31,7 @@ function fixture({failCatalog=false,failHistory=false,delayedCatalog=false}={}){
   "const cloud={",
   "async loadInitialCatalog(){catCount++;if(delayed)await new Promise(r=>releaseCatalog=r);if(failCatalog)throw Error('Catálogo fuera de línea');return [{id:'ref-1',g:'Gym A'}]},",
   "async loadOwnCatalog(){return [{id:'own-1',e:'Remo'}]},",
-  "async loadIndependentCatalog(){window.GymEntities={gyms:[{id:'gymA'}],sites:[],machines:[],options:[]}},",
+  "async loadIndependentCatalog(){if(failIndependent)throw Error('Listas de gimnasios no disponibles');window.GymEntities={gyms:[{id:'gymA'}],sites:[],machines:[],options:[]}},",
   "async loadHistory(){historyReads++;if(failHistory)throw Error('Historial fuera de línea');return [{id:'serie-1',user_id:signedIn.id,date:'2026-10-10',weight:25}]},",
   "async loadCatalogStats(){} ,",
   retry,
@@ -111,4 +111,22 @@ test('En inicio exitoso la actualización manual queda habilitada',async()=>{
  assert.equal(h.state().catalogRefresh,false);
  assert.equal(h.state().records.length,1);
  assert.equal(h.state().ready,true);
+});
+
+test('Si fallan las listas de gimnasios, no declara completo el catálogo ni abre Registro',async()=>{
+ const h=fixture({failIndependent:true});await h.start();
+ const st=h.state();
+ assert.equal(st.page,'catalogos');
+ assert.match(st.catMessage,/Actualizar catálogo/);
+ assert.equal(st.records.length,1);
+ assert.equal(st.ready,true);
+ assert.equal(st.historyReads,1);
+});
+test('Si falla solo la descarga del historial, no la repite automáticamente',async()=>{
+ const h=fixture({failHistory:true});await h.start();
+ const st=h.state();
+ assert.equal(st.historyReads,1);
+ assert.equal(st.ready,false);
+ assert.equal(st.refresh,false);
+ assert.equal(st.page,'registro');
 });
