@@ -10,7 +10,7 @@ function extract(text,a,b){
  assert.ok(from>=0&&to>from,'No se encontró sección '+a);
  return text.slice(from,to);
 }
-const method=extract(cloudSource,'async deleteSeries(id){','async loadHistory(){');
+const method=extract(cloudSource,'async deleteSeries(id){','async loadHistory(onProgress){');
 const deletionUI=extract(appSource,'async function deleteRecord(id){','function drawReports(){');
 const exportMethod=extract(appSource,'function exportJson(){','async function importJson(');
 
