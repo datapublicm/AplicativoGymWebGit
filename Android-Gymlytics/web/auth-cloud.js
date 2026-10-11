@@ -62,6 +62,10 @@ async function applyState(session,epoch) {
   if(typeof setHistoryReady==='function')setHistoryReady(false);
   const historyRefresh=$('historyRefresh');
   if(historyRefresh)historyRefresh.disabled=true;
+  const catalogRefresh=$('catalogRefresh');
+  if(catalogRefresh)catalogRefresh.disabled=true;
+  const catalogStatus=$('catalogStatus');
+  if(catalogStatus)catalogStatus.textContent='';
   // Ocultar inmediatamente los datos de la sesión previa, incluso mientras se valida el nuevo perfil.
   if(typeof invalidatePendingSave==='function')invalidatePendingSave();
   window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
@@ -93,6 +97,7 @@ async function applyState(session,epoch) {
   });
   // Bloquear recargas paralelas hasta terminar la carga inicial.
   if(historyRefresh)historyRefresh.disabled=true;
+  if(catalogRefresh)catalogRefresh.disabled=!owns();
   const logged=owns();
   $('authForm').hidden=logged;$('authRegister').hidden=logged;$('authRecovery').hidden=logged;
   $('authProfile').hidden=!logged;
@@ -109,12 +114,14 @@ async function applyState(session,epoch) {
   }
   $('loggedUser').textContent=signedIn.gymlytics.nombre||signedIn.gymlytics.usuario;
   $('loggedEmail').textContent=signedIn.email;
+  let catalogLoaded=false,historyLoaded=false;
   setStatus('Cargando catálogos desde Supabase…');
   try{
     const [base,custom]=await Promise.all([cloud.loadInitialCatalog(),cloud.loadOwnCatalog()]);
     if(epoch!==authEpoch)return;
     window.GymBaseCatalog=base;
     window.GymCustomCatalog=custom;
+    catalogLoaded=true;
     await cloud.loadIndependentCatalog();
     if(epoch!==authEpoch)return;
     if(typeof cascade==='function')cascade(0);
@@ -127,6 +134,7 @@ async function applyState(session,epoch) {
     const history=await cloud.loadHistory();
     if(epoch!==authEpoch)return;
     model.records=history;drawRecent();drawHistory();drawReports();
+    historyLoaded=true;
     if(typeof setHistoryReady==='function')setHistoryReady(true);
     if(historyRefresh)historyRefresh.disabled=false;
     await cloud.loadCatalogStats();
@@ -134,10 +142,26 @@ async function applyState(session,epoch) {
     setStatus('Sesión activa · '+base.length.toLocaleString('es-PE')+' ejercicios de referencia · '+history.length.toLocaleString('es-PE')+' series cargadas · '+config.environment);
   }catch(error){
     if(epoch!==authEpoch)return;
-    setStatus('Sesión activa; error al cargar datos: '+error.message);
+    let issue=error.message;
+    // Un fallo de catálogo no debe dejar también vacíos el historial y el Dashboard.
+    if(!historyLoaded){
+      try{
+        setStatus('Error en catálogo; recuperando el historial de entrenamientos…');
+        const recovered=await cloud.loadHistory();
+        if(epoch!==authEpoch)return;
+        model.records=recovered;drawRecent();drawHistory();drawReports();
+        historyLoaded=true;
+        if(typeof setHistoryReady==='function')setHistoryReady(true);
+      }catch(loadError){
+        if(epoch!==authEpoch)return;
+        issue+=' · Historial: '+loadError.message;
+      }
+    }
+    if(!catalogLoaded&&catalogStatus)catalogStatus.textContent='No se cargó el catálogo. Pulsa Actualizar catálogo para reintentar.';
+    setStatus('Sesión activa; error al cargar datos: '+issue);
     if(historyRefresh)historyRefresh.disabled=false;
   }
-  if(epoch===authEpoch)showPage('registro');
+  if(epoch===authEpoch)showPage(catalogLoaded?'registro':'catalogos');
 }
 async function findOrCreate(table,fields,insertExtra={}) {
   let q=db.from(table).select('id');
@@ -152,6 +176,21 @@ async function findOrCreate(table,fields,insertExtra={}) {
 const cloud={
  canWrite:()=>owns(),
  getSessionStamp:()=>owns()?signedIn.id+':'+authEpoch:null,
+ async refreshCatalog(){
+  if(!owns())throw Error('Debes iniciar sesión para cargar tu catálogo.');
+  const uid=signedIn.id,epoch=authEpoch;
+  const [base,custom]=await Promise.all([this.loadInitialCatalog(),this.loadOwnCatalog()]);
+  assertCurrentSession(uid,epoch);
+  await this.loadIndependentCatalog();
+  assertCurrentSession(uid,epoch);
+  window.GymBaseCatalog=base;
+  window.GymCustomCatalog=custom;
+  if(typeof cascade==='function')cascade(0);
+  if(typeof renderOwnCatalog==='function')renderOwnCatalog();
+  await this.loadCatalogStats();
+  assertCurrentSession(uid,epoch);
+  return base.length;
+ },
  async ensureExercise(exercise,technique=''){
   if(!owns())throw Error('La sesión no está autorizada');
   const user_id=signedIn.id,epoch=authEpoch;
@@ -434,6 +473,21 @@ const cloud={
  }
 };
 window.GymCloud=cloud;
+$('catalogRefresh').addEventListener('click',async()=>{
+ if(!owns())return;
+ const uid=signedIn.id,epoch=authEpoch,button=$('catalogRefresh');
+ const current=()=>owns()&&signedIn.id===uid&&authEpoch===epoch;
+ button.disabled=true;
+ $('catalogStatus').textContent='Cargando ejercicios y listas desde Supabase…';
+ try{
+  const count=await cloud.refreshCatalog();
+  if(!current())return;
+  $('catalogStatus').textContent=count.toLocaleString('es-PE')+' ejercicios de referencia cargados correctamente.';
+  setStatus('Sesión activa · Catálogo actualizado · '+config.environment);
+ }catch(error){
+  if(current())$('catalogStatus').textContent='No se pudo cargar el catálogo: '+error.message;
+ }finally{if(current())button.disabled=false;}
+});
 for(const [formId,kind,feedbackId] of [
  ['addGymForm','gym','gymFeedback'],['addSiteForm','site','siteFeedback'],['addMachineForm','machine','machineFeedback'],['addOptionForm','option','optionFeedback']
 ]){
