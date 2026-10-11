@@ -279,7 +279,52 @@ async function deleteRecord(id){
   toast('Serie eliminada de Supabase');
  }catch(err){if(current())toast('Serie ELIMINADA; no se pudo actualizar el historial.');}
 }
-function drawReports(){const rows=model.records,days=new Set(rows.map(r=>r.date)).size,vol=rows.reduce((v,r)=>v+r.weight*(r.unit==='lb'?0.45359237:1)*r.reps,0);$('reportStats').innerHTML=`<div class="stat"><strong>${rows.length}</strong><small>Series guardadas</small></div><div class="stat"><strong>${days}</strong><small>Días con registros</small></div><div class="stat"><strong>${Math.round(vol).toLocaleString('es-PE')}</strong><small>Volumen en kg</small></div>`;const counts={};rows.forEach(r=>counts[r.exercise]=(counts[r.exercise]||0)+1);$('frequentExercises').innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([name,n])=>`<div class="freq"><span>${esc(name)}</span><strong>${n}</strong></div>`).join('')||'<div class="empty">Sin ejercicios todavía.</div>';}
+function drawReports(){const rows=model.records,days=new Set(rows.map(r=>r.date)).size,vol=rows.reduce((v,r)=>v+r.weight*(r.unit==='lb'?0.45359237:1)*r.reps,0);$('reportStats').innerHTML=`<div class="stat"><strong>${rows.length}</strong><small>Series guardadas</small></div><div class="stat"><strong>${days}</strong><small>Días con registros</small></div><div class="stat"><strong>${Math.round(vol).toLocaleString('es-PE')}</strong><small>Volumen en kg</small></div>`;const counts={};rows.forEach(r=>counts[r.exercise]=(counts[r.exercise]||0)+1);$('frequentExercises').innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([name,n])=>`<div class="freq"><span>${esc(name)}</span><strong>${n}</strong></div>`).join('')||'<div class="empty">Sin ejercicios todavía.</div>';drawProgressChart(rows);}
+
+function drawProgressChart(records){
+ const target=$('progressChart'),exerciseSelect=$('progressExercise'),metricSelect=$('progressMetric'),summary=$('progressSummary');
+ if(!target||!exerciseSelect||!metricSelect||!summary)return;
+ const frequencies=new Map();
+ for(const row of records||[])if(row.exercise)frequencies.set(row.exercise,(frequencies.get(row.exercise)||0)+1);
+ const names=[...frequencies.keys()].sort((a,b)=>frequencies.get(b)-frequencies.get(a)||a.localeCompare(b,'es'));
+ const previous=exerciseSelect.value,chosen=names.includes(previous)?previous:(names[0]||'');
+ exerciseSelect.replaceChildren(...names.map(name=>new Option(name,name)));
+ exerciseSelect.value=chosen;
+ exerciseSelect.disabled=!names.length;
+ metricSelect.disabled=!names.length;
+ if(!chosen){summary.textContent='Guarda una serie para visualizar tu progreso.';target.innerHTML='<p class="empty">No hay entrenamientos disponibles para graficar.</p>';return;}
+ const metric=metricSelect.value||'weight';
+ const metricLabels={weight:['Peso máximo','kg'],reps:['Repeticiones totales','rep.'],series:['Series realizadas','series'],volume:['Volumen total','kg × rep.']};
+ const [label,unit]=metricLabels[metric]||metricLabels.weight;
+ const days=new Map();
+ for(const r of records){
+  if(r.exercise!==chosen||!/^\d{4}-\d{2}-\d{2}$/.test(r.date||''))continue;
+  const weight=Number(r.weight),reps=Number(r.reps);
+  if(!Number.isFinite(weight)||!Number.isFinite(reps)||weight<0||reps<0)continue;
+  const kg=weight*(r.unit==='lb'?0.45359237:1);
+  const d=days.get(r.date)||{date:r.date,weight:0,reps:0,series:0,volume:0};
+  d.weight=Math.max(d.weight,kg);d.reps+=reps;d.series++;d.volume+=kg*reps;
+  days.set(r.date,d);
+ }
+ const points=[...days.values()].sort((a,b)=>a.date.localeCompare(b.date)).slice(-10);
+ if(!points.length){summary.textContent='Este ejercicio todavía no tiene fechas registradas.';target.innerHTML='<p class="empty">Sin fechas para mostrar.</p>';return;}
+ const format=value=>Number(value).toLocaleString('es-PE',{maximumFractionDigits:1});
+ const values=points.map(p=>p[metric]||0),maximum=Math.max(1,...values);
+ const left=54,right=721,top=28,bottom=222,plotHeight=bottom-top;
+ const xy=points.map((p,i)=>({
+  x:points.length===1?(left+right)/2:left+i*(right-left)/(points.length-1),
+  y:bottom-values[i]/maximum*plotHeight,date:p.date,value:values[i]
+ }));
+ const line=xy.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+ const area='M '+xy[0].x.toFixed(1)+' '+bottom+' L '+xy.map(p=>p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' L ')+' L '+xy.at(-1).x.toFixed(1)+' '+bottom+' Z';
+ const grids=[0,.25,.5,.75,1].map(t=>{
+  const y=bottom-t*plotHeight;return '<line x1="'+left+'" y1="'+y+'" x2="'+right+'" y2="'+y+'" stroke="#31526e" stroke-dasharray="4 7" stroke-opacity=".6"/><text x="45" y="'+(y+4)+'" text-anchor="end" fill="#98b8d1" font-size="11">'+esc(format(t*maximum))+'</text>';
+ }).join('');
+ const marks=xy.map(p=>'<g><rect x="'+(p.x-13).toFixed(1)+'" y="'+p.y.toFixed(1)+'" width="26" height="'+(bottom-p.y).toFixed(1)+'" rx="6" fill="url(#gymBar)" opacity=".43"/><circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="5" fill="#e4fdff" stroke="#29d6ff" stroke-width="3"><title>'+esc(p.date+' · '+format(p.value)+' '+unit)+'</title></circle><text x="'+p.x.toFixed(1)+'" y="'+Math.max(13,p.y-13).toFixed(1)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#e8faff">'+esc(format(p.value))+'</text><text x="'+p.x.toFixed(1)+'" y="247" text-anchor="middle" font-size="11" fill="#a5c1d7">'+esc(p.date.slice(8)+'/'+p.date.slice(5,7))+'</text></g>').join('');
+ target.innerHTML='<svg class="progress-svg" viewBox="0 0 760 270" role="img" aria-label="'+esc(label+' de '+chosen+' durante '+points.length+' fechas')+'"><defs><linearGradient id="gymArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#15d9ef" stop-opacity=".27"/><stop offset="1" stop-color="#15d9ef" stop-opacity="0"/></linearGradient><linearGradient id="gymBar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5deaff"/><stop offset="1" stop-color="#25509c"/></linearGradient></defs>'+grids+'<path d="'+area+'" fill="url(#gymArea)"/><polyline points="'+line+'" fill="none" stroke="#3bdfff" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>'+marks+'</svg>';
+ summary.textContent=label+' · '+points.length+' fecha'+(points.length===1?'':'s')+' · Último valor: '+format(values.at(-1))+' '+unit;
+}
+
 function download(name,content,mime){const blob=new Blob([content],{type:mime}),a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
 function setHistoryReady(ready){
  historyReady=!!ready;
@@ -351,7 +396,7 @@ function photoCanvas(file,maxSize){
 }
 
 function detailOpenAfterUpload(type){const r=chosenRow(),[src,available]=photoFor(type,r);$(type==='equipo'?'detailEquipmentImg':'detailExerciseImg').src=src;$(type==='equipo'?'equipmentNoPhoto':'exerciseNoPhoto').hidden=available}
-function install(){$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('historySearch').addEventListener('input',()=>drawHistory(true));$('historyLoadMore').addEventListener('click',()=>{historyVisible+=60;drawHistory()});$('historyRefresh').addEventListener('click',refreshHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(b)deleteRecord(b.dataset.delete)})}
+function install(){$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('progressExercise').addEventListener('change',()=>drawProgressChart(model.records));$('progressMetric').addEventListener('change',()=>drawProgressChart(model.records));$('historySearch').addEventListener('input',()=>drawHistory(true));$('historyLoadMore').addEventListener('click',()=>{historyVisible+=60;drawHistory()});$('historyRefresh').addEventListener('click',refreshHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(b)deleteRecord(b.dataset.delete)})}
 $('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();install();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
