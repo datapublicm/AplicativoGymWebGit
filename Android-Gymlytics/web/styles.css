@@ -321,3 +321,14 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 @media(max-width:950px){.history-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.history-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.history-filters label:first-child{grid-column:1/-1}.history-filters button{grid-column:1/-1}}
 @media(max-width:380px){.history-filters{grid-template-columns:1fr}.history-filters label:first-child,.history-filters button{grid-column:auto}}
+
+/* Sincronización real: progreso accesible sin tapar los márgenes móviles. */
+.history-loading{margin:8px 10px 14px;padding:13px 15px;border:1px solid #286c92;background:#0b2842;border-radius:12px;min-width:0}
+.history-loading[hidden]{display:none!important}
+.history-loading-header{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:center;margin-bottom:10px}
+.history-loading-header strong{color:#b4eaff;font-size:12px;font-weight:650;overflow-wrap:anywhere}
+.history-loading-header span{color:#62dcf5;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums}
+.history-loading progress{display:block;width:100%;height:10px;border:0;border-radius:12px;overflow:hidden;accent-color:#20d4ef}
+.history-loading progress::-webkit-progress-bar{background:#1a3958;border-radius:12px}
+.history-loading progress::-webkit-progress-value{background:linear-gradient(90deg,#11b8ea,#78edff);border-radius:12px}
+@media(max-width:760px){.history-loading{margin:4px 0 12px;padding:11px 12px}}
