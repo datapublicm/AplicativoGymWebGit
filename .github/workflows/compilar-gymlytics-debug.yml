@@ -33,8 +33,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Preparar Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Usar SDK Android preinstalado en GitHub
+        run: |
+          SDK=${ANDROID_HOME:-/usr/local/lib/android/sdk}
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          test -x "$SDK/cmdline-tools/latest/bin/sdkmanager"
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" --list_installed | head -60
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
       - name: Validar que no se compilen modificaciones del modelo 3D
         run: |
           test "${GITHUB_REF_NAME}" = "Android-Gymlytics"
