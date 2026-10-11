@@ -75,3 +75,16 @@ test('El HTML ofrece filtros reales y el CSS contempla márgenes de Android y co
  assert.match(css,/\.history-tools\{grid-template-columns:1fr\}/);
  assert.match(css,/\.progress-filters\{grid-template-columns:1fr\}/);
 });
+
+test('Las acciones de recuperación respetan el ancho en móviles de 320 px',()=>{
+ assert.match(css,/\.catalog-main-actions\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+ assert.match(css,/@media\(max-width:380px\)\{\s*\.catalog-main-actions\{grid-template-columns:1fr\}/);
+ assert.match(css,/\.catalog-main-actions button\{min-width:0/);
+ assert.match(html,/id="catalogRefresh"[^>]*disabled/);
+});
+test('El cuadro de detalle y la barra inferior respetan los márgenes físicos del dispositivo',()=>{
+ assert.match(css,/\.detail-modal\{width:calc\(100vw - max\(12px,env\(safe-area-inset-left/);
+ assert.match(css,/max-height:calc\(100dvh - env\(safe-area-inset-top/);
+ assert.match(css,/\.bottom-nav\{padding-left:env\(safe-area-inset-left/);
+ assert.match(css,/\.content\{width:100%;max-width:100%;padding-left:max\(12px,env\(safe-area-inset-left/);
+});
