@@ -166,3 +166,18 @@ Consulta SQL solo de lectura:
 - GitHub Actions [38109134139](https://github.com/datapublicm/AplicativoGymWebGit/actions/runs/38109134139): **91 de 91 pruebas aprobadas**, 0 fallos, sintaxis correcta, sin artefactos de Android.
 
 **Pendiente:** estas pruebas verifican el RPC real y las restricciones RLS usando identidades simuladas. No prueban login por HTTPS, validación de JWT de cuentas reales ni la interfaz Android. La comprobación HTTP pública de GitHub Actions sigue recibiendo `401` sin `apikey`, que solo acredita que el gateway respondió. No introducir contraseñas, claves privadas ni JWT en el repositorio o el chat.
+
+
+## Validación de respaldos completos y recarga manual
+
+**Fecha local:** 10 de octubre de 2026. Actualizaciones exclusivas de GitHub en `Android-Gymlytics/`; sin APK y sin escrituras en PostgreSQL.
+
+- **Bloqueo inmediato de sesión:** `applyState` bloquea navegación privada, marca como no preparado el historial y deshabilita la recarga manual **antes** del `await` de comprobación de perfil. Así, al pasar de A a B, la cuenta B no encuentra botones privados habilitados durante la espera.
+- **Historial listo solo tras carga completa:** `setHistoryReady(true)` se activa después de descargar el historial al iniciar sesión y tras una actualización correcta. Se invalida al cambiar de cuenta y tras confirmar un guardado o eliminación, mientras se resincronizan los datos.
+- **Exportación segura:** los botones CSV y JSON empiezan deshabilitados desde el HTML. `canExportHistory` exige historial sincronizado y sesión autorizada. Si una lectura falla después de guardar o eliminar, las exportaciones continúan bloqueadas para evitar descargar una copia incompleta o desactualizada.
+- **Recuperación:** nuevo botón `Actualizar historial` en la sección Tablas. La operación vuelve a consultar `GymCloud.loadHistory`, valida que la sesión no haya cambiado y solo reemplaza `model.records` cuando la consulta finaliza correctamente. Un error mantiene el respaldo bloqueado, pero permite reintentar. El botón no está disponible mientras se comprueba un perfil o se realiza la carga inicial.
+- **Pruebas de regresión:** `tests/history-backup-readiness.test.mjs` (7 pruebas nuevas) y verificaciones ampliadas de bloqueo inmediato en `tests/auth-transition-privacy.test.mjs`. Se actualizaron los entornos simulados de pruebas anteriores para incorporar el estado de sincronización real.
+- **Última CI del código comprobado:** [38110082835](https://github.com/datapublicm/AplicativoGymWebGit/actions/runs/38110082835): **98/98 pruebas aprobadas**, cero fallos. Sin artefactos Android compilados.
+- **Comprobación SQL posterior solo de lectura:** 2 usuarios, **18.526 series**, **6.218 reportes**, 0 fotos, 0 archivos privados de usuario y 0 reportes temporales de validación. **15/15 tablas con RLS**. La rama `main` mantiene su SHA `7642f8eac9623892e7d292b2b49f81d14d76e2b1`.
+
+**Límites:** estas pruebas son estáticas/de aislamiento simulado más consultas SQL reales de lectura. Todavía no sustituyen la validación HTTP con JWT reales de dos cuentas ni las pruebas de interfaz Android en un dispositivo. No se usaron secretos administrativos ni contraseñas de usuarios.
