@@ -71,6 +71,7 @@ async function applyState(session,epoch) {
   window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
   window.GymEntities={gyms:[],sites:[],machines:[],options:[]};
   model.records=[];model.photos={};
+  if(typeof resetHistoryFilters==='function')resetHistoryFilters();
   if(lastDraftOwner!==null){lastDraftOwner=null;if(typeof resetExerciseTabs==='function')resetExerciseTabs();}
   if(typeof renderOwnCatalog==='function')renderOwnCatalog();
   if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
