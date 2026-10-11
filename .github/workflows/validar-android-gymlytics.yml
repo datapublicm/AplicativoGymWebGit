@@ -32,7 +32,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gymlytics-viewport-capturas
-          path: Android-Gymlytics/.mobile-check/*.png
+          path: Android-Gymlytics/mobile-check/*.png
           if-no-files-found: ignore
       - name: Comprobar respuesta HTTP pública del gateway de Pruebas
         continue-on-error: true
