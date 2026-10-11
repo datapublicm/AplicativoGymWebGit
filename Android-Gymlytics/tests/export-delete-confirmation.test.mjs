@@ -50,7 +50,7 @@ const cloud={${method}};
 test('Eliminación exitosa: confirma la fila y su propietario',async()=>{
  const h=deletionServiceFixture(),id=await h.run();
  assert.equal(id,'serie-1');
- assert.deepEqual(h.calls().map(x=>x[0]),['id','user_id','select']);
+ assert.deepEqual(Array.from(h.calls(),x=>x[0]),['id','user_id','select']);
  assert.equal(h.calls()[1][1],'cuenta-A');
 });
 test('Eliminación de registro inexistente NO se reporta como éxito',async()=>{
