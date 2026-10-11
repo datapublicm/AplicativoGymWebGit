@@ -123,6 +123,7 @@ async function applyState(session,epoch) {
     const history=await cloud.loadHistory();
     if(epoch!==authEpoch)return;
     model.records=history;drawRecent();drawHistory();drawReports();
+   if(typeof setHistoryReady==='function')setHistoryReady(true);
     await cloud.loadCatalogStats();
     if(epoch!==authEpoch)return;
     setStatus('Sesión activa · '+history.length.toLocaleString('es-PE')+' series cargadas · '+config.environment);
