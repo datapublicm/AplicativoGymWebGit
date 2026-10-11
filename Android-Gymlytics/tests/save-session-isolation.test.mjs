@@ -31,6 +31,7 @@ const getValue=()=> 'Base';
 const getEntries=()=>[{weight:activeDraftId==='tabA'?'10':'25',reps:'8',assistance:'0',
  series:'Serie 1',sub:'-',unit:'kg'}];
 const toast=value=>messages.push(value);
+const setHistoryReady=()=>{};
 const renderSeries=()=>{cleared++};
 const drawRecent=()=>{redraws++},drawHistory=()=>{redraws++},drawReports=()=>{redraws++};
 ${saving}
