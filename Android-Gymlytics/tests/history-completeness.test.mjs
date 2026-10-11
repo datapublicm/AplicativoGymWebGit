@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 
 const source=readFileSync(new URL('../web/auth-cloud.js',import.meta.url),'utf8');
-const from=source.indexOf('async loadHistory(){');
+const from=source.indexOf('async loadHistory(onProgress){');
 const to=source.indexOf('async loadInitialCatalog(){',from);
 assert.ok(from>=0&&to>from,'Método completo de descarga del historial');
 const implementation=source.slice(from,to);
