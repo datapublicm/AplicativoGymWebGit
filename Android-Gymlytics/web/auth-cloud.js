@@ -161,7 +161,10 @@ async function applyState(session,epoch) {
     setStatus('Sesión activa; error al cargar datos: '+issue);
     if(historyRefresh)historyRefresh.disabled=false;
   }
-  if(epoch===authEpoch)showPage(catalogLoaded?'registro':'catalogos');
+  if(epoch===authEpoch){
+    if(catalogLoaded)showPage('registro');
+    else showPage('catalogos');
+  }
 }
 async function findOrCreate(table,fields,insertExtra={}) {
   let q=db.from(table).select('id');
