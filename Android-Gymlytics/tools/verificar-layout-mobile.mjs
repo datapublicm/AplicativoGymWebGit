@@ -11,7 +11,7 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'../web');
 const work=mkdtempSync(join(tmpdir(),'gym-layout-'));
 const chrome=process.env.CHROME_BIN||['google-chrome','google-chrome-stable','chromium','chromium-browser'].find(n=>(process.env.PATH||'').split(':').some(p=>existsSync(join(p,n))));
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
-const pending=new Map();let browser,server,ws,id=0;
+const pending=new Map();let browser,server,ws,id=0,chromeStderr='';
 function request(method,params={}){
  return new Promise((ok,fail)=>{
   const n=++id;
@@ -71,10 +71,13 @@ try{
   }catch{res.writeHead(404);res.end()}
  });
  await new Promise(ok=>server.listen(0,'127.0.0.1',ok));
- browser=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--no-first-run','--disable-background-networking','--remote-debugging-port=0','--user-data-dir='+work,'about:blank'],{stdio:'ignore'});
+ browser=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--no-first-run','--disable-background-networking','--remote-debugging-port=0','--user-data-dir='+work,'about:blank'],{stdio:['ignore','ignore','pipe']});
+ browser.on('error',e=>{chromeStderr+='\n'+e.message});
+ browser.stderr?.on('data',chunk=>{chromeStderr+=String(chunk).slice(-2000)});
+ console.log('Chrome binario:',chrome);
  let port;
  for(let i=0;i<100;i++){try{port=Number(readFileSync(join(work,'DevToolsActivePort'),'utf8').split('\n')[0]);break}catch{await delay(100)}}
- assert.ok(port,'Chrome no inició DevTools');
+ assert.ok(port,'Chrome no inició DevTools; exit='+browser.exitCode+'; stderr='+chromeStderr.slice(-2500));
  const targets=await(await fetch('http://127.0.0.1:'+port+'/json/list')).json();
  ws=new WebSocket(targets.find(x=>x.type==='page').webSocketDebuggerUrl);
  await new Promise((ok,fail)=>{ws.addEventListener('open',ok,{once:true});ws.addEventListener('error',fail,{once:true})});
