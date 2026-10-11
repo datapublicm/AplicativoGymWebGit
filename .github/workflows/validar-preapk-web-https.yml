@@ -1,0 +1,55 @@
+name: Gymlytics - preflight web y HTTPS (sin APK)
+on:
+  push:
+    branches: [Android-Gymlytics]
+    paths:
+      - '.github/workflows/validar-preapk-web-https.yml'
+      - 'Android-Gymlytics/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preflight-sin-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Android-Gymlytics
+    env:
+      VITE_SUPABASE_URL: https://jasuqnxrskhqfobsazwd.supabase.co
+      VITE_SUPABASE_SCHEMA: sch_android_gymlytics
+      VITE_GYMLYTICS_ENVIRONMENT: pruebas
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_sQH_z37OD2mzNMoL4M3Lwg_jF8Lpmx2
+      GYMLYTICS_TEST_EMAIL_A: ${{ secrets.GYMLYTICS_TEST_EMAIL_A }}
+      GYMLYTICS_TEST_PASSWORD_A: ${{ secrets.GYMLYTICS_TEST_PASSWORD_A }}
+      GYMLYTICS_TEST_USERNAME_A: ${{ secrets.GYMLYTICS_TEST_USERNAME_A }}
+      GYMLYTICS_TEST_EMAIL_B: ${{ secrets.GYMLYTICS_TEST_EMAIL_B }}
+      GYMLYTICS_TEST_PASSWORD_B: ${{ secrets.GYMLYTICS_TEST_PASSWORD_B }}
+    steps:
+      - name: Extraer rama de trabajo
+        uses: actions/checkout@v4
+      - name: Preparar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: HTTPS de Pruebas y aislamiento anónimo (sin escrituras)
+        run: npm run test:integration
+      - name: Instalar dependencias para validar el empaquetado web
+        run: npm install --no-audit --no-fund
+      - name: Generar exclusivamente recursos web
+        run: |
+          npm run build:web
+          test -s dist/index.html
+          test -s dist/app.js
+          test -s dist/styles.css
+          test -s dist/manifest.webmanifest
+          test -s dist/assets/jalon-pecho.webp
+      - name: Garantizar ausencia de proyecto Gradle y APK
+        run: |
+          test ! -d android/app
+          test ! -d android/.gradle
+          test ! -f android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Informe de alcance
+        run: |
+          echo "Recursos web validados; NO se creó ni compiló una APK."
+          echo "Sin credenciales A/B, la prueba HTTPS solo valida API, no login real."
