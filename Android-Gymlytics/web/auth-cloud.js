@@ -374,7 +374,12 @@ const cloud={
   const path=uid+'/'+crypto.randomUUID()+'.jpg';
   const {error}=await client.storage.from('gymlog-usuarios').upload(path,blob,{contentType:'image/jpeg',upsert:false});
   if(error)throw error;
-  assertCurrentSession(uid,epoch);
+  try{assertCurrentSession(uid,epoch);}
+  catch(sessionError){
+   // Intento de limpieza: Storage puede denegarlo si ya cambió la sesión JWT.
+   await client.storage.from('gymlog-usuarios').remove([path]).catch(()=>{});
+   throw sessionError;
+  }
   const saved=await db.from('tbl_fotos').insert({user_id:uid,ejercicio_id,
    storage_path:path,tipo_referencia:type,vista:side||null,descripcion:'Fotografía Gymlytics'});
   if(saved.error){await client.storage.from('gymlog-usuarios').remove([path]);throw saved.error;}
