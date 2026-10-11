@@ -37,7 +37,7 @@ const db={from(table){
  }};
 }};
 const cloud={${method}};
-({run:()=>cloud.loadHistory(),calls,getUser:()=>signedIn.id});
+({run:callback=>cloud.loadHistory(callback),calls,getUser:()=>signedIn.id});
 `;
  return runInNewContext(fixture);
 }
@@ -62,4 +62,16 @@ test('Rechaza una descarga vieja tras nueva sesión de la MISMA cuenta',async()=
  const h=harness(false,true);
  await assert.rejects(h.run(),/La sesión cambió durante la carga/);
  assert.equal(h.getUser(),'cuenta-A');
+});
+
+test('Informa progreso real de las 9.263 series por lotes y solo completa al final',async()=>{
+ const h=harness(),events=[];
+ const history=await h.run((received,total)=>events.push([received,total]));
+ assert.equal(history.length,9263);
+ assert.deepEqual(events,[[0,9263],[2800,9263],[5600,9263],[8400,9263],[9263,9263]]);
+});
+test('Si cambia la sesión durante la descarga no informa progreso de otra cuenta',async()=>{
+ const h=harness(true),events=[];
+ await assert.rejects(h.run((received,total)=>events.push([received,total])),/La sesión cambió/);
+ assert.deepEqual(events,[[0,9263]]);
 });
