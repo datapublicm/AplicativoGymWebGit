@@ -50,6 +50,11 @@ async function cannotReadOther(token,uid){
  success(r,'Aislamiento RLS');
  if(r.data.length)throw Error('ALERTA: una cuenta recuperó información de otra');
 }
+// Una API key inexistente o inválida no debe presentarse como éxito de RLS.
+const health=await request('/auth/v1/health');
+if(health.status!==200||!['GoTrue','Auth'].includes(health.data?.name))
+ throw Error('Clave publicable no validada o Auth inaccesible: HTTP '+health.status);
+console.log('✓ Servicio Auth respondió 200 con la clave publicable de Pruebas.');
 const anon=await request('/rest/v1/tbl_usuarios?select=id&limit=1',{profile:true});
 if(anon.status===200 && Array.isArray(anon.data)&&anon.data.length)throw Error('ALERTA: perfil accesible sin sesión');
 if(![200,401,403].includes(anon.status))throw Error('Preflight Data API: HTTP '+anon.status);
