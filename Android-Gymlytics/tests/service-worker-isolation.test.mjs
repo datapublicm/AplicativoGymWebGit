@@ -6,7 +6,7 @@ import {runInNewContext} from 'node:vm';
 const source=readFileSync(new URL('../web/sw.js',import.meta.url),'utf8');
 function harness(){
  const handlers={},deleted=[],put=[],fetches=[],cacheNames=[
-  'gymlytics-mobile-v0.3-20261010','gymlytics-mobile-v0.4-20261010',
+  'gymlytics-mobile-v0.3-20261010','gymlytics-mobile-v0.4-20261010','gymlytics-mobile-v0.5-20261011',
   'otra-app-v1','dashboard-personal','gymlog-otra-app'
  ];
  const self={
