@@ -60,6 +60,8 @@ async function applyState(session,epoch) {
     if(b.dataset.page!=='sesion'){b.disabled=true;b.setAttribute('aria-disabled','true');}
   });
   if(typeof setHistoryReady==='function')setHistoryReady(false);
+  const historyRefresh=$('historyRefresh');
+  if(historyRefresh)historyRefresh.disabled=true;
   // Ocultar inmediatamente los datos de la sesión previa, incluso mientras se valida el nuevo perfil.
   if(typeof invalidatePendingSave==='function')invalidatePendingSave();
   window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
@@ -89,6 +91,7 @@ async function applyState(session,epoch) {
   document.querySelectorAll('[data-page]').forEach(b=>{
     if(b.dataset.page!=='sesion'){b.disabled=!owns();b.setAttribute('aria-disabled',String(!owns()));}
   });
+  if(historyRefresh)historyRefresh.disabled=!owns();
   const logged=owns();
   $('authForm').hidden=logged;$('authRegister').hidden=logged;$('authRecovery').hidden=logged;
   $('authProfile').hidden=!logged;
