@@ -11,7 +11,7 @@ const method=src.slice(a,b);
 function fixture({rejectProfile=false}={}){
  const code=`
 let signedIn={id:'cuenta-A',email:'a@pruebas.test'},lastDraftOwner='cuenta-A',authEpoch=8;
-let releaseProfile,draws=0,resets=0,invalidated=0,page='registro',status='',loads=0;
+let releaseProfile,draws=0,resets=0,invalidated=0,page='registro',status='',loads=0,navLocked=false,historyReady=true;
 const profileGate=new Promise(resolve=>releaseProfile=resolve);
 const model={records:[{id:'serie-A',weight:25}],photos:{'fotografia-A':'data:privada'}};
 const window={
@@ -23,7 +23,10 @@ const elements={authProfile:{hidden:false},authForm:{hidden:true},authRegister:{
  authRecovery:{hidden:true},loggedUser:{textContent:'Cuenta A'},
  loggedEmail:{textContent:'a@pruebas.test'}};
 const $=id=>(elements[id]??={hidden:false,textContent:''});
-const document={body:{classList:{toggle(){}}},querySelectorAll:()=>[]};
+const nav=[{dataset:{page:'registro'},disabled:false,setAttribute(k,v){this.ariaDisabled=v}},
+ {dataset:{page:'tablas'},disabled:false,setAttribute(k,v){this.ariaDisabled=v}}];
+const document={body:{classList:{toggle(_name,value){navLocked=value}}},querySelectorAll:()=>nav};
+const setHistoryReady=ready=>{historyReady=ready};
 const owns=()=>!!signedIn?.id;
 const invalidatePendingSave=()=>{invalidated++};
 const resetExerciseTabs=()=>{resets++};
@@ -54,6 +57,7 @@ ${method}
  state:()=>({signedIn,records:model.records,photos:model.photos,base:window.GymBaseCatalog,
  custom:window.GymCustomCatalog,library:window.GymExerciseLibrary,
  entities:window.GymEntities,owner:lastDraftOwner,draws,resets,invalidated,page,status,loads,
+ navLocked,navDisabled:nav.every(x=>x.disabled),refreshDisabled:$('historyRefresh').disabled,historyReady,
  profileVisible:!elements.authProfile.hidden,formVisible:!elements.authForm.hidden})
 });
 `;
@@ -74,11 +78,19 @@ test('Cambia A por B: datos privados de A se vacían ANTES de validar el perfil 
  assert.equal(state.profileVisible,false);
  assert.equal(state.formVisible,false);
  assert.equal(state.loads,0);
+ assert.equal(state.navLocked,true);
+ assert.equal(state.navDisabled,true);
+ assert.equal(state.refreshDisabled,true);
+ assert.equal(state.historyReady,false);
  assert.ok(state.resets>=1);
  h.finishProfile();await pending;
  assert.equal(h.state().records[0].id,'serie-B');
  assert.equal(h.state().custom[0].e,'Ejercicio B');
  assert.equal(h.state().page,'registro');
+ assert.equal(h.state().navLocked,false);
+ assert.equal(h.state().navDisabled,false);
+ assert.equal(h.state().refreshDisabled,false);
+ assert.equal(h.state().historyReady,true);
 });
 test('Cuenta B sin permiso no conserva información A ni presenta registro privado',async()=>{
  const h=fixture({rejectProfile:true}),pending=h.start();
@@ -91,6 +103,10 @@ test('Cuenta B sin permiso no conserva información A ni presenta registro priva
  assert.equal(state.formVisible,true);
  assert.match(state.status,/Acceso no autorizado/);
  assert.equal(state.loads,0);
+ assert.equal(state.navLocked,true);
+ assert.equal(state.navDisabled,true);
+ assert.equal(state.refreshDisabled,true);
+ assert.equal(state.historyReady,false);
 });
 test('Cierre de sesión limpia historial, catálogos y fotos inmediatamente',async()=>{
  const h=fixture();await h.logout();
@@ -101,4 +117,7 @@ test('Cierre de sesión limpia historial, catálogos y fotos inmediatamente',asy
  assert.equal(state.page,'sesion');
  assert.equal(state.profileVisible,false);
  assert.equal(state.formVisible,true);
+ assert.equal(state.navLocked,true);
+ assert.equal(state.navDisabled,true);
+ assert.equal(state.historyReady,false);
 });
