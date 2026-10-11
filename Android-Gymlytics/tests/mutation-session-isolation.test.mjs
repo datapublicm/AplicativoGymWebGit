@@ -24,6 +24,7 @@ const messages=[],window={GymCloud:{
   return [{id:'a-recargada'}]}
 }};
 const confirm=()=>true,toast=x=>messages.push(x);
+const setHistoryReady=()=>{};
 const drawRecent=()=>{redraws++},drawHistory=()=>{redraws++},drawReports=()=>{redraws++};
 ${deletion}
 ({run:()=>deleteRecord('a1'),switchAccount:()=>{session='B';model.records=[{id:'b1'}]},
