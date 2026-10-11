@@ -39,7 +39,7 @@ function harness(){
 
 test('Actualizar Gymlytics no elimina cachés de otras aplicaciones',async()=>{
  const h=harness();await h.activate();
- assert.deepEqual(h.deleted,['gymlytics-mobile-v0.3-20261010','gymlytics-mobile-v0.4-20261010']);
+ assert.deepEqual(h.deleted,['gymlytics-mobile-v0.3-20261010','gymlytics-mobile-v0.4-20261010','gymlytics-mobile-v0.5-20261011']);
 });
 test('La app solo intercepta y almacena recursos estáticos propios',async()=>{
  const h=harness();
