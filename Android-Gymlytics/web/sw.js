@@ -1,5 +1,5 @@
 const PREFIX='gymlytics-mobile-';
-const CACHE=PREFIX+'v0.7-20261011';
+const CACHE=PREFIX+'v0.8-20261011';
 const ASSETS=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./assets/polea-alta.webp','./assets/jalon-pecho.webp','./icons/icon-192.png','./icons/icon-512.png'];
 const STATIC_URLS=new Set(ASSETS.map(path=>new URL(path,self.location.href).href));
 
