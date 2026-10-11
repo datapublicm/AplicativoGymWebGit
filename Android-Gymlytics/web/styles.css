@@ -308,3 +308,16 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 @media(max-width:400px){
  .progress-filters label:last-child{grid-column:auto}
 }
+
+
+/* Historial: filtros visibles y accesibles sin ensanchar la pantalla Android. */
+.history-filters{display:grid;grid-template-columns:minmax(170px,2fr) repeat(2,minmax(118px,1fr)) auto;gap:10px;align-items:end;margin-top:13px}
+.history-filters label{display:flex;flex-direction:column;gap:6px;min-width:0;color:#a9c9df;font-size:12px;font-weight:700}
+.history-filters input,.history-filters select{width:100%;min-width:0;min-height:44px;border:1px solid #365c7b;border-radius:9px;padding:9px 10px;background:#081a32;color:#e9f8ff;color-scheme:dark}
+.history-filters button{min-height:44px;white-space:normal}
+.history-filter-summary{margin:12px 0 6px;color:#86ddf1;font-size:12px;line-height:1.55;overflow-wrap:anywhere}
+.record-actions{flex-wrap:wrap;gap:7px}
+.record-actions button{min-height:34px}
+@media(max-width:950px){.history-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.history-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.history-filters label:first-child{grid-column:1/-1}.history-filters button{grid-column:1/-1}}
+@media(max-width:380px){.history-filters{grid-template-columns:1fr}.history-filters label:first-child,.history-filters button{grid-column:auto}}
