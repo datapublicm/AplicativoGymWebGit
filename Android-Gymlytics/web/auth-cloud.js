@@ -97,7 +97,8 @@ async function applyState(session,epoch) {
   });
   // Bloquear recargas paralelas hasta terminar la carga inicial.
   if(historyRefresh)historyRefresh.disabled=true;
-  if(catalogRefresh)catalogRefresh.disabled=!owns();
+  // No iniciar una segunda carga mientras aún se ejecuta la inicial.
+  if(catalogRefresh)catalogRefresh.disabled=true;
   const logged=owns();
   $('authForm').hidden=logged;$('authRegister').hidden=logged;$('authRecovery').hidden=logged;
   $('authProfile').hidden=!logged;
@@ -140,6 +141,7 @@ async function applyState(session,epoch) {
     await cloud.loadCatalogStats();
     if(epoch!==authEpoch)return;
     setStatus('Sesión activa · '+base.length.toLocaleString('es-PE')+' ejercicios de referencia · '+history.length.toLocaleString('es-PE')+' series cargadas · '+config.environment);
+    if(catalogRefresh)catalogRefresh.disabled=false;
   }catch(error){
     if(epoch!==authEpoch)return;
     let issue=error.message;
@@ -160,6 +162,7 @@ async function applyState(session,epoch) {
     if(!catalogLoaded&&catalogStatus)catalogStatus.textContent='No se cargó el catálogo. Pulsa Actualizar catálogo para reintentar.';
     setStatus('Sesión activa; error al cargar datos: '+issue);
     if(historyRefresh)historyRefresh.disabled=false;
+    if(catalogRefresh)catalogRefresh.disabled=false;
   }
   if(epoch===authEpoch){
     if(catalogLoaded)showPage('registro');
