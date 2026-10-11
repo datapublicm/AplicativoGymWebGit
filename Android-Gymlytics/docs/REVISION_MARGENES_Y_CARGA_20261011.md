@@ -47,3 +47,18 @@ Se conservó el Dashboard ya implementado: los indicadores de peso, repeticiones
 **Lectura SQL sin modificar datos en Supabase Pruebas:** 2 usuarios, 242 ejercicios activos de referencia (242 IDs únicos), 278 ejercicios totales, 18.526 series, 6.218 reportes, 0 fotos, 0 objetos en Storage y 15/15 tablas con RLS. Bajo `authenticated` con `auth.uid()` simulado para cada cuenta: 9.263 series, 9.263 IDs únicos, 0 series de otra cuenta y 0 registros incompletos (fecha, ejercicio, peso, repeticiones).
 
 **Alcance de la evidencia:** Chrome en modo móvil no sustituye un dispositivo físico Android ni WebView de una APK. La validación SQL de permisos no sustituye autenticación por HTTPS con JWT real; no se proporcionaron contraseñas ni tokens.
+
+
+## Continuación: progreso visible de la carga del historial
+
+**Implementación web sin alterar la base de datos ni la funcionalidad 3D.** El historial de cada cuenta contiene miles de series (9.263 registros por cuenta en Supabase Pruebas). Hasta ahora, durante la descarga inicial y la recarga manual, Gymlytics no indicaba cuántas series había recibido. Se incorporó:
+
+- Una barra de progreso visible en `web/index.html` y `web/styles.css`, adaptable al ancho del móvil. Muestra el recuento de filas y el porcentaje. Durante la consulta inicial del total, se comporta como indicador indeterminado y **no inventa porcentajes**.
+- `cloud.loadHistory(onProgress)` comunica los totales después de consultar el recuento y al finalizar cada lote paginado comprobado. Por ejemplo, sobre 9.263 filas: 0, 2.800, 5.600, 8.400 y 9.263. Un cambio de cuenta anula respuestas anteriores.
+- El inicio de sesión y la opción **Actualizar historial** utilizan ese progreso y lo ocultan al terminar, fallar o cambiar de usuario. Las exportaciones CSV/JSON **permanecen bloqueadas** hasta completarse toda la descarga; se conservan las validaciones de duplicados, cuenta y cantidad exacta.
+- Actualización del Service Worker: caché estática `gymlytics-mobile-v0.8-20261011`; no se cachean respuestas privadas de Supabase.
+- Pruebas nuevas de progreso y adaptación de pruebas anteriores: **150/150 pruebas aprobadas**, CI [38167202998](https://github.com/datapublicm/AplicativoGymWebGit/actions/runs/38167202998).
+
+**Lectura SQL de conservación:** 2 usuarios, 242 ejercicios de referencia activos, 18.526 series, 6.218 reportes, 0 fotos. Solo consultas de lectura en esta continuación. `main` no modificada. No se compiló APK durante esta intervención y el modelo humano 3D **sigue pospuesto**.
+
+**Alcance de la evidencia:** el indicador funciona en pruebas de código y muestra avances calculados por lotes; todavía no se ha confirmado mediante navegación autenticada en un dispositivo físico. No presentar las pruebas simuladas como sesión HTTPS real.
