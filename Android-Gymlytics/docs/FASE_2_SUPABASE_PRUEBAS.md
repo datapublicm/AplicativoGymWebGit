@@ -181,3 +181,22 @@ Consulta SQL solo de lectura:
 - **Comprobación SQL posterior solo de lectura:** 2 usuarios, **18.526 series**, **6.218 reportes**, 0 fotos, 0 archivos privados de usuario y 0 reportes temporales de validación. **15/15 tablas con RLS**. La rama `main` mantiene su SHA `7642f8eac9623892e7d292b2b49f81d14d76e2b1`.
 
 **Límites:** estas pruebas son estáticas/de aislamiento simulado más consultas SQL reales de lectura. Todavía no sustituyen la validación HTTP con JWT reales de dos cuentas ni las pruebas de interfaz Android en un dispositivo. No se usaron secretos administrativos ni contraseñas de usuarios.
+
+
+## Validación estricta de integridad de historial paginado
+
+**Fecha local: 10/10/2026.** Cambio exclusivo de la rama de desarrollo `Android-Gymlytics`; sin compilar APK ni modificar registros en Supabase.
+
+**Problema:** `cloud.loadHistory()` utilizaba un `count: 'exact'` y páginas de 700 filas, pero podía aceptar una respuesta HEAD sin recuento (interpretada como cero), una página corta sin error REST, duplicación de identificadores por cambios concurrentes o una fila de usuario distinto. Una descarga de ese tipo podía marcarse como completa y permitir exportar un respaldo defectuoso.
+
+**Corrección:** la descarga exige ahora `count` entero seguro/no negativo, verifica que cada respuesta REST sea un arreglo del tamaño esperado, comprueba `id` único y no nulo, exige `user_id` igual al propietario capturado al comenzar y coteja la cantidad final con el total anunciado. Cualquier inconsistencia rechaza `loadHistory()` con un mensaje de recarga; el circuito de `setHistoryReady` de la fase anterior mantiene los respaldos bloqueados y `Actualizar historial` permite repetir la lectura.
+
+**Pruebas nuevas:** `tests/history-completeness.test.mjs` contiene nueve escenarios: éxito con 1.503 filas y tres páginas, historial legítimamente vacío, `count=NULL`, página incompleta, identificadores repetidos, usuario ajeno, ID nulo, cuerpo REST nulo y error remoto. La batería global pasó de 98 a **107 pruebas, todas aprobadas**: [CI 38110794847](https://github.com/datapublicm/AplicativoGymWebGit/actions/runs/38110794847).
+
+**Validación real SQL de referencia:** bajo RLS de la cuenta A (`SET LOCAL ROLE authenticated` y `auth.uid()` simulado) la vista devolvió **9.263 filas, 9.263 IDs únicos y 0 filas ajenas**. Esta comprobación SQL no equivale a un inicio de sesión HTTPS con JWT.
+
+**Conservación después de los cambios:** 2 usuarios, 18.526 series y 6.218 reportes, 0 fotos, 0 objetos en `gymlog-usuarios`, 0 reportes temporales; **15/15** tablas con RLS. Solo se realizaron lecturas SQL en esta ronda. `main` sigue intacta.
+
+**Limitación técnica:** la paginación por desplazamiento (offset) no ofrece una instantánea transaccional entre múltiples solicitudes HTTP. Las comprobaciones detectan diferencias de recuento, páginas cortas, duplicaciones y cruce de propietarios, pero no garantizan detectar una sustitución concurrente que conserve exactamente la cantidad e identificadores únicos. Para una garantía de instantánea se necesitaría un mecanismo de lectura consistente del lado servidor, evaluado y autorizado aparte.
+
+**Pendiente:** pruebas HTTP de extremo a extremo con credenciales de dos usuarios de prueba seguras y validación de UI Android real, sin dar por validados los JWT por la sola comprobación SQL.
