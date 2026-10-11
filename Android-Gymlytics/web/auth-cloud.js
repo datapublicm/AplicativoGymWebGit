@@ -390,12 +390,15 @@ for(const [formId,kind,feedbackId] of [
   event.preventDefault();
   if(!owns())return $('authStatus').textContent='Inicia sesión para editar tu catálogo.';
   const form=event.currentTarget, button=form.querySelector('[type="submit"]');
+  const stamp=cloud.getSessionStamp();
+  const current=()=>stamp===cloud.getSessionStamp()&&cloud.canWrite();
   button.disabled=true;
   try{
     await cloud.addIndependentItem(kind,Object.fromEntries(new FormData(form).entries()));
+    if(!current())return;
     form.reset();
     $(feedbackId).textContent='Elemento guardado en tu cuenta de Supabase.';
-  }catch(error){$(feedbackId).textContent='No se pudo guardar: '+error.message;}
+  }catch(error){if(current())$(feedbackId).textContent='No se pudo guardar: '+error.message;}
   finally{button.disabled=false;}
  });
 }
@@ -403,16 +406,21 @@ $('catalogForm')?.addEventListener('submit',async event=>{
   event.preventDefault();
   if(!owns())return setStatus('Inicia sesión para modificar tu catálogo.');
   const values=Object.fromEntries(new FormData(event.currentTarget).entries());
+  const stamp=cloud.getSessionStamp();
+  const current=()=>stamp===cloud.getSessionStamp()&&cloud.canWrite();
   const button=$('catalogSubmit');button.disabled=true;
   try{
-   window.GymCustomCatalog=await cloud.saveCustomExercise(values);
+   const catalog=await cloud.saveCustomExercise(values);
+   if(!current())return;
+   window.GymCustomCatalog=catalog;
    if(typeof cascade==='function')cascade(0,{e:values.e,z:values.z,t:values.tecnica||'Ejecución base'});
    if(typeof renderOwnCatalog==='function')renderOwnCatalog();
    await cloud.loadCatalogStats();
+   if(!current())return;
    event.currentTarget.reset();
    if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
    $('catalogFeedback').textContent='Ejercicio guardado en tu catálogo de Supabase.';
-  }catch(error){$('catalogFeedback').textContent='No se pudo guardar: '+error.message;}
+  }catch(error){if(current())$('catalogFeedback').textContent='No se pudo guardar: '+error.message;}
   finally{button.disabled=false;}
 });
 // Bloquear navegación antes de que cualquier controlador del mockup la procese.
