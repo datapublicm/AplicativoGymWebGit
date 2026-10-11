@@ -32,3 +32,18 @@ Se conservó el Dashboard ya implementado: los indicadores de peso, repeticiones
 - `main` permanece intacta y no se generó APK.
 
 **Pendiente dentro del mismo alcance:** ejecución visual real con tamaños 320/360/390/412 px y una sesión HTTPS de prueba para observar carga del catálogo y series en el navegador del dispositivo. Las simulaciones y pruebas estáticas no sustituyen esas comprobaciones.
+
+
+## Verificación de navegador y datos — 11/10/2026
+
+**Alcance inalterado:** márgenes, carga de información y visualización. **El modelo humano 3D sigue pospuesto**. No se ha habilitado ni modificado. No se compiló APK ni se fusionó `main`.
+
+**Problema detectado:** en la etapa «Series» del registro a 390 px, el botón `#backToContext` sobresalía aproximadamente 3 px. Chrome reportó `innerWidth=393` con viewport visual de 390 px. La cabecera `.series-head` no acomodaba correctamente título, contador y botón. Se corrigió con `flex-wrap`, reducción flexible del título y reorganización del botón en móviles. La tabla ancha conserva su desplazamiento horizontal contenido.
+
+**Verificación real en navegador:** el flujo `.github/workflows/validar-android-gymlytics.yml` ejecuta `tools/verificar-layout-mobile.mjs`, que inicia Chrome headless, sirve los archivos HTML/CSS/JS del repositorio por HTTP local y configura el viewport mediante DevTools. Comprueba **Sesión, Catálogos, Registro, Registro/Series, Tablas y Dashboard** en 320, 360, 390 y 412 px: **24 escenarios**, verificando desbordamientos, rectángulos de controles, barra inferior y gráfico SVG de Dashboard con datos ficticios. Guarda capturas de Dashboard 320 px y Registro/Series 390 px en los artefactos de GitHub Actions. Se realiza sin dependencias adicionales y sin APK.
+
+**Ejecución validada:** [CI 38117617991](https://github.com/datapublicm/AplicativoGymWebGit/actions/runs/38117617991), 133 pruebas de Node y 24 escenarios Chrome aprobados. [Capturas verificables](https://github.com/datapublicm/AplicativoGymWebGit/actions/runs/38117617991/artifacts/11693841679). Se incorporaron después dos pruebas adicionales de regresión y este informe; verificar la ejecución final correspondiente.
+
+**Lectura SQL sin modificar datos en Supabase Pruebas:** 2 usuarios, 242 ejercicios activos de referencia (242 IDs únicos), 278 ejercicios totales, 18.526 series, 6.218 reportes, 0 fotos, 0 objetos en Storage y 15/15 tablas con RLS. Bajo `authenticated` con `auth.uid()` simulado para cada cuenta: 9.263 series, 9.263 IDs únicos, 0 series de otra cuenta y 0 registros incompletos (fecha, ejercicio, peso, repeticiones).
+
+**Alcance de la evidencia:** Chrome en modo móvil no sustituye un dispositivo físico Android ni WebView de una APK. La validación SQL de permisos no sustituye autenticación por HTTPS con JWT real; no se proporcionaron contraseñas ni tokens.
