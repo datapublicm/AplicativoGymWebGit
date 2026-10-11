@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 
 const src=readFileSync(new URL('../web/app.js',import.meta.url),'utf8');
-const start=src.indexOf('function invalidatePendingSave(){');
+const start=src.indexOf('function validSeriesDecimal(value,limit){');
 const end=src.indexOf('function recordHtml(',start);
 assert.ok(start>=0&&end>start,'Se encuentra el ciclo completo de guardado');
 const saving=src.slice(start,end);
