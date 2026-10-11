@@ -114,3 +114,17 @@ En la rama `Android-Gymlytics` se incorporaron las siguientes correcciones sin c
 7. **Conservación SQL**: 2 usuarios, **18.526 series**, **6.218 reportes**, 0 filas de fotos, 0 objetos en bucket privado `gymlog-usuarios`, y **15/15 tablas con RLS**. Las consultas fueron solo de lectura; Producción y `main` permanecen sin cambios.
 
 **Siguiente bloqueo auténtico de la Fase 2:** falta ejecutar una sesión HTTP de prueba con clave publicable y dos identidades reales, sin compartir contraseñas en el chat. Después vendrán las operaciones ficticias de escritura reversibles y las pruebas de interfaz en dispositivo Android. No se autorizó ni realizó compilación APK.
+
+
+## Continuación — protección de valores numéricos y exportaciones
+
+**Fecha:** 10/10/2026. Esta revisión solo modifica la rama `Android-Gymlytics`. No se compila APK ni se modifica la base.
+
+- **Precisión de series:** `web/app.js` valida las tres columnas antes del guardado. Solo acepta números no negativos con cero, uno o dos decimales; las repeticiones deben ser mayores a cero. Respeta `peso numeric(12,2)`, `repeticiones numeric(10,2)` y `asistencias numeric(10,2)`. Se admiten valores como `6.5`, `1.25`, `.5`, peso `0` y kilogramos o libras.
+- **Validación antes de escribir:** `cloud.saveWorkout()` realiza también el control de entradas sin confiar solo en el formulario. Rechaza `NaN`, `Infinity`, negativos, precisión superior a dos decimales, valores fuera del límite numérico y unidades distintas de `kg`/`lb` **antes de ejecutar `ensureExercise`**, impidiendo altas auxiliares accidentales por datos inválidos.
+- **CSV:** `exportCsv()` antepone un apóstrofo a textos cuyo contenido, incluso precedido por espacios o controles, pudiera ejecutarse como fórmula al abrir en hojas de cálculo (`=`, `+`, `-`, `@`). Mantiene el formato separado por punto y coma, el BOM UTF-8 y los números válidos. La exportación JSON no cambia.
+- **Pruebas nuevas:** `tests/series-data-integrity.test.mjs` incluye cinco escenarios para límites decimales, validación anterior a la creación de tablas auxiliares y neutralización del CSV. Se ajustaron `tests/save-session-isolation.test.mjs` y `tests/history-pagination.test.mjs` para ejecutar el validador real.
+- **CI:** [ejecución 38107904471](https://github.com/datapublicm/AplicativoGymWebGit/actions/runs/38107904471), **89/89 pruebas aprobadas**, 0 fallidas, sin artefactos compilados.
+- **Supabase Pruebas, comprobación SQL posterior:** 2 cuentas, **18.526 series**, **6.218 reportes**, 0 fotos en `tbl_fotos`, 0 objetos en bucket `gymlog-usuarios`; **15/15 tablas con RLS**. Todas las consultas fueron de lectura.
+
+**Pendientes reales:** prueba HTTPS de extremo a extremo con JWT de dos cuentas autorizadas, escrituras de ensayo controladas y comprobación funcional/visual en Android real. La validación SQL de roles simulados documentada en `VALIDACION_RLS_2026-10-10.md` sigue siendo distinta de una sesión JWT real. No se ha compilado la APK.
