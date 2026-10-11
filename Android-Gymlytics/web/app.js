@@ -247,17 +247,44 @@ async function saveSeries(){
  }
  finally{if(current()){btn.disabled=false;btn.textContent='Guardar series'}}
 }
-function recordHtml(r){return `<div class="record-item"><div><strong>${esc(r.exercise)}</strong><p>${esc(fmtDate(r.date))} · ${esc(r.gym)} · ${esc(r.sede)}<br>${esc(r.series)}${r.subdivision!=='-'?' · '+esc(r.subdivision):''} · ${esc(r.technique)}${r.assistance!==null&&r.assistance!==undefined?' · Asist.: '+esc(r.assistance):''}</p></div><aside><strong>${esc(r.weight)} ${esc(r.unit)} × ${esc(r.reps)}</strong><small>repeticiones</small><div class="record-actions"><button type="button" data-delete="${esc(r.id)}" title="Eliminar serie">Eliminar</button></div></aside></div>`}
+function recordHtml(r){return `<div class="record-item"><div><strong>${esc(r.exercise)}</strong><p>${esc(fmtDate(r.date))} · ${esc(r.gym)} · ${esc(r.sede)}<br>${esc(r.series)}${r.subdivision!=='-'?' · '+esc(r.subdivision):''} · ${esc(r.technique)}${r.assistance!==null&&r.assistance!==undefined?' · Asist.: '+esc(r.assistance):''}</p></div><aside><strong>${esc(r.weight)} ${esc(r.unit)} × ${esc(r.reps)}</strong><small>repeticiones</small><div class="record-actions"><button type="button" data-delete="${esc(r.id)}" title="Eliminar serie">Eliminar</button><button type="button" data-progress="${esc(r.exercise)}" title="Mostrar evolución de este ejercicio">Ver progreso</button></div></aside></div>`}
 function orderedRecords(){return [...model.records].sort((a,b)=>b.date.localeCompare(a.date)||(b.createdAt||'').localeCompare(a.createdAt||''))}
 function drawRecent(){const list=orderedRecords().slice(0,3);$('recentRecords').innerHTML=list.length?list.map(recordHtml).join(''):'<div class="empty">Aún no hay registros nuevos. Completa una fila y guárdala.</div>'}
 let historyVisible=60;
+function resetHistoryFilters(){
+ for(const id of ['historySearch','historyExercise','historyDateFrom','historyDateTo']){
+  const field=$(id);if(field)field.value='';
+ }
+ historyVisible=60;
+}
 function drawHistory(reset=false){
  if(reset)historyVisible=60;
+ const ordered=orderedRecords();
+ const exerciseSelect=$('historyExercise');
+ if(exerciseSelect){
+  const names=uniq(ordered.map(r=>r.exercise));
+  const selected=exerciseSelect.value;
+  exerciseSelect.innerHTML='<option value="">Todos los ejercicios</option>'+names.map(name=>'<option value="'+esc(name)+'">'+esc(name)+'</option>').join('');
+  exerciseSelect.value=names.includes(selected)?selected:'';
+ }
  const q=$('historySearch').value.trim().toLocaleLowerCase();
- const list=orderedRecords().filter(r=>[r.gym,r.sede,r.zone,r.equipment,r.exercise,r.technique].join(' ').toLocaleLowerCase().includes(q));
- $('historyRecords').innerHTML=list.length?list.slice(0,historyVisible).map(recordHtml).join(''):'<div class="empty">No se encontraron series registradas.</div>';
+ const exercise=exerciseSelect?.value||'',from=$('historyDateFrom')?.value||'',to=$('historyDateTo')?.value||'';
+ const invalid=Boolean(from&&to&&from>to);
+ const list=invalid?[]:ordered.filter(r=>
+  (!exercise||r.exercise===exercise)&&(!from||r.date>=from)&&(!to||r.date<=to)&&
+  [r.gym,r.sede,r.zone,r.equipment,r.exercise,r.technique].join(' ').toLocaleLowerCase().includes(q));
+ $('historyRecords').innerHTML=list.length?list.slice(0,historyVisible).map(recordHtml).join(''):'<div class="empty">'+(invalid?'Revisa las fechas: «Desde» no puede superar «Hasta».':'No se encontraron series con los filtros seleccionados.')+'</div>';
  $('historyPagination').hidden=list.length<=historyVisible;
  $('historyPageInfo').textContent='Mostrando '+Math.min(historyVisible,list.length).toLocaleString('es-PE')+' de '+list.length.toLocaleString('es-PE')+' series';
+ const summary=$('historyFilterSummary');
+ if(summary){
+  const volume=list.reduce((total,r)=>{
+   const weight=Number(r.weight),reps=Number(r.reps);
+   return Number.isFinite(weight)&&Number.isFinite(reps)?total+weight*(r.unit==='lb'?0.45359237:1)*reps:total;
+  },0);
+  const count=n=>n.toLocaleString('es-PE');
+  summary.textContent=invalid?'Rango de fechas incorrecto.':count(list.length)+' de '+count(ordered.length)+' series · '+count(new Set(list.map(r=>r.date)).size)+' fechas · Volumen: '+Math.round(volume).toLocaleString('es-PE')+' kg × rep.';
+ }
 }
 async function deleteRecord(id){
  if(!window.GymCloud?.canWrite())return;
@@ -403,7 +430,7 @@ function photoCanvas(file,maxSize){
 }
 
 function detailOpenAfterUpload(type){const r=chosenRow(),[src,available]=photoFor(type,r);$(type==='equipo'?'detailEquipmentImg':'detailExerciseImg').src=src;$(type==='equipo'?'equipmentNoPhoto':'exerciseNoPhoto').hidden=available}
-function install(){$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('progressExercise').addEventListener('change',()=>drawProgressChart(model.records));$('progressMetric').addEventListener('change',()=>drawProgressChart(model.records));$('progressRange').addEventListener('change',()=>drawProgressChart(model.records));$('historySearch').addEventListener('input',()=>drawHistory(true));$('historyLoadMore').addEventListener('click',()=>{historyVisible+=60;drawHistory()});$('historyRefresh').addEventListener('click',refreshHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(b)deleteRecord(b.dataset.delete)})}
+function install(){$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('progressExercise').addEventListener('change',()=>drawProgressChart(model.records));$('progressMetric').addEventListener('change',()=>drawProgressChart(model.records));$('progressRange').addEventListener('change',()=>drawProgressChart(model.records));$('historySearch').addEventListener('input',()=>drawHistory(true));$('historyExercise').addEventListener('change',()=>drawHistory(true));$('historyDateFrom').addEventListener('change',()=>drawHistory(true));$('historyDateTo').addEventListener('change',()=>drawHistory(true));$('historyClearFilters').addEventListener('click',()=>{resetHistoryFilters();drawHistory(true)});$('historyLoadMore').addEventListener('click',()=>{historyVisible+=60;drawHistory()});$('historyRefresh').addEventListener('click',refreshHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(b){deleteRecord(b.dataset.delete);return;}const progress=e.target.closest('[data-progress]');if(progress){const exercise=progress.dataset.progress;showPage('dashboard');if(model.records.some(r=>r.exercise===exercise)){$('progressExercise').value=exercise;drawProgressChart(model.records);}}})}
 $('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();install();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
