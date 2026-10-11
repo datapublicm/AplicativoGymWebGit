@@ -88,3 +88,17 @@ test('El cuadro de detalle y la barra inferior respetan los márgenes físicos d
  assert.match(css,/\.bottom-nav\{padding-left:env\(safe-area-inset-left/);
  assert.match(css,/\.content\{width:100%;max-width:100%;padding-left:max\(12px,env\(safe-area-inset-left/);
 });
+
+test('Cabecera de series permite que Editar ejercicio salte de línea sin desbordar 390 px',()=>{
+ assert.match(css,/@media\(max-width:760px\)\{\s*\.series-head\{flex-wrap:wrap/);
+ assert.match(css,/\.series-head>div\{flex:1 1 155px;min-width:0\}/);
+ assert.match(css,/\.series-head \.series-back\{max-width:100%;white-space:normal/);
+});
+test('La CI comprueba la interfaz real en Chrome y no compila Android',()=>{
+ const workflow=readFileSync(new URL('../../.github/workflows/validar-android-gymlytics.yml',import.meta.url),'utf8');
+ const browser=readFileSync(new URL('../tools/verificar-layout-mobile.mjs',import.meta.url),'utf8');
+ assert.match(workflow,/run: node tools\/verificar-layout-mobile\.mjs/);
+ assert.match(browser,/for\(const width of \[320,360,390,412\]\)/);
+ assert.match(browser,/Page\.captureScreenshot/);
+ assert.doesNotMatch(workflow,/assembleDebug|gradlew|npx cap|npm run build:web/);
+});
