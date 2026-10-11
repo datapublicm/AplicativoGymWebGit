@@ -49,6 +49,7 @@ const chosenRow=()=>({g:'Pruebas',e:activeDraftId==='tab1'?'Curl bíceps':'Curl 
 const getValue=()=> 'Base';
 const getEntries=()=>[{weight:activeDraftId==='tab1'?'10':'20',reps:activeDraftId==='tab1'?'10':'8',assistance:'0',series:'Serie 1',sub:'-',unit:'kg'}];
 const toast=msg=>messages.push(msg);
+const setHistoryReady=()=>{};
 const renderSeries=()=>{cleared=true};
 function drawRecent(){};function drawHistory(){};function drawReports(){};
 `;
