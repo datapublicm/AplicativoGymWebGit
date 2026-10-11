@@ -31,7 +31,7 @@ function fixture(mode='valid',length=1503){
   "if(mode==='foreign-owner'&&start===0)page[0]={...page[0],user_id:'cuenta-B'};",
   "if(mode==='missing-id'&&start===0)page[0]={...page[0],id:null};",
   "return {data:page,error:null};",
-  "}}}}};",
+  "}}}}}};",
   "const cloud={"+implementation+"};",
   "({run:()=>cloud.loadHistory(),requests:()=>requests});"
  ].join('\n');
