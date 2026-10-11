@@ -131,7 +131,7 @@ async function applyState(session,epoch) {
     if(historyRefresh)historyRefresh.disabled=false;
     await cloud.loadCatalogStats();
     if(epoch!==authEpoch)return;
-    setStatus('Sesión activa · '+history.length.toLocaleString('es-PE')+' series cargadas · '+config.environment);
+    setStatus('Sesión activa · '+base.length.toLocaleString('es-PE')+' ejercicios de referencia · '+history.length.toLocaleString('es-PE')+' series cargadas · '+config.environment);
   }catch(error){
     if(epoch!==authEpoch)return;
     setStatus('Sesión activa; error al cargar datos: '+error.message);
@@ -242,17 +242,32 @@ const cloud={
  },
  async loadInitialCatalog(){
   if(!owns())return [];
+  const uid=signedIn.id,epoch=authEpoch;
+  const {count,error:countError}=await db.from('tbl_catalogo_predeterminado')
+    .select('id',{count:'exact',head:true}).eq('activo',true);
+  must(null,countError);
+  assertCurrentSession(uid,epoch);
+  if(!Number.isSafeInteger(count)||count<0)
+   throw Error('No se pudo comprobar la cantidad de ejercicios del catálogo.');
   const all=[],pageSize=700;
-  for(let offset=0;;offset+=pageSize){
-    const {data,error}=await db.from('tbl_catalogo_predeterminado')
-      .select('id,gimnasio,sede,anotacion,zona_entrenamiento,instrumento,ejercicio,accesorio_implemento,tecnica_actualizada,musculos_principales,musculos_secundarios')
-      .eq('activo',true).order('fila_origen',{ascending:true})
-      .range(offset,offset+pageSize-1);
-    must(data,error);
-    const batch=data||[];
-    all.push(...batch);
-    if(batch.length<pageSize)break;
+  const ids=new Set();
+  for(let offset=0;offset<count;offset+=pageSize){
+   const {data,error}=await db.from('tbl_catalogo_predeterminado')
+    .select('id,gimnasio,sede,anotacion,zona_entrenamiento,instrumento,ejercicio,accesorio_implemento,tecnica_actualizada,musculos_principales,musculos_secundarios')
+    .eq('activo',true).order('fila_origen',{ascending:true}).order('id',{ascending:true})
+    .range(offset,offset+pageSize-1);
+   must(data,error);
+   assertCurrentSession(uid,epoch);
+   if(!Array.isArray(data)||data.length!==Math.min(pageSize,count-offset))
+    throw Error('La carga del catálogo está incompleta. Vuelve a iniciar sesión.');
+   for(const row of data){
+    if(!row?.id||ids.has(row.id))
+     throw Error('El catálogo contiene filas repetidas o sin identificación.');
+    ids.add(row.id);
+    all.push(row);
+   }
   }
+  if(all.length!==count)throw Error('La cantidad cargada no coincide con el catálogo.');
   return all.map(x=>{
     const equipment=x.instrumento||'';
     const kind=/máquina|maquina|freemotion|estación|polea|hack|peck deck/i.test(equipment)?'Máquina':
