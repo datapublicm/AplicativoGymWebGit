@@ -228,3 +228,46 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 .catalog-options-list{display:flex;gap:7px;flex-wrap:wrap;padding:4px 0 18px}
 .catalog-option-pill{padding:7px 10px;border-radius:9px;border:1px solid #28688c;background:#09283f;color:#c4eafd;font-size:12px}
 .catalog-option-pill strong{color:#79dff3}
+
+
+/* Gymlytics: márgenes consistentes + dashboard adaptable (sin visor 3D) */
+.content,.page,.panel,.progress-panel{min-width:0}
+.progress-panel{overflow:hidden}
+.progress-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.progress-heading h2{margin:0 0 7px;font-size:18px;color:#e8f8ff}
+.progress-heading p,.progress-footnote{margin:0;color:#94b5cc;font-size:12px;line-height:1.5}
+.progress-filters{display:flex;flex-wrap:wrap;gap:10px;min-width:0}
+.progress-filters label{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:11px;font-weight:700;color:#a9c9df}
+.progress-filters select{width:min(280px,100%);min-height:42px;border:1px solid #365c7b;border-radius:9px;padding:9px 12px;background:#081a32;color:#e9f8ff;font-size:13px}
+.progress-summary{margin:13px 0 10px!important;color:#80e9ff!important;font-size:12px!important;font-weight:700}
+.progress-chart{overflow-x:auto;max-width:100%;min-height:120px;scrollbar-width:thin}
+.progress-svg{display:block;width:100%;min-width:580px;height:auto}
+.progress-footnote{margin:6px 0 0!important;font-size:11px!important}
+.history-tools{align-items:center;flex-wrap:wrap}
+.history-tools .outline-btn{min-height:41px}
+.catalog-grid span,.catalog-row,.record-item{overflow-wrap:anywhere}
+@media(max-width:760px){
+ .layout{padding-top:calc(env(safe-area-inset-top,0px) + 12px)!important}
+ .content{width:100%;max-width:100%;padding-left:max(12px,env(safe-area-inset-left,0px))!important;padding-right:max(12px,env(safe-area-inset-right,0px))!important;padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))!important}
+ .page-title{margin:0 2px 14px!important;flex-wrap:wrap}
+ .panel{max-width:100%}
+ .history-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .history-tools input{grid-column:1/-1;width:100%;min-height:44px}
+ .history-tools .outline-btn{white-space:normal;overflow-wrap:anywhere;min-width:0;min-height:44px}
+ .table-scroll{max-width:100%;overscroll-behavior-x:contain}
+ .progress-heading{flex-direction:column;gap:12px}
+ .progress-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+ .progress-filters label,.progress-filters select{width:100%;min-width:0}
+ .progress-svg{min-width:550px}
+ .stats-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .stat{min-width:0}
+ .stat strong{font-size:clamp(17px,5.5vw,23px);overflow-wrap:anywhere}
+ .save-row{max-width:100%}
+}
+@media(max-width:400px){
+ .progress-filters{grid-template-columns:1fr}
+ .history-tools{grid-template-columns:1fr}
+ .history-tools input{grid-column:auto}
+ .progress-svg{min-width:520px}
+ .record-item{align-items:flex-start}
+}
