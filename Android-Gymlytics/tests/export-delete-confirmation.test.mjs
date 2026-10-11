@@ -106,3 +106,8 @@ ${exportMethod}
  assert.match(output.message,/exportada/);
  assert.ok(appSource.includes("$('exportJson').addEventListener('click',exportJson)"));
 });
+
+test('Exportar JSON registra UN SOLO listener y evita dos descargas por clic',()=>{
+ const occurrences=appSource.match(/\$\('exportJson'\)\.addEventListener\('click',exportJson\)/g)||[];
+ assert.equal(occurrences.length,1);
+});
