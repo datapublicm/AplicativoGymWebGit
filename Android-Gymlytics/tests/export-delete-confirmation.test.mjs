@@ -94,6 +94,7 @@ let downloaded=null,message='';
 const dateNow=()=> '2026-10-10';
 const download=(name,body,mime)=>{downloaded={name,body,mime}};
 const toast=x=>{message=x};
+const canExportHistory=()=>true;
 ${exportMethod}
 ({run:()=>exportJson(),output:()=>({downloaded,message})});
 `;
