@@ -1,3 +1,4 @@
+# Inicio autorizado de compilación debug de pruebas (2026-10-11). Nunca compilar main ni integrar el modelo 3D.
 name: Gymlytics - compilar APK debug (Supabase Pruebas)
 on:
   push:
