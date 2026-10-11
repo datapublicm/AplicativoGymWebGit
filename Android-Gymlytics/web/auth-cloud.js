@@ -117,7 +117,7 @@ async function applyState(session,epoch) {
   }
   $('loggedUser').textContent=signedIn.gymlytics.nombre||signedIn.gymlytics.usuario;
   $('loggedEmail').textContent=signedIn.email;
-  let catalogLoaded=false,historyLoaded=false;
+  let catalogLoaded=false,historyLoaded=false,historyAttempted=false;
   const progress=(received,total)=>{
     if(epoch===authEpoch&&typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(received,total);
   };
@@ -127,7 +127,6 @@ async function applyState(session,epoch) {
     if(epoch!==authEpoch)return;
     window.GymBaseCatalog=base;
     window.GymCustomCatalog=custom;
-    catalogLoaded=true;
     await cloud.loadIndependentCatalog();
     if(epoch!==authEpoch)return;
     if(typeof cascade==='function')cascade(0);
@@ -136,8 +135,10 @@ async function applyState(session,epoch) {
       lastDraftOwner=signedIn.id;
     }
     if(typeof renderOwnCatalog==='function')renderOwnCatalog();
+    catalogLoaded=true;
     setStatus('Cargando historial de entrenamientos…');
     progress(0,null);
+    historyAttempted=true;
     const history=await cloud.loadHistory(progress);
     if(epoch!==authEpoch)return;
     model.records=history;drawRecent();drawHistory();drawReports();
@@ -152,7 +153,7 @@ async function applyState(session,epoch) {
     if(epoch!==authEpoch)return;
     let issue=error.message;
     // Un fallo de catálogo no debe dejar también vacíos el historial y el Dashboard.
-    if(!historyLoaded){
+    if(!historyLoaded&&!historyAttempted){
       try{
         setStatus('Error en catálogo; recuperando el historial de entrenamientos…');
         progress(0,null);
