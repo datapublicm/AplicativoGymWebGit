@@ -159,7 +159,15 @@ const cloud={
   })).error);
   assertCurrentSession(uid,epoch);
  },
- async deleteSeries(id){if(!owns())throw Error('Sin sesión');must(null,(await db.from('tbl_series').delete().eq('id',id).eq('user_id',signedIn.id)).error);},
+ async deleteSeries(id){
+  if(!owns())throw Error('Sin sesión');
+  const uid=signedIn.id,epoch=authEpoch;
+  const {data,error}=await db.from('tbl_series').delete().eq('id',id).eq('user_id',uid).select('id');
+  must(data,error);
+  assertCurrentSession(uid,epoch);
+  if(data?.length!==1)throw Error('No se eliminó ninguna serie. Actualiza el historial antes de reintentar.');
+  return data[0].id;
+ },
  async loadHistory(){
   if(!owns())return [];
   const uid=signedIn.id,epoch=authEpoch,pageSize=700,parallel=4;
