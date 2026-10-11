@@ -54,6 +54,7 @@ function updateState(session) {
 async function applyState(session,epoch) {
   const user=session?.user||null;
   signedIn=null;
+  if(typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(null,null);
   // Bloquear inmediatamente toda navegación privada antes de verificar el nuevo perfil.
   document.body.classList.toggle('auth-locked',true);
   document.querySelectorAll('[data-page]').forEach(b=>{
@@ -117,6 +118,9 @@ async function applyState(session,epoch) {
   $('loggedUser').textContent=signedIn.gymlytics.nombre||signedIn.gymlytics.usuario;
   $('loggedEmail').textContent=signedIn.email;
   let catalogLoaded=false,historyLoaded=false;
+  const progress=(received,total)=>{
+    if(epoch===authEpoch&&typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(received,total);
+  };
   setStatus('Cargando catálogos desde Supabase…');
   try{
     const [base,custom]=await Promise.all([cloud.loadInitialCatalog(),cloud.loadOwnCatalog()]);
@@ -133,7 +137,8 @@ async function applyState(session,epoch) {
     }
     if(typeof renderOwnCatalog==='function')renderOwnCatalog();
     setStatus('Cargando historial de entrenamientos…');
-    const history=await cloud.loadHistory();
+    progress(0,null);
+    const history=await cloud.loadHistory(progress);
     if(epoch!==authEpoch)return;
     model.records=history;drawRecent();drawHistory();drawReports();
     historyLoaded=true;
@@ -150,7 +155,8 @@ async function applyState(session,epoch) {
     if(!historyLoaded){
       try{
         setStatus('Error en catálogo; recuperando el historial de entrenamientos…');
-        const recovered=await cloud.loadHistory();
+        progress(0,null);
+        const recovered=await cloud.loadHistory(progress);
         if(epoch!==authEpoch)return;
         model.records=recovered;drawRecent();drawHistory();drawReports();
         historyLoaded=true;
@@ -166,6 +172,7 @@ async function applyState(session,epoch) {
     if(catalogRefresh)catalogRefresh.disabled=false;
   }
   if(epoch===authEpoch){
+    progress(null,null);
     if(catalogLoaded)showPage('registro');
     else showPage('catalogos');
   }
@@ -248,7 +255,7 @@ const cloud={
   if(data?.length!==1)throw Error('No se eliminó ninguna serie. Actualiza el historial antes de reintentar.');
   return data[0].id;
  },
- async loadHistory(){
+ async loadHistory(onProgress){
   if(!owns())return [];
   const uid=signedIn.id,epoch=authEpoch,pageSize=700,parallel=4;
   // Cargar todo el historial, sin tope de 1.000 filas del REST de Supabase.
@@ -258,6 +265,7 @@ const cloud={
   assertCurrentSession(uid,epoch);
   if(!Number.isSafeInteger(count)||count<0)
     throw Error('No se pudo verificar el total del historial. Vuelve a actualizarlo.');
+  if(typeof onProgress==='function')onProgress(0,count);
   const rows=[],ids=new Set();
   for(let start=0;start<count;start+=pageSize*parallel){
     const offsets=Array.from({length:parallel},(_,i)=>start+i*pageSize)
@@ -281,6 +289,7 @@ const cloud={
           assistance:Number(r.assistance||0)});
       }
     }
+    if(typeof onProgress==='function')onProgress(rows.length,count);
   }
   if(rows.length!==count||ids.size!==count)
     throw Error('El historial no coincide con el recuento de Supabase. Actualízalo otra vez.');
