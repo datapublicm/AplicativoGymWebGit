@@ -6,6 +6,24 @@ const INITIAL={g:'Smart Fit',s:'La Rambla Brasil',z:'Espalda lateral',kind:'Máq
 let model={records:[],photos:{}},toastTimer;
 let historyReady=false;
 const $=id=>document.getElementById(id);
+function showHistoryLoadProgress(loaded,total){
+ const section=$('historyLoadingStatus');
+ if(!section)return;
+ if(loaded===null){section.hidden=true;return;}
+ section.hidden=false;
+ const bar=$('historyLoadingBar'),label=$('historyLoadingText'),percent=$('historyLoadingPercent');
+ if(!Number.isSafeInteger(total)||total<0){
+  label.textContent='Consultando el total de series en Supabase…';
+  percent.textContent='';
+  bar.removeAttribute('value');
+  return;
+ }
+ const received=Math.max(0,Math.min(total,Number(loaded)||0));
+ const progress=total===0?100:Math.round(received/total*100);
+ bar.max=Math.max(1,total);bar.value=total?received:1;
+ label.textContent=total===0?'Historial vacío, descarga completa.':received.toLocaleString('es-PE')+' de '+total.toLocaleString('es-PE')+' series recibidas';
+ percent.textContent=progress+'%';
+}
 const esc=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const makeId=()=>typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2,9);
 const uniq=arr=>[...new Set(arr)].filter(Boolean).sort((a,b)=>String(a).localeCompare(String(b),'es',{numeric:true}));
@@ -378,15 +396,18 @@ async function refreshHistory(){
  const current=()=>stamp===window.GymCloud?.getSessionStamp?.()&&!!window.GymCloud?.canWrite();
  const button=$('historyRefresh');button.disabled=true;
  setHistoryReady(false);
+ if(typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(0,null);
  try{
-  const latest=await window.GymCloud.loadHistory();
+  const latest=await window.GymCloud.loadHistory((loaded,total)=>{
+   if(current()&&typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(loaded,total);
+  });
   if(!current())return;
   model.records=latest;drawRecent();drawHistory(true);drawReports();
   setHistoryReady(true);
   toast('Historial actualizado desde Supabase ✓');
  }catch(error){
   if(current())toast('No se pudo actualizar el historial: '+String(error.message||error).slice(0,120));
- }finally{if(current())button.disabled=false;}
+ }finally{if(current()){button.disabled=false;if(typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(null,null);}}
 }
 function exportCsv(){if(!canExportHistory())return;const fields=[['date','Fecha'],['gym','Gimnasio'],['sede','Sede'],['zone','Zona de entrenamiento'],['type','Tipo de equipo'],['equipment','Máquina / equipo'],['accessory','Accesorio / implemento'],['grip','Agarre'],['exercise','Ejercicio'],['technique','Técnica de ejecución'],['series','Número de serie'],['subdivision','Subdivisión'],['unit','Unidad'],['weight','Peso'],['reps','Repeticiones'],['assistance','Asistencias'],['notes','Observaciones']];const quote=s=>{const v=String(s??'');return '"'+(/^[\u0000-\u0020]*[=+@-]/.test(v)?"'":'')+v.replace(/"/g,'""')+'"'},lines=[fields.map(x=>quote(x[1])),...orderedRecords().map(r=>fields.map(([k])=>quote(r[k])))].map(x=>x.join(';'));download('Gymlytics_series_'+dateNow()+'.csv','\ufeff'+lines.join('\r\n'),'text/csv;charset=utf-8');toast('CSV exportado')}
 function exportJson(){if(!canExportHistory())return;download('Gymlytics_respaldo_'+dateNow()+'.json',JSON.stringify({version:2,...model},null,2),'application/json');toast('Copia de seguridad exportada')}
