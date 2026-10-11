@@ -75,6 +75,7 @@ const orderedRecords=()=>[{
 const download=(name,body,mime)=>{result={name,body,mime}};
 const dateNow=()=> '2026-10-10';
 const toast=text=>{notice=text};
+const canExportHistory=()=>true;
 ${csvCode}
 ({run:()=>exportCsv(),out:()=>({result,notice})});
 `;
