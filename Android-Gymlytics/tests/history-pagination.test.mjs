@@ -31,7 +31,9 @@ const recordHtml=r=>'<article>'+r.id+'</article>';
 function workoutHarness({failSave=false,failRefresh=false,deferSave=false}={}){
  const start=app.indexOf('async function saveSeries(){'),end=app.indexOf('function recordHtml(',start);
  assert.ok(start>=0&&end>start);
- const code=app.slice(start,end);
+ const validationStart=app.indexOf('function validSeriesDecimal(value,limit){');
+ assert.ok(validationStart>=0&&validationStart<start);
+ const code=app.slice(validationStart,end);
  const fixture=`
 const messages=[];
 let calls=0,cleared=false,finishSave;
