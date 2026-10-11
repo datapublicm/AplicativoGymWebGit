@@ -99,3 +99,18 @@ En la rama `Android-Gymlytics` se incorporaron las siguientes correcciones sin c
 - **Ramas**: `main` sigue en `7642f8eac9623892e7d292b2b49f81d14d76e2b1`; solo se modificó `Android-Gymlytics`.
 
 **Limitaciones:** la validación HTTP autenticada con dos cuentas reales, el flujo en un dispositivo Android, las operaciones de escritura de entrenamiento con datos de ensayo y el manejo definitivo de archivos huérfanos en Storage permanecen sin ejecutar o resolver. Ninguna prueba automatizada reemplaza estas verificaciones.
+
+
+## Continuación — integración HTTP pública y operaciones de catálogo
+
+**Fecha local: 10/10/2026.** Cambios efectuados solamente en `Android-Gymlytics` y sin compilar APK.
+
+1. **Exportación JSON**: se eliminó el controlador duplicado del botón. Una pulsación no debe generar dos copias.
+2. **Operaciones de catálogo**: `addIndependentItem`, `saveCustomExercise` y sus formularios mantienen el `uid` y `authEpoch` de la solicitud; un resultado de A no puede recargar el catálogo, borrar campos ni mostrar un mensaje de éxito en la sesión B. Se probaron también inicios de sesión repetidos de la misma cuenta.
+3. **Fotos tras cambio de sesión**: si un archivo terminó de subirse cuando la sesión original ya no es vigente, la aplicación realiza un intento de eliminación del archivo antes de rechazar la operación. Es **limpieza de mejor esfuerzo**: una nueva identidad podría carecer de permisos para eliminar ese archivo. No se considera una solución garantizada a archivos huérfanos.
+4. **Conexión HTTP realmente observada**: GitHub Actions hizo `GET https://jasuqnxrskhqfobsazwd.supabase.co/auth/v1/health` **sin apikey** y recibió **HTTP 401**. Esto prueba la respuesta HTTP del *gateway*, **no** la salud de Auth ni el inicio de sesión. El paso CI se describe como comprobación de gateway, no de autenticación.
+5. **Prueba autenticada preparada, sin ejecutar**: `tools/validar-data-api.mjs` exige clave publicable configurada fuera del repositorio; valida primero `/auth/v1/health` con respuesta 200 antes de probar acceso anónimo y, cuando existan credenciales privadas de prueba, login y aislamiento por RLS entre dos cuentas. No se enviaron contraseñas ni JWT.
+6. **Último CI**: [38103429903](https://github.com/datapublicm/AplicativoGymWebGit/actions/runs/38103429903), **84 pruebas automatizadas aprobadas, cero fallidas**. Se comprueba también sintaxis JS y ausencia de artefactos compilados.
+7. **Conservación SQL**: 2 usuarios, **18.526 series**, **6.218 reportes**, 0 filas de fotos, 0 objetos en bucket privado `gymlog-usuarios`, y **15/15 tablas con RLS**. Las consultas fueron solo de lectura; Producción y `main` permanecen sin cambios.
+
+**Siguiente bloqueo auténtico de la Fase 2:** falta ejecutar una sesión HTTP de prueba con clave publicable y dos identidades reales, sin compartir contraseñas en el chat. Después vendrán las operaciones ficticias de escritura reversibles y las pruebas de interfaz en dispositivo Android. No se autorizó ni realizó compilación APK.
