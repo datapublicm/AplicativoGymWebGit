@@ -54,6 +54,21 @@ function updateState(session) {
 async function applyState(session,epoch) {
   const user=session?.user||null;
   signedIn=null;
+  // Ocultar inmediatamente los datos de la sesión previa, incluso mientras se valida el nuevo perfil.
+  if(typeof invalidatePendingSave==='function')invalidatePendingSave();
+  window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
+  window.GymEntities={gyms:[],sites:[],machines:[],options:[]};
+  model.records=[];model.photos={};
+  if(lastDraftOwner!==null){lastDraftOwner=null;if(typeof resetExerciseTabs==='function')resetExerciseTabs();}
+  if(typeof renderOwnCatalog==='function')renderOwnCatalog();
+  if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
+  drawRecent();drawHistory();drawReports();
+  $('authProfile').hidden=true;
+  $('authForm').hidden=!!user;
+  $('authRegister').hidden=!!user;
+  $('authRecovery').hidden=!!user;
+  setStatus(user?'Verificando acceso a Gymlytics…':'Sesión cerrada.');
+  showPage('sesion');
   let accessError=null;
   if(user){
     try {
