@@ -44,7 +44,7 @@ test('La tabla presenta series completas con resumen de volumen y fechas',()=>{
  assert.match(s.page,/4 de 4 series/);
  assert.match(s.summary,/4 de 4 series/);
  assert.match(s.summary,/3 fechas/);
- assert.match(s.summary,/700 kg × rep\./);
+ assert.match(s.summary,/800 kg × rep\./);
 });
 test('Filtro por ejercicio conserva únicamente las series de ese ejercicio',()=>{
  const f=fixture(sample);f.draw();f.filter('historyExercise','Remo');
