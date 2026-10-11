@@ -39,7 +39,7 @@ function fixture({failCatalog=false,failHistory=false,delayedCatalog=false}={}){
   apply,
   "({start:()=>applyState({user:{id:'A',email:'a@test.dev'}},1),reload:()=>cloud.refreshCatalog(),",
   "stop:()=>{signedIn={id:'B'};authEpoch++},resolve:()=>releaseCatalog?.(),",
-  "enableCatalog:()=>{failCatalog=false},disableHistory:()=>{failHistory=true},",
+  "enableCatalog:()=>{failCatalog=false},setDelayed:()=>{delayed=true},disableHistory:()=>{failHistory=true},",
   "state:()=>({records:model.records,ready:historyReady,page,status,base:window.GymBaseCatalog,custom:window.GymCustomCatalog,catMessage:$('catalogStatus').textContent,",
   "refresh:$('historyRefresh').disabled,catalogRefresh:$('catalogRefresh').disabled,historyReads,catCount})});"
  ].join('\n');
@@ -95,4 +95,20 @@ test('El botón de actualización está deshabilitado por defecto y se conecta a
  assert.match(html,/id="catalogRefresh"[^>]*disabled/);
  assert.match(auth,/\$\('catalogRefresh'\)\.addEventListener\('click'/);
  assert.match(auth,/if\(!catalogLoaded&&catalogStatus\)/);
+});
+
+test('La actualización manual tardía no publica los ejercicios en otra sesión',async()=>{
+ const h=fixture();await h.start();
+ h.setDelayed();
+ const loading=h.reload();
+ await Promise.resolve();await Promise.resolve();
+ h.stop();h.resolve();
+ await assert.rejects(loading,/La sesión cambió/);
+ assert.equal(h.state().base[0].id,'ref-1');
+});
+test('En inicio exitoso la actualización manual queda habilitada',async()=>{
+ const h=fixture();await h.start();
+ assert.equal(h.state().catalogRefresh,false);
+ assert.equal(h.state().records.length,1);
+ assert.equal(h.state().ready,true);
 });
