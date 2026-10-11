@@ -54,7 +54,14 @@ jobs:
           test -f dist/index.html
           test -f dist/assets/jalon-pecho.webp
       - name: Generar proyecto Android con Capacitor
-        run: npx cap add android
+        run: |
+          # El repositorio solo guarda android/README.md; retirar esa carpeta
+          # reservada en el runner efímero para permitir crear la plataforma.
+          test -f android/README.md
+          test "$(find android -mindepth 1 -maxdepth 1 | wc -l)" -eq 1
+          mv android/README.md android-notas-de-plataforma.txt
+          rmdir android
+          npx cap add android
       - name: Sincronizar archivos a Android
         run: npx cap sync android
       - name: Construir APK debug
