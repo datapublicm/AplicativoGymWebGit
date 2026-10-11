@@ -210,22 +210,34 @@ const cloud={
     .select('*',{count:'exact',head:true}).eq('user_id',uid);
   must(null,countError);
   assertCurrentSession(uid,epoch);
-  const rows=[];
-  for(let start=0;start<(count||0);start+=pageSize*parallel){
+  if(!Number.isSafeInteger(count)||count<0)
+    throw Error('No se pudo verificar el total del historial. Vuelve a actualizarlo.');
+  const rows=[],ids=new Set();
+  for(let start=0;start<count;start+=pageSize*parallel){
     const offsets=Array.from({length:parallel},(_,i)=>start+i*pageSize)
-      .filter(offset=>offset<(count||0));
+      .filter(offset=>offset<count);
     const batches=await Promise.all(offsets.map(async offset=>{
       const {data,error}=await db.from('vw_historial_series').select('*')
         .eq('user_id',uid).order('date',{ascending:false})
         .order('id',{ascending:true}).range(offset,offset+pageSize-1);
       must(data,error);
-      return data||[];
+      if(!Array.isArray(data)||data.length!==Math.min(pageSize,count-offset))
+        throw Error('El historial cambió durante la descarga o llegó incompleto. Actualízalo otra vez.');
+      return data;
     }));
     assertCurrentSession(uid,epoch);
-    for(const batch of batches)rows.push(...batch.map(r=>({...r,
-      weight:Number(r.weight||0),reps:Number(r.reps||0),
-      assistance:Number(r.assistance||0)})));
+    for(const batch of batches){
+      for(const r of batch){
+        if(!r?.id||r.user_id!==uid||ids.has(r.id))
+          throw Error('Se detectaron series repetidas o ajenas en el historial. Actualízalo otra vez.');
+        ids.add(r.id);
+        rows.push({...r,weight:Number(r.weight||0),reps:Number(r.reps||0),
+          assistance:Number(r.assistance||0)});
+      }
+    }
   }
+  if(rows.length!==count||ids.size!==count)
+    throw Error('El historial no coincide con el recuento de Supabase. Actualízalo otra vez.');
   return rows;
  },
  async loadInitialCatalog(){
