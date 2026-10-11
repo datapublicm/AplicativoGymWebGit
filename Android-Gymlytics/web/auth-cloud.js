@@ -160,6 +160,12 @@ const cloud={
  },
  async saveWorkout({exercise,date,technique,notes,entries}) {
   if(!owns())throw Error('Inicia sesión antes de guardar');
+  const valid=(value,limit)=>/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(String(value).trim())&&Number(value)<limit;
+  if(!Array.isArray(entries)||!entries.length||entries.some(x=>
+   !['kg','lb'].includes(x.unit)||!valid(x.weight,1e10)||!valid(x.reps,1e8)
+   ||Number(x.reps)<=0||!valid(x.assistance||'0',1e8)
+  ))throw Error('Serie inválida: solo números positivos con hasta dos decimales.');
+
   const uid=signedIn.id,epoch=authEpoch;
   const ids=await this.ensureExercise(exercise,technique);
   assertCurrentSession(uid,epoch);
