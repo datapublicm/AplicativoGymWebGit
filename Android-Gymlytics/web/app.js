@@ -180,6 +180,14 @@ function renderSeries(preserve=false){const retained=preserve?new Map([...$('ser
  $('seriesRows').innerHTML=rows.join('');$('seriesGroupCount').textContent=seriesGroups===1?'1 serie':`${seriesGroups} series`;$('removeSeriesGroup').disabled=seriesGroups===1;$('addSeriesGroup').disabled=seriesGroups===12;$('seriesModeLabel').textContent=seriesMode==='normal'?`${seriesGroups} series normales · sin subdivisiones`:seriesMode==='sub'?`${seriesGroups} series · Sub1 y Sub2`:`${seriesGroups} series · Derecha e Izquierda`;$('toggleSubdivisions').textContent=seriesMode==='normal'?'⊞ Adicionar subdivisiones':'⇄ Cambiar subdivisiones';
  document.querySelector('.series-panel').classList.toggle('mode-normal',seriesMode==='normal');updateSeriesCount();}
 function getEntries(){return [...$('seriesRows').querySelectorAll('tr')].map(row=>{const weight=row.querySelector('.weight').value.trim(),reps=row.querySelector('.reps').value.trim(),help=row.querySelector('.help').value.trim();return {el:row,series:row.dataset.serie,sub:row.dataset.sub,unit:row.querySelector('select').value,weight,reps,assistance:help,dirty:!!(weight||reps||help)}}).filter(x=>x.dirty)}
+function validSeriesDecimal(value,limit){
+ const s=String(value).trim();
+ return /^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(s)&&Number(s)<limit;
+}
+function validSeriesEntry(x){
+ return validSeriesDecimal(x.weight,1e10)&&validSeriesDecimal(x.reps,1e8)&&Number(x.reps)>0
+  &&validSeriesDecimal(x.assistance||'0',1e8)&&['kg','lb'].includes(x.unit);
+}
 function updateSeriesCount(){const n=getEntries().length;$('seriesCount').textContent=n===1?'1 fila con datos':`${n} filas con datos`;$('saveSummary').textContent=n?`${n} fila${n!==1?'s':''} por validar y guardar.`:'Introduce al menos una fila con peso y repeticiones.';[...$('seriesRows').querySelectorAll('tr')].forEach(row=>row.classList.toggle('filled',[...row.querySelectorAll('input')].some(i=>i.value.trim())))}
 function invalidatePendingSave(){
  window.GymSaveAttempt=(window.GymSaveAttempt||0)+1;
@@ -190,7 +198,7 @@ function invalidatePendingSave(){
 async function saveSeries(){
  const r=chosenRow(),date=$('fecha').value,tech=getValue('t'),entries=getEntries();
  if(!r||!tech||!date||!entries.length){toast('Completa ejercicio, fecha y al menos una serie.');return}
- if(entries.some(x=>x.weight===''||x.reps===''||Number(x.weight)<0||Number(x.reps)<=0||Number(x.assistance||0)<0)){
+ if(entries.some(x=>!validSeriesEntry(x))){
   toast('Revisa peso, repeticiones y asistencias.');return;
  }
  if(!window.GymCloud?.canWrite()){toast('Inicia sesión para guardar en Supabase.');return}
@@ -268,7 +276,7 @@ async function deleteRecord(id){
 }
 function drawReports(){const rows=model.records,days=new Set(rows.map(r=>r.date)).size,vol=rows.reduce((v,r)=>v+r.weight*(r.unit==='lb'?0.45359237:1)*r.reps,0);$('reportStats').innerHTML=`<div class="stat"><strong>${rows.length}</strong><small>Series guardadas</small></div><div class="stat"><strong>${days}</strong><small>Días con registros</small></div><div class="stat"><strong>${Math.round(vol).toLocaleString('es-PE')}</strong><small>Volumen en kg</small></div>`;const counts={};rows.forEach(r=>counts[r.exercise]=(counts[r.exercise]||0)+1);$('frequentExercises').innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([name,n])=>`<div class="freq"><span>${esc(name)}</span><strong>${n}</strong></div>`).join('')||'<div class="empty">Sin ejercicios todavía.</div>';}
 function download(name,content,mime){const blob=new Blob([content],{type:mime}),a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
-function exportCsv(){const fields=[['date','Fecha'],['gym','Gimnasio'],['sede','Sede'],['zone','Zona de entrenamiento'],['type','Tipo de equipo'],['equipment','Máquina / equipo'],['accessory','Accesorio / implemento'],['grip','Agarre'],['exercise','Ejercicio'],['technique','Técnica de ejecución'],['series','Número de serie'],['subdivision','Subdivisión'],['unit','Unidad'],['weight','Peso'],['reps','Repeticiones'],['assistance','Asistencias'],['notes','Observaciones']];const quote=s=>'"'+String(s??'').replace(/"/g,'""')+'"',lines=[fields.map(x=>quote(x[1])),...orderedRecords().map(r=>fields.map(([k])=>quote(r[k])))].map(x=>x.join(';'));download('Gymlytics_series_'+dateNow()+'.csv','\ufeff'+lines.join('\r\n'),'text/csv;charset=utf-8');toast('CSV exportado')}
+function exportCsv(){const fields=[['date','Fecha'],['gym','Gimnasio'],['sede','Sede'],['zone','Zona de entrenamiento'],['type','Tipo de equipo'],['equipment','Máquina / equipo'],['accessory','Accesorio / implemento'],['grip','Agarre'],['exercise','Ejercicio'],['technique','Técnica de ejecución'],['series','Número de serie'],['subdivision','Subdivisión'],['unit','Unidad'],['weight','Peso'],['reps','Repeticiones'],['assistance','Asistencias'],['notes','Observaciones']];const quote=s=>{const v=String(s??'');return '"'+(/^[\u0000-\u0020]*[=+@-]/.test(v)?"'":'')+v.replace(/"/g,'""')+'"'},lines=[fields.map(x=>quote(x[1])),...orderedRecords().map(r=>fields.map(([k])=>quote(r[k])))].map(x=>x.join(';'));download('Gymlytics_series_'+dateNow()+'.csv','\ufeff'+lines.join('\r\n'),'text/csv;charset=utf-8');toast('CSV exportado')}
 function exportJson(){download('Gymlytics_respaldo_'+dateNow()+'.json',JSON.stringify({version:2,...model},null,2),'application/json');toast('Copia de seguridad exportada')}
 async function importJson(event){const file=event.target.files?.[0];if(!file)return;try{const parsed=JSON.parse(await file.text());if(!Array.isArray(parsed.records)||!parsed.photos||typeof parsed.photos!=='object')throw Error('Incompatible');if(!confirm(`¿Reemplazar los ${model.records.length} registros locales con ${parsed.records.length} registros del archivo?`))return;const previous=model;model={records:parsed.records,photos:parsed.photos};if(!persist()){model=previous;return}drawRecent();drawHistory();toast('Copia de seguridad restaurada')}catch(e){toast('No se pudo importar. Comprueba el JSON.')}finally{event.target.value=''}}
 async function uploadPhoto(event){
