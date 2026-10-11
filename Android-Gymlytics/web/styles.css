@@ -271,3 +271,21 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
  .progress-svg{min-width:520px}
  .record-item{align-items:flex-start}
 }
+
+
+/* Revisión de márgenes en móvil: acciones de catálogo, pantalla estrecha y modal */
+.catalog-main-actions{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;margin:13px 0 0}
+.catalog-main-actions button{min-height:44px;max-width:100%;white-space:normal}
+.catalog-status{margin:9px 0 0!important;color:#9edcf3!important;line-height:1.5;overflow-wrap:anywhere}
+.catalog-status:empty{display:none}
+@media(max-width:760px){
+ .catalog-main-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .catalog-main-actions button{min-width:0;padding:10px 8px;overflow-wrap:anywhere}
+ .bottom-nav{padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+ .detail-modal{width:calc(100vw - max(12px,env(safe-area-inset-left,0px)) - max(12px,env(safe-area-inset-right,0px)))!important;
+  max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 20px)!important}
+ .dialog-body{max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 175px)}
+}
+@media(max-width:380px){
+ .catalog-main-actions{grid-template-columns:1fr}
+}
