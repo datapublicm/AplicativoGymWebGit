@@ -25,7 +25,7 @@ jobs:
           node --check tools/verificar-salud-supabase.mjs
       - name: Verificar pruebas del proyecto
         run: npm run test:static
-      - name: Comprobar salud HTTP de Supabase Pruebas sin credenciales
+      - name: Comprobar respuesta HTTP pública del gateway de Pruebas
         continue-on-error: true
         run: node tools/verificar-salud-supabase.mjs
       - name: No se han compilado artefactos
