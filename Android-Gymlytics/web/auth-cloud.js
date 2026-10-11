@@ -91,7 +91,8 @@ async function applyState(session,epoch) {
   document.querySelectorAll('[data-page]').forEach(b=>{
     if(b.dataset.page!=='sesion'){b.disabled=!owns();b.setAttribute('aria-disabled',String(!owns()));}
   });
-  if(historyRefresh)historyRefresh.disabled=!owns();
+  // Bloquear recargas paralelas hasta terminar la carga inicial.
+  if(historyRefresh)historyRefresh.disabled=true;
   const logged=owns();
   $('authForm').hidden=logged;$('authRegister').hidden=logged;$('authRecovery').hidden=logged;
   $('authProfile').hidden=!logged;
@@ -126,13 +127,15 @@ async function applyState(session,epoch) {
     const history=await cloud.loadHistory();
     if(epoch!==authEpoch)return;
     model.records=history;drawRecent();drawHistory();drawReports();
-   if(typeof setHistoryReady==='function')setHistoryReady(true);
+    if(typeof setHistoryReady==='function')setHistoryReady(true);
+    if(historyRefresh)historyRefresh.disabled=false;
     await cloud.loadCatalogStats();
     if(epoch!==authEpoch)return;
     setStatus('Sesión activa · '+history.length.toLocaleString('es-PE')+' series cargadas · '+config.environment);
   }catch(error){
     if(epoch!==authEpoch)return;
     setStatus('Sesión activa; error al cargar datos: '+error.message);
+    if(historyRefresh)historyRefresh.disabled=false;
   }
   if(epoch===authEpoch)showPage('registro');
 }
