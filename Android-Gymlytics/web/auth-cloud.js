@@ -54,6 +54,12 @@ function updateState(session) {
 async function applyState(session,epoch) {
   const user=session?.user||null;
   signedIn=null;
+  // Bloquear inmediatamente toda navegación privada antes de verificar el nuevo perfil.
+  document.body.classList.toggle('auth-locked',true);
+  document.querySelectorAll('[data-page]').forEach(b=>{
+    if(b.dataset.page!=='sesion'){b.disabled=true;b.setAttribute('aria-disabled','true');}
+  });
+  if(typeof setHistoryReady==='function')setHistoryReady(false);
   // Ocultar inmediatamente los datos de la sesión previa, incluso mientras se valida el nuevo perfil.
   if(typeof invalidatePendingSave==='function')invalidatePendingSave();
   window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
