@@ -6,8 +6,11 @@ try{
   method:'GET',headers:{Accept:'application/json'},
   redirect:'error',signal:AbortSignal.timeout(12000)
  });
- if(response.status!==200){
-  console.error('Auth responde HTTP '+response.status+'; salud no confirmada.');
+ if(response.status===401||response.status===403){
+  console.log('✓ HTTP '+response.status+': gateway de Supabase Pruebas alcanzable.');
+  console.log('— La solicitud no contiene API key; no se confirma salud de Auth ni inicio de sesión.');
+ }else if(response.status!==200){
+  console.error('Gateway respondió HTTP '+response.status+'; conectividad o salud no confirmadas.');
   process.exitCode=1;
  }else{
   const body=await response.json();
