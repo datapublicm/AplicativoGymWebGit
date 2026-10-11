@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 
 // Ejecuta la implementación real de cloud.loadHistory con respuestas simuladas.
 const source=readFileSync(new URL('../web/auth-cloud.js',import.meta.url),'utf8');
-const begin=source.indexOf('async loadHistory(){');
+const begin=source.indexOf('async loadHistory(onProgress){');
 const end=source.indexOf('async loadInitialCatalog(){',begin);
 assert.ok(begin>=0&&end>begin,'Se encontró loadHistory');
 const method=source.slice(begin,end);
