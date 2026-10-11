@@ -38,11 +38,13 @@ async function check(width,page){
  'const selectors='+JSON.stringify(names[page])+';'+
  'const positions=selectors.map(selector=>{const el=document.querySelector(selector);if(!el)return{selector,missing:true};const r=el.getBoundingClientRect();return{selector,left:r.left,right:r.right,width:r.width,visible:getComputedStyle(el).display!=="none"&&r.width>0}});'+
  'const r=document.querySelector(".bottom-nav").getBoundingClientRect();'+
- 'return JSON.stringify({screen:innerWidth,documentWidth:document.documentElement.scrollWidth,positions,nav:{left:r.left,right:r.right},chart:!!document.querySelector("#progressChart svg"),summary:document.getElementById("progressSummary").textContent});'+
+ 'const over=[...document.querySelectorAll("body *")].filter(el=>{const s=getComputedStyle(el);if(s.display==="none"||s.position==="fixed")return false;const r=el.getBoundingClientRect();return r.width>0&&(r.right>390.5||r.left<-.5)}).slice(0,15).map(el=>({tag:el.tagName,id:el.id,cls:String(el.className).slice(0,65),right:el.getBoundingClientRect().right,width:el.getBoundingClientRect().width}));'+
+ 'return JSON.stringify({screen:innerWidth,visual:visualViewport.width,documentWidth:document.documentElement.scrollWidth,positions,over,nav:{left:r.left,right:r.right},chart:!!document.querySelector("#progressChart svg"),summary:document.getElementById("progressSummary").textContent});'+
  '})()';
  const result=await request('Runtime.evaluate',{expression:js,returnByValue:true});
  if(result.exceptionDetails)throw Error('Error al evaluar página: '+JSON.stringify(result.exceptionDetails).slice(0,400));
  const d=JSON.parse(result.result.value);
+ if(d.screen!==width||d.documentWidth>width+1)console.log('MOBILE_LAYOUT_DEBUG',width,page,JSON.stringify(d));
  assert.equal(d.screen,width,'Chrome no aplicó la anchura solicitada');
  assert.ok(d.documentWidth<=width+1, width+'px '+page+': documento desbordado '+d.documentWidth+'px');
  for(const r of d.positions){
