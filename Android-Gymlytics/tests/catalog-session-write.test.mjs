@@ -9,7 +9,7 @@ function extract(start,end){
  assert.ok(a>=0&&b>a,'Método no encontrado: '+start);
  return src.slice(a,b);
 }
-const methods=extract('async addIndependentItem(kind,values){','async loadCatalogStats(){');
+const methods=extract('async addIndependentItem(kind,values){','async updateCatalogItem(kind,itemId,newName){')+extract('async saveCustomExercise(values){','async loadCatalogStats(){');
 
 function cloudFixture(){
  const code=`
@@ -25,6 +25,7 @@ const findOrCreate=async(table,fields)=>{
  return 'nuevo-id';
 };
 const window={GymEntities:{gyms:[],sites:[],machines:[],options:[]}};
+const normalizeCatalogName=s=>String(s||'').trim().toLowerCase();
 const cloud={${methods}
  async loadIndependentCatalog(){reloads++},
  async loadCatalogStats(){stats++},
@@ -62,7 +63,7 @@ test('Catálogo sin cambio de sesión conserva su carga y estadísticas',async()
  assert.equal(h.state().stats,1);
 });
 
-const eventMethods=extract('for(const [formId,kind,feedbackId] of [','// Bloquear navegación antes');
+const eventMethods=extract('for(const [formId,kind,feedbackId] of [',"document.querySelector('#addOptionForm [name=\"tipo\"]')");
 function formFixture(){
  const code=`
 let session='A',resolve,started,resetCount=0;
