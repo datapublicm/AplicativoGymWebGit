@@ -35,7 +35,7 @@ test('Las series pueden volver a sin subdivisiones, con confirmación si hay dat
  assert.match(html,/id="resetSubdivisions"[^>]*hidden/);
  assert.match(app,/resetSubdivisions'\)\.addEventListener\('click',\(\)=>changeSeriesMode\('normal'\)\)/);
  assert.match(app,/hasSeriesData\(\).*confirm\('Cambiar el tipo de subdivisión borrará/);
- assert.match(app,/seriesMode==='normal'\?4:3/);
+ assert.match(app,/mode==='normal'\?4:3/);
  assert.match(css,/\.series-reset-division\[hidden\]\{display:none!important\}/);
 });
 test('Dashboard permanece en una página independiente sin cambios de flujo',()=>{
