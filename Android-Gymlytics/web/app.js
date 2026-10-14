@@ -456,7 +456,7 @@ function resetHistoryFilters(){
 function drawHistory(reset=false){
  if(reset){historyVisible=60;expandedHistoryId=null;}
  const ordered=orderedRecords();
- renderSeriesCatalogShortcuts();
+ if(typeof renderSeriesCatalogShortcuts==='function')renderSeriesCatalogShortcuts();
  for(const [id,key,title] of HISTORY_FIELDS){
   const select=$(id);if(!select)continue;
   const names=uniq(ordered.map(r=>historyFieldValue(r,key)));
