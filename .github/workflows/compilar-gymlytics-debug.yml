@@ -52,10 +52,10 @@ jobs:
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
           test -x "$SDK/cmdline-tools/latest/bin/sdkmanager"
           "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+      - name: Ejecutar pruebas estaticas antes de crear node_modules
+        run: npm run test:static
       - name: Instalar dependencias de JavaScript
         run: npm install --no-package-lock --no-audit --no-fund
-      - name: Ejecutar pruebas del codigo
-        run: npm run test:static
       - name: Construir web con datos de Supabase Pruebas
         run: |
           node -e 'if(!process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.startsWith("sb_publishable_"))process.exit(1)'
