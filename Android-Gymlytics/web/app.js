@@ -177,8 +177,7 @@ function setupCatalogCompact(){
  const defs=[
   {id:'addGymForm',select:'gymExistingSelect',total:'gymCount',label:'Gimnasios',symbol:'▣'},
   {id:'addSiteForm',select:'siteExistingSelect',total:'siteCount',label:'Sedes',symbol:'⌖'},
-  {id:'addMachineForm',select:'machineExistingSelect',total:'machineCount',label:'Instrumentos / equipos',symbol:'⚙'},
-  {id:'addOptionForm',select:'optionExistingSelect',total:'optionCount',label:'AnotaciónV2 · Agarre · Técnica',symbol:'≡'}
+  {id:'addMachineForm',select:'machineExistingSelect',total:'machineCount',label:'Instrumento',symbol:'⚙'}
  ];
  function makeCard(label,symbol,select,total,contents,insertAt){
   const card=document.createElement('section');card.className='catalog-compact-card';
@@ -205,6 +204,39 @@ function setupCatalogCompact(){
   heading?.remove();
   makeCard(d.label,d.symbol,select,count,[form],holder);
  }
+ const optionForm=$('addOptionForm');
+ if(optionForm){
+  optionForm.querySelector('h3')?.remove();
+  const advanced=makeCard('Editar listas','≡',$('optionExistingSelect'),$('optionCount'),[optionForm],holder);
+  advanced.classList.add('catalog-advanced-options');advanced.hidden=true;advanced.id='catalogAdvancedOptions';
+  for(const item of [
+   {id:'zone',name:'AnotaciónV2',type:'zona',icon:'▤'},
+   {id:'grip',name:'Agarre / Implemento',type:'agarre',icon:'✋'},
+   {id:'technique',name:'Tecnica_Actualizada',type:'tecnica',icon:'▣'}
+  ]){
+   const row=document.createElement('section');row.className='catalog-compact-card';
+   const bar=document.createElement('div');bar.className='catalog-compact-bar';
+   const name=document.createElement('strong');name.className='catalog-compact-label';
+   name.innerHTML='<span class="catalog-compact-symbol">'+item.icon+'</span><span>'+item.name+'</span>';
+   const select=document.createElement('select');select.id='catalogShortcut'+item.id;
+   select.className='catalog-muscle-select';select.setAttribute('aria-label','Valores existentes de '+item.name);
+   const badge=document.createElement('span');badge.id='catalogShortcutCount'+item.id;badge.className='catalog-total';badge.textContent='0';
+   const add=document.createElement('button');add.type='button';add.className='catalog-compact-toggle';add.textContent='＋';add.setAttribute('aria-label','Agregar o modificar '+item.name);
+   const open=(value='')=>{
+    const type=optionForm.querySelector('[name="tipo"]');const selected=(window.GymEntities?.options||[]).find(x=>x.tipo+'|'+x.id===value);
+    type.value=selected?.tipo||item.type;
+    if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
+    const active=$('optionExistingSelect');active.value=selected?.id||'';
+    $('optionEditName').value=selected?.nombre||'';
+    advanced.hidden=false;const toggle=advanced.querySelector('.catalog-compact-toggle');
+    if(advanced.querySelector('.catalog-compact-detail').hidden)toggle.click();
+    advanced.scrollIntoView?.({block:'nearest',behavior:'smooth'});
+   };
+   select.addEventListener('change',()=>{if(select.value)open(select.value)});
+   add.addEventListener('click',()=>open(select.value));
+   bar.append(name,select,badge,add);row.append(bar);holder.insertBefore(row,advanced);
+  }
+ }
  const exercise=$('catalogForm'),exerciseSel=$('exerciseExistingSelect'),exerciseCount=$('exerciseCount');
  if(exercise&&exerciseSel&&exerciseCount){
   const editing=document.querySelector('.catalog-exercise-selector');
@@ -222,6 +254,32 @@ function setupCatalogCompact(){
   if(count)bar.append(count);
   const note=document.createElement('span');note.className='catalog-readonly-note';note.textContent='Consulta';
   bar.append(note);card.append(bar);muscle.replaceWith(card);head?.remove();
+ }
+}
+function renderCatalogShortcuts(){
+ const options=window.GymEntities?.options||[];
+ for(const [kind,types] of [
+  ['zone',['zona']],['grip',['agarre','accesorio']],['technique',['tecnica']]
+ ]){
+  const select=$('catalogShortcut'+kind),badge=$('catalogShortcutCount'+kind);
+  if(!select||!badge)continue;
+  const values=options.filter(x=>types.includes(x.tipo));
+  const old=select.value;
+  select.replaceChildren(new Option('Selecciona un elemento…',''));
+  for(const x of values)select.add(new Option((types.length>1?x.tipo==='agarre'?'Agarre: ':'Implemento: ':'')+x.nombre,x.tipo+'|'+x.id));
+  select.value=values.some(x=>x.tipo+'|'+x.id===old)?old:'';
+  badge.textContent=String(values.length);
+ }
+}
+function renderSeriesCatalogShortcuts(){
+ for(const [id,key] of [['catalogSeriesLookup','series'],['catalogSubdivisionLookup','subdivision']]){
+  const select=$(id),badge=$(id+'Count');
+  if(!select||!badge)continue;
+  const vals=uniq((model.records||[]).map(r=>key==='subdivision'?historyFieldValue(r,key):String(r[key]||'')).filter(Boolean));
+  const old=select.value;select.replaceChildren(new Option('Valores registrados…',''));
+  for(const val of vals)select.add(new Option(val,val));
+  select.value=vals.includes(old)?old:'';
+  badge.textContent=String(vals.length);
  }
 }
 function populateCatalogSelect(selectId,items,labelFn){
@@ -263,6 +321,7 @@ function renderIndependentCatalog(){
   if($(id))$(id).textContent=String(count);
  if($('optionCount'))$('optionCount').textContent=values.length+' / '+ent.options.length+' total';
  if($('customCatalogItems'))$('customCatalogItems').innerHTML='';
+ renderCatalogShortcuts();
  if(window.GymBaseCatalog?.length||window.GymCustomCatalog?.length)cascade(0);
 }
 function renderOwnCatalog(){
@@ -383,6 +442,7 @@ function resetHistoryFilters(){
 function drawHistory(reset=false){
  if(reset){historyVisible=60;expandedHistoryId=null;}
  const ordered=orderedRecords();
+ renderSeriesCatalogShortcuts();
  for(const [id,key,title] of HISTORY_FIELDS){
   const select=$(id);if(!select)continue;
   const names=uniq(ordered.map(r=>historyFieldValue(r,key)));
