@@ -1,0 +1,31 @@
+name: Gymlytics APK pruebas - validacion sin compilacion
+on:
+  push:
+    branches:
+      - apk/pruebas
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Android-Gymlytics
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Revisar sintaxis de interfaz y acceso a Supabase
+        run: |
+          node --check web/app.js
+          node --check web/auth-cloud.js
+          node --check tools/validar-data-api.mjs
+      - name: Ejecutar pruebas unitarias y de regresion
+        run: npm run test:static
+      - name: Confirmar que no se generaron binarios
+        run: |
+          test ! -d dist
+          test ! -d android/app
+          test ! -d node_modules
