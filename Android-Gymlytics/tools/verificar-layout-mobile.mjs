@@ -23,10 +23,10 @@ function request(method,params={}){
 async function check(width,page){
  const names={
   sesion:['#page-sesion .auth-panel'],
-  catalogos:['#page-catalogos .catalog-grid','#page-catalogos .catalog-main-actions','#catalogRefresh'],
+  catalogos:['#page-catalogos .catalog-compact-card','#page-catalogos .catalog-main-actions','#catalogRefresh','#gymExistingSelect','#exerciseExistingSelect'],
   registro:['#page-registro .exercise-tabs-wrap','#page-registro .context-panel','#continueToSeries'],
   'registro-series':['#page-registro .series-panel','#page-registro .table-scroll','#saveRecords'],
-  tablas:['#page-tablas .history-tools','#historySearch','#historyRefresh','#exportCsv'],
+  tablas:['#page-tablas .history-tools','#historyGym','#historyRefresh','#exportCsv','#historyView'],
   dashboard:['#page-dashboard .progress-panel','#page-dashboard .progress-filters','#progressExercise','#progressMetric','#progressChart']
  };
  const js='(()=>{'+
@@ -38,7 +38,7 @@ async function check(width,page){
  'const selectors='+JSON.stringify(names[page])+';'+
  'const positions=selectors.map(selector=>{const el=document.querySelector(selector);if(!el)return{selector,missing:true};const r=el.getBoundingClientRect();return{selector,left:r.left,right:r.right,width:r.width,visible:getComputedStyle(el).display!=="none"&&r.width>0}});'+
  'const r=document.querySelector(".bottom-nav").getBoundingClientRect();'+
- 'const over=[...document.querySelectorAll("body *")].filter(el=>{const s=getComputedStyle(el);if(s.display==="none"||s.position==="fixed")return false;const r=el.getBoundingClientRect();return r.width>0&&(r.right>390.5||r.left<-.5)}).slice(0,15).map(el=>({tag:el.tagName,id:el.id,cls:String(el.className).slice(0,65),right:el.getBoundingClientRect().right,width:el.getBoundingClientRect().width}));'+
+ 'const over=[...document.querySelectorAll("body *")].filter(el=>{const s=getComputedStyle(el);if(s.display==="none"||s.position==="fixed")return false;const r=el.getBoundingClientRect();return r.width>0&&(r.right>innerWidth+.5||r.left<-.5)}).slice(0,15).map(el=>({tag:el.tagName,id:el.id,cls:String(el.className).slice(0,65),right:el.getBoundingClientRect().right,width:el.getBoundingClientRect().width}));'+
  'return JSON.stringify({screen:innerWidth,visual:visualViewport.width,documentWidth:document.documentElement.scrollWidth,positions,over,nav:{left:r.left,right:r.right},chart:!!document.querySelector("#progressChart svg"),summary:document.getElementById("progressSummary").textContent});'+
  '})()';
  const result=await request('Runtime.evaluate',{expression:js,returnByValue:true});
