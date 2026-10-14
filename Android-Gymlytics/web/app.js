@@ -255,6 +255,19 @@ function setupCatalogCompact(){
   const note=document.createElement('span');note.className='catalog-readonly-note';note.textContent='Consulta';
   bar.append(note);card.append(bar);muscle.replaceWith(card);head?.remove();
  }
+ for(const item of [{id:'catalogSeriesLookup',name:'Número de serie',icon:'#'},{id:'catalogSubdivisionLookup',name:'Subdivisión',icon:'◫'}]){
+  const card=document.createElement('section');card.className='catalog-compact-card catalog-compact-readonly';
+  const bar=document.createElement('div');bar.className='catalog-compact-bar';
+  const heading=document.createElement('strong');heading.className='catalog-compact-label';
+  const icon=document.createElement('span');icon.className='catalog-compact-symbol';icon.textContent=item.icon;
+  const title=document.createElement('span');title.textContent=item.name;heading.append(icon,title);
+  const select=document.createElement('select');select.id=item.id;select.className='catalog-muscle-select';
+  select.setAttribute('aria-label','Consultar '+item.name);
+  const count=document.createElement('span');count.id=item.id+'Count';count.className='catalog-total';count.textContent='0';
+  const note=document.createElement('span');note.className='catalog-readonly-note';note.textContent='Registro';
+  bar.append(heading,select,count,note);card.append(bar);holder.append(card);
+ }
+ renderSeriesCatalogShortcuts();
 }
 function renderCatalogShortcuts(){
  const options=window.GymEntities?.options||[];
