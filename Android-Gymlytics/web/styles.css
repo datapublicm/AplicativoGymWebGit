@@ -344,6 +344,8 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 .catalog-exercise-selector p{min-height:0;color:#8bd8ef;font-size:12px}
 .catalog-muscles{border-top:1px solid #305371;margin-top:20px;padding-top:14px}
 .catalog-muscles p{font-size:12px;color:#a7b9d4}
+.catalog-muscles label{display:block;color:#c2e5fa;font-size:13px;font-weight:700;margin:9px 0 6px}
+.catalog-muscles select{width:100%;min-height:44px;border:1px solid #365c7b;background:#0a162a;color:#fff;border-radius:9px;padding:8px 11px}
 .series-reset-division{margin:0 0 12px;min-height:40px}
 .series-reset-division[hidden]{display:none!important}
 /* Historial: tablas reales, con desplazamiento horizontal solo dentro del resultado. */
