@@ -105,5 +105,5 @@ try{
  console.log('24 escenarios de navegador realizados, sin APK.');
 }finally{
  try{ws?.close()}catch{}browser?.kill('SIGKILL');server?.close();
- rmSync(work,{recursive:true,force:true});
+ rmSync(work,{recursive:true,force:true,maxRetries:15,retryDelay:150});
 }
