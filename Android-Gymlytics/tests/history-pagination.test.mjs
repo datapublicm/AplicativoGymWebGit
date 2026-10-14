@@ -5,27 +5,36 @@ import {runInNewContext} from 'node:vm';
 
 const app=readFileSync(new URL('../web/app.js',import.meta.url),'utf8');
 
-test('El historial de 9263 filas se presenta por páginas de 60, no completo',()=>{
-  const start=app.indexOf('let historyVisible=60;');
-  const end=app.indexOf('async function deleteRecord(id)',start);
-  assert.ok(start>=0&&end>start);
-  const code=app.slice(start,end);
-  const harness=`
-const records=Array.from({length:9263},(_,i)=>({id:i,exercise:i<100?'Curl de bíceps':'Curl martillo',gym:'Pruebas',sede:'Centro',zone:'Brazo',equipment:'Mancuerna',technique:'Base'}));
-const els={historySearch:{value:''},historyRecords:{innerHTML:''},historyPagination:{hidden:true},historyPageInfo:{textContent:''}};
+test('El historial de 9263 filas conserva paginación de 60 en la tabla corta',()=>{
+ const start=app.indexOf('const HISTORY_FIELDS=[');
+ const end=app.indexOf('async function deleteRecord(id)',start);
+ assert.ok(start>=0&&end>start);
+ const code=app.slice(start,end);
+ const harness=`
+const records=Array.from({length:9263},(_,i)=>({
+ id:String(i),date:'2026-10-10',exercise:i<100?'Curl de bíceps':'Curl martillo',
+ gym:'Pruebas',sede:'Centro',zone:'Brazo',equipment:'Mancuerna',technique:'Base',
+ series:'Serie 1',subdivision:null,unit:'kg',weight:20,reps:12
+}));
+const keys=['historyGym','historySede','historyZone','historyEquipment','historyExercise','historyAccessory','historyTechnique','historySeries','historySubdivision'];
+const els={historyView:{value:'short'},historyDateFrom:{value:''},historyDateTo:{value:''},historyRecords:{innerHTML:''},historyPagination:{hidden:true},historyPageInfo:{textContent:''},historyFilterSummary:{textContent:''}};
+for(const id of keys)els[id]={value:'',options:[],replaceChildren(...o){this.options=o;this.value=o[0]?.value||''},add(option){this.options.push(option)}};
+const Option=function(text,value){this.text=text;this.value=value;};
 const $=id=>els[id];
 const orderedRecords=()=>records;
-const recordHtml=r=>'<article>'+r.id+'</article>';
+const uniq=a=>[...new Set(a)].filter(Boolean).sort((a,b)=>a.localeCompare(b,'es'));
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const fmtDate=s=>s?.split('-').reverse().join('/')||'—';
 `;
-  const m=runInNewContext(harness+code+`({drawHistory,els,more:()=>{historyVisible+=60},getVisible:()=>historyVisible})`);
-  m.drawHistory();
-  assert.equal((m.els.historyRecords.innerHTML.match(/<article>/g)||[]).length,60);
-  assert.equal(m.els.historyPagination.hidden,false);
-  m.more();m.drawHistory();
-  assert.equal((m.els.historyRecords.innerHTML.match(/<article>/g)||[]).length,120);
-  m.els.historySearch.value='bíceps';m.drawHistory(true);
-  assert.equal((m.els.historyRecords.innerHTML.match(/<article>/g)||[]).length,60);
-  assert.match(m.els.historyPageInfo.textContent,/100 series/);
+ const m=runInNewContext(harness+code+`({drawHistory,els,more:()=>{historyVisible+=60},getVisible:()=>historyVisible})`);
+ m.drawHistory();
+ assert.equal((m.els.historyRecords.innerHTML.match(/data-history-row=/g)||[]).length,60);
+ assert.equal(m.els.historyPagination.hidden,false);
+ m.more();m.drawHistory();
+ assert.equal((m.els.historyRecords.innerHTML.match(/data-history-row=/g)||[]).length,120);
+ m.els.historyExercise.value='Curl de bíceps';m.drawHistory(true);
+ assert.equal((m.els.historyRecords.innerHTML.match(/data-history-row=/g)||[]).length,60);
+ assert.match(m.els.historyPageInfo.textContent,/100 series/);
 });
 
 function workoutHarness({failSave=false,failRefresh=false,deferSave=false}={}){
