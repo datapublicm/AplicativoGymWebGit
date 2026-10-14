@@ -392,6 +392,48 @@ const cloud={
   await this.loadCatalogStats();
   assertCurrentSession(user_id,epoch);
  },
+ async updateCatalogItem(kind,itemId,newName){
+  if(!owns())throw Error('Inicia sesión para modificar tu catálogo');
+  const user_id=signedIn.id,epoch=authEpoch,nombre=String(newName||'').trim(),id=String(itemId||'');
+  if(!id||!nombre||nombre.length>160)throw Error('Selecciona un elemento y escribe un nombre válido');
+  const groups={
+   gym:{table:'tbl_gimnasios',items:window.GymEntities?.gyms||[]},
+   site:{table:'tbl_sedes',items:window.GymEntities?.sites||[]},
+   machine:{table:'tbl_maquinas',items:window.GymEntities?.machines||[]},
+   option:{table:'tbl_opciones_personales',items:window.GymEntities?.options||[]},
+   exercise:{table:'tbl_ejercicios',items:[
+    ...(window.GymExerciseLibrary||[]),
+    ...(window.GymCustomCatalog||[]).filter(x=>x.cloud_id).map(x=>({id:x.cloud_id,nombre:x.e}))
+   ]}
+  };
+  const group=groups[kind];if(!group)throw Error('Tipo de catálogo incorrecto');
+  const original=group.items.find(x=>x.id===id);
+  if(!original)throw Error('Ese elemento no pertenece al catálogo personal actual');
+  const comparable=s=>String(s||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es');
+  if(group.items.some(x=>x.id!==id&&comparable(x.nombre)===comparable(nombre)&&
+    (kind!=='site'||x.gimnasio_id===original.gimnasio_id)&&
+    (kind!=='option'||x.tipo===original.tipo)))
+   throw Error('Ese nombre ya existe en la lista. Selecciónalo en el desplegable.');
+  if(comparable(original.nombre)===comparable(nombre))throw Error('El nombre ya coincide con el existente.');
+  const {data,error}=await db.from(group.table).update({nombre}).eq('id',id).eq('user_id',user_id).select('id');
+  must(data,error);assertCurrentSession(user_id,epoch);
+  if(data?.length!==1)throw Error('No se pudo confirmar la modificación del elemento.');
+  if(kind==='exercise'){
+   const custom=await this.loadOwnCatalog();assertCurrentSession(user_id,epoch);
+   window.GymCustomCatalog=custom;
+   if(typeof renderOwnCatalog==='function')renderOwnCatalog();
+  }else{
+   await this.loadIndependentCatalog();assertCurrentSession(user_id,epoch);
+   if(kind==='gym'||kind==='machine'){
+    const custom=await this.loadOwnCatalog();assertCurrentSession(user_id,epoch);
+    window.GymCustomCatalog=custom;
+    if(typeof renderOwnCatalog==='function')renderOwnCatalog();
+   }
+  }
+  if(typeof cascade==='function')cascade(0);
+  await this.loadCatalogStats();assertCurrentSession(user_id,epoch);
+  return id;
+ },
  async saveCustomExercise(values){
   if(!owns())throw Error('Inicia sesión para editar tu catálogo');
   const user_id=signedIn.id,epoch=authEpoch,nombre=String(values.e||'').trim();
