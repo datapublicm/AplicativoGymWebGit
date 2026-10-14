@@ -169,35 +169,60 @@ function closeDraft(id){
 function refreshActiveDraftTitle(){const tab=draftTabs.find(t=>t.id===activeDraftId);if(!tab)return;tab.title=getValue('e')||tab.title;showDraftTabs();}
 function resetExerciseTabs(){draftTabs=[];activeDraftId=null;draftSeq=0;newDraft(false);}
 function hasSeriesData(){return getEntries().length>0}
+function populateCatalogSelect(selectId,items,labelFn){
+ const select=$(selectId);if(!select)return;
+ const selected=select.value;
+ select.replaceChildren(new Option('Selecciona un elemento…',''));
+ for(const item of items)select.add(new Option(labelFn(item),item.id));
+ select.value=items.some(x=>x.id===selected)?selected:'';
+ const inputId=selectId.replace('ExistingSelect','EditName');
+ const input=$(inputId);
+ if(input)input.value=items.find(x=>x.id===select.value)?.nombre||'';
+}
+function existingCatalogItems(kind){
+ const ent=window.GymEntities||{gyms:[],sites:[],machines:[],options:[]};
+ if(kind==='gym')return ent.gyms||[];
+ if(kind==='site')return ent.sites||[];
+ if(kind==='machine')return ent.machines||[];
+ if(kind==='option')return (ent.options||[]).filter(x=>x.tipo===document.querySelector('#addOptionForm [name="tipo"]')?.value);
+ if(kind==='exercise')return [...(window.GymExerciseLibrary||[]).map(x=>({id:x.id,nombre:x.nombre})),...(window.GymCustomCatalog||[]).filter(x=>x.cloud_id).map(x=>({id:x.cloud_id,nombre:x.e}))];
+ return [];
+}
 function renderIndependentCatalog(){
- const entities=window.GymEntities||{gyms:[],sites:[],machines:[],options:[]};
+ const ent=window.GymEntities||{gyms:[],sites:[],machines:[],options:[]};
  const el=$('siteGymSelect'),previous=el.value;
  el.replaceChildren();
- if(!entities.gyms.length){el.add(new Option('Primero registra un gimnasio',''));el.disabled=true;}
+ if(!ent.gyms.length){el.add(new Option('Primero registra un gimnasio',''));el.disabled=true;}
  else{
   el.disabled=false;
-  for(const gym of entities.gyms)el.add(new Option(gym.nombre,gym.id));
-  if(entities.gyms.some(g=>g.id===previous))el.value=previous;
+  for(const gym of ent.gyms)el.add(new Option(gym.nombre,gym.id));
+  if(ent.gyms.some(g=>g.id===previous))el.value=previous;
  }
- const entries=$('customCatalogItems');
- entries.innerHTML=(entities.options||[]).length?
-  '<div class="catalog-options-list">'+entities.options.map(x=>
-   '<span class="catalog-option-pill"><strong>'+esc(({zona:'Zona',accesorio:'Accesorio',agarre:'Agarre',tecnica:'Técnica'})[x.tipo]||x.tipo)+'</strong> · '+esc(x.nombre)+'</span>'
-  ).join('')+'</div>':'';
- if(window.GymBaseCatalog?.length||window.GymCustomCatalog?.length) cascade(0);
+ const gymById=new Map((ent.gyms||[]).map(x=>[x.id,x.nombre]));
+ populateCatalogSelect('gymExistingSelect',ent.gyms||[],x=>x.nombre);
+ populateCatalogSelect('siteExistingSelect',ent.sites||[],x=>x.nombre+' · '+(gymById.get(x.gimnasio_id)||'Sin gimnasio'));
+ populateCatalogSelect('machineExistingSelect',ent.machines||[],x=>x.nombre+' · '+(x.tipo_equipo||'Equipo'));
+ const values=existingCatalogItems('option');
+ populateCatalogSelect('optionExistingSelect',values,x=>x.nombre);
+ for(const [id,count] of [['siteCount',ent.sites.length],['machineCount',ent.machines.length]])
+  if($(id))$(id).textContent=String(count);
+ if($('optionCount'))$('optionCount').textContent=values.length+' / '+ent.options.length+' total';
+ if($('customCatalogItems'))$('customCatalogItems').innerHTML='';
+ if(window.GymBaseCatalog?.length||window.GymCustomCatalog?.length)cascade(0);
 }
 function renderOwnCatalog(){
- const list=document.getElementById('catalogEntries');if(!list)return;
- const records=[...(window.GymCustomCatalog||[]),...(window.GymExerciseLibrary||[]).map(r=>({e:r.nombre,g:'Catálogo personal',s:'Sin vincular',i:'Se vincula al entrenar'}))];
- list.innerHTML=records.length?records.map(r=>`<div class="catalog-row"><strong>${esc(r.e)}</strong><small>${esc(r.g)} · ${esc(r.s)} · ${esc(r.i)}</small></div>`).join(''):
- '<div class="empty">Todavía no hay ejercicios propios. Puedes crear el primero aquí.</div>';
+ const records=existingCatalogItems('exercise');
+ populateCatalogSelect('exerciseExistingSelect',records,x=>x.nombre);
+ const entries=$('catalogEntries');
+ if(entries)entries.innerHTML=records.length?'':'<div class="empty">Aún no hay ejercicios propios. Puedes agregar el primero aquí.</div>';
 }
-function changeSeriesMode(mode){if(!['normal','sub','lateral'].includes(mode))return;if(mode!==seriesMode&&hasSeriesData()&&!confirm('Cambiar el tipo de subdivisión borrará los valores aún no guardados. ¿Continuar?'))return;seriesMode=mode;if(!seriesCustomized)seriesGroups=mode==='normal'?4:3;renderSeries();$('splitOptions').hidden=true;$('toggleSubdivisions').setAttribute('aria-expanded','false')}
+
+function changeSeriesMode(mode){if(!['normal','sub','lateral'].includes(mode))return;if(mode!==seriesMode&&hasSeriesData()&&!confirm('Cambiar el tipo de subdivisión borrará los valores aún no guardados. ¿Continuar?'))return;seriesMode=mode;if(!seriesCustomized)seriesGroups=mode==='normal'?4:3;renderSeries();$('splitOptions').hidden=true;$('toggleSubdivisions').setAttribute('aria-expanded','false');$('resetSubdivisions').hidden=mode==='normal'}
 function resizeSeries(delta){const next=Math.max(1,Math.min(12,seriesGroups+delta));if(next===seriesGroups)return;if(delta<0&&[...$('seriesRows').querySelectorAll('tr')].slice(-1*(seriesMode==='normal'?1:2)).some(row=>[...row.querySelectorAll('input')].some(i=>i.value.trim()))&&!confirm('La última serie tiene datos sin guardar. ¿Quitarla?'))return;seriesGroups=next;seriesCustomized=true;renderSeries(true)}
 function renderSeries(preserve=false){const retained=preserve?new Map([...$('seriesRows').querySelectorAll('tr')].map(row=>[row.dataset.serie+'|'+row.dataset.sub,{unit:row.querySelector('select')?.value||'kg',weight:row.querySelector('.weight')?.value||'',reps:row.querySelector('.reps')?.value||'',help:row.querySelector('.help')?.value||''}])):new Map();const subs=seriesMode==='normal'?['-']:seriesMode==='sub'?['Sub1','Sub2']:['Derecha','Izquierda'];const rows=[];
  for(let n=1;n<=seriesGroups;n++){const label=`Serie ${n}`;subs.forEach((sub,index)=>{const v=retained.get(label+'|'+sub)||{};const tag=label+(sub==='-'?'':' · '+sub);rows.push(`<tr class="${index===0?'group-start ':''}" data-serie="${esc(label)}" data-sub="${esc(sub)}">${index===0?`<td class="series-name" rowspan="${subs.length}">${esc(label)}</td>`:''}${seriesMode!=='normal'?`<td class="division division-col">${esc(sub)}</td>`:''}<td class="unit-cell"><select aria-label="Unidad, ${esc(tag)}"><option${v.unit==='kg'||!v.unit?' selected':''}>kg</option><option${v.unit==='lb'?' selected':''}>lb</option></select></td><td class="number-cell"><input class="entry weight" type="number" min="0" step="any" inputmode="decimal" placeholder="—" value="${esc(v.weight||'')}" aria-label="Peso, ${esc(tag)}"></td><td class="number-cell"><input class="entry reps" type="number" min="0" step="any" inputmode="decimal" placeholder="—" value="${esc(v.reps||'')}" aria-label="Repeticiones, ${esc(tag)}"></td><td class="number-cell"><input class="entry help" type="number" min="0" step="any" inputmode="decimal" placeholder="—" value="${esc(v.help||'')}" aria-label="Asistencias, ${esc(tag)}"></td></tr>`)});}
  $('seriesRows').innerHTML=rows.join('');$('seriesGroupCount').textContent=seriesGroups===1?'1 serie':`${seriesGroups} series`;$('removeSeriesGroup').disabled=seriesGroups===1;$('addSeriesGroup').disabled=seriesGroups===12;$('seriesModeLabel').textContent=seriesMode==='normal'?`${seriesGroups} series normales · sin subdivisiones`:seriesMode==='sub'?`${seriesGroups} series · Sub1 y Sub2`:`${seriesGroups} series · Derecha e Izquierda`;$('toggleSubdivisions').textContent=seriesMode==='normal'?'⊞ Adicionar subdivisiones':'⇄ Cambiar subdivisiones';
- document.querySelector('.series-panel').classList.toggle('mode-normal',seriesMode==='normal');updateSeriesCount();}
+ document.querySelector('.series-panel').classList.toggle('mode-normal',seriesMode==='normal');$('resetSubdivisions').hidden=seriesMode==='normal';updateSeriesCount();}
 function getEntries(){return [...$('seriesRows').querySelectorAll('tr')].map(row=>{const weight=row.querySelector('.weight').value.trim(),reps=row.querySelector('.reps').value.trim(),help=row.querySelector('.help').value.trim();return {el:row,series:row.dataset.serie,sub:row.dataset.sub,unit:row.querySelector('select').value,weight,reps,assistance:help,dirty:!!(weight||reps||help)}}).filter(x=>x.dirty)}
 function validSeriesDecimal(value,limit){
  const s=String(value).trim();
@@ -268,42 +293,82 @@ async function saveSeries(){
 function recordHtml(r){return `<div class="record-item"><div><strong>${esc(r.exercise)}</strong><p>${esc(fmtDate(r.date))} · ${esc(r.gym)} · ${esc(r.sede)}<br>${esc(r.series)}${r.subdivision!=='-'?' · '+esc(r.subdivision):''} · ${esc(r.technique)}${r.assistance!==null&&r.assistance!==undefined?' · Asist.: '+esc(r.assistance):''}</p></div><aside><strong>${esc(r.weight)} ${esc(r.unit)} × ${esc(r.reps)}</strong><small>repeticiones</small><div class="record-actions"><button type="button" data-delete="${esc(r.id)}" title="Eliminar serie">Eliminar</button><button type="button" data-progress="${esc(r.exercise)}" title="Mostrar evolución de este ejercicio">Ver progreso</button></div></aside></div>`}
 function orderedRecords(){return [...model.records].sort((a,b)=>b.date.localeCompare(a.date)||(b.createdAt||'').localeCompare(a.createdAt||''))}
 function drawRecent(){const list=orderedRecords().slice(0,3);$('recentRecords').innerHTML=list.length?list.map(recordHtml).join(''):'<div class="empty">Aún no hay registros nuevos. Completa una fila y guárdala.</div>'}
-let historyVisible=60;
-function resetHistoryFilters(){
- for(const id of ['historySearch','historyExercise','historyDateFrom','historyDateTo']){
-  const field=$(id);if(field)field.value='';
+const HISTORY_FIELDS=[
+ ['historyGym','gym','Gimnasios'],['historySede','sede','Sedes'],['historyZone','zone','Anotaciones'],
+ ['historyEquipment','equipment','Instrumentos'],['historyExercise','exercise','Ejercicios'],
+ ['historyAccessory','accessory','Agarres / implementos'],['historyTechnique','technique','Técnicas'],
+ ['historySeries','series','Números de serie'],['historySubdivision','subdivision','Subdivisiones']
+];
+function historyFieldValue(record,key){
+ if(key==='accessory'){
+  const names=[record.grip,record.accessory].filter(v=>v&&v!=='No especificado'&&v!=='-');
+  return uniq(names).join(' / ')||'No especificado';
  }
- historyVisible=60;
+ if(key==='subdivision')return record.subdivision&&record.subdivision!=='-'?String(record.subdivision):'Sin subdivisiones';
+ return String(record[key]??'')||'No especificado';
+}
+function historyColumnValue(record,key){
+ if(key==='date')return fmtDate(record.date);
+ if(key==='weight')return String(record.weight??'')+' '+String(record.unit||'kg');
+ if(key==='reps')return String(record.reps??'');
+ return historyFieldValue(record,key);
+}
+const HISTORY_COLUMNS=[
+ ['date','Fecha'],['gym','Gimnasio'],['sede','Sede'],['zone','AnotaciónV2'],
+ ['equipment','Instrumento'],['exercise','Ejercicio'],['accessory','Agarre / Implemento'],
+ ['technique','Tecnica_Actualizada'],['series','Número de serie'],['subdivision','Subdivisión'],
+ ['weight','Peso'],['reps','Repeticiones']
+];
+let historyVisible=60,expandedHistoryId=null;
+function resetHistoryFilters(){
+ for(const [id] of HISTORY_FIELDS)if($(id))$(id).value='';
+ for(const id of ['historyDateFrom','historyDateTo'])if($(id))$(id).value='';
+ historyVisible=60;expandedHistoryId=null;
 }
 function drawHistory(reset=false){
- if(reset)historyVisible=60;
+ if(reset){historyVisible=60;expandedHistoryId=null;}
  const ordered=orderedRecords();
- const exerciseSelect=$('historyExercise');
- if(exerciseSelect){
-  const names=uniq(ordered.map(r=>r.exercise));
-  const selected=exerciseSelect.value;
-  exerciseSelect.innerHTML='<option value="">Todos los ejercicios</option>'+names.map(name=>'<option value="'+esc(name)+'">'+esc(name)+'</option>').join('');
-  exerciseSelect.value=names.includes(selected)?selected:'';
+ for(const [id,key,title] of HISTORY_FIELDS){
+  const select=$(id);if(!select)continue;
+  const names=uniq(ordered.map(r=>historyFieldValue(r,key)));
+  const selected=select.value;
+  select.replaceChildren(new Option('Todos los '+title.toLowerCase(),''));
+  for(const name of names)select.add(new Option(name,name));
+  select.value=names.includes(selected)?selected:'';
  }
- const q=$('historySearch').value.trim().toLocaleLowerCase();
- const exercise=exerciseSelect?.value||'',from=$('historyDateFrom')?.value||'',to=$('historyDateTo')?.value||'';
+ const filters=Object.fromEntries(HISTORY_FIELDS.map(([id,key])=>[key,$(id)?.value||'']));
+ const from=$('historyDateFrom')?.value||'',to=$('historyDateTo')?.value||'';
  const invalid=Boolean(from&&to&&from>to);
  const list=invalid?[]:ordered.filter(r=>
-  (!exercise||r.exercise===exercise)&&(!from||r.date>=from)&&(!to||r.date<=to)&&
-  [r.gym,r.sede,r.zone,r.equipment,r.exercise,r.technique].join(' ').toLocaleLowerCase().includes(q));
- $('historyRecords').innerHTML=list.length?list.slice(0,historyVisible).map(recordHtml).join(''):'<div class="empty">'+(invalid?'Revisa las fechas: «Desde» no puede superar «Hasta».':'No se encontraron series con los filtros seleccionados.')+'</div>';
+  (!from||r.date>=from)&&(!to||r.date<=to)&&
+  Object.entries(filters).every(([key,value])=>!value||historyFieldValue(r,key)===value));
+ const extended=$('historyView')?.value==='extended';
+ const columns=HISTORY_COLUMNS.filter(([key])=>extended?!filters[key]:['date','series','subdivision','weight','reps'].includes(key));
+ const shown=list.slice(0,historyVisible);
+ const heads=columns.map(([,label])=>'<th scope="col">'+esc(label)+'</th>').join('');
+ const rows=shown.map(r=>{
+  const cells=columns.map(([key])=>{
+   const value=esc(historyColumnValue(r,key));
+   return '<td>'+ (key==='date'?'<button class="history-row-open" type="button" data-history-detail="'+esc(r.id)+'" aria-label="Ver acciones de serie del '+esc(fmtDate(r.date))+'">'+value+' ⋯</button>':value)+'</td>';
+  }).join('');
+  const expanded=expandedHistoryId===r.id;
+  const more=expanded?'<tr class="history-detail-actions"><td colspan="'+columns.length+'"><strong>'+esc(r.exercise)+'</strong> · '+esc(r.technique||'')+' <button type="button" data-delete="'+esc(r.id)+'">Eliminar</button><button type="button" data-progress="'+esc(r.exercise)+'">Ver progreso</button></td></tr>':'';
+  return '<tr data-history-row="'+esc(r.id)+'">'+cells+'</tr>'+more;
+ }).join('');
+ const container=$('historyRecords');
+ container.innerHTML=shown.length?
+  '<div class="history-table-scroll" tabindex="0" role="region" aria-label="Tabla de historial desplazable"><table class="history-data-table"><thead><tr>'+heads+'</tr></thead><tbody>'+rows+'</tbody></table></div><p class="history-table-hint">Toca la fecha de una fila para eliminar esa serie o ver su progreso.</p>':
+  '<div class="empty">'+(invalid?'Revisa las fechas: «Desde» no puede superar «Hasta».':'No se encontraron series con los filtros seleccionados.')+'</div>';
  $('historyPagination').hidden=list.length<=historyVisible;
  $('historyPageInfo').textContent='Mostrando '+Math.min(historyVisible,list.length).toLocaleString('es-PE')+' de '+list.length.toLocaleString('es-PE')+' series';
- const summary=$('historyFilterSummary');
- if(summary){
-  const volume=list.reduce((total,r)=>{
-   const weight=Number(r.weight),reps=Number(r.reps);
-   return Number.isFinite(weight)&&Number.isFinite(reps)?total+weight*(r.unit==='lb'?0.45359237:1)*reps:total;
-  },0);
-  const count=n=>n.toLocaleString('es-PE');
-  summary.textContent=invalid?'Rango de fechas incorrecto.':count(list.length)+' de '+count(ordered.length)+' series · '+count(new Set(list.map(r=>r.date)).size)+' fechas · Volumen: '+Math.round(volume).toLocaleString('es-PE')+' kg × rep.';
- }
+ const volume=list.reduce((sum,r)=>{
+  const w=Number(r.weight),rep=Number(r.reps);
+  return Number.isFinite(w)&&Number.isFinite(rep)?sum+w*(r.unit==='lb'?0.45359237:1)*rep:sum;
+ },0);
+ const n=v=>v.toLocaleString('es-PE');
+ $('historyFilterSummary').textContent=invalid?'Rango de fechas incorrecto.':n(list.length)+' de '+n(ordered.length)+' series · '+n(new Set(list.map(r=>r.date)).size)+' fechas · Volumen: '+Math.round(volume).toLocaleString('es-PE')+' kg × rep.';
 }
+
 async function deleteRecord(id){
  if(!window.GymCloud?.canWrite())return;
  const stamp=window.GymCloud.getSessionStamp?.();
@@ -451,7 +516,25 @@ function photoCanvas(file,maxSize){
 }
 
 function detailOpenAfterUpload(type){const r=chosenRow(),[src,available]=photoFor(type,r);$(type==='equipo'?'detailEquipmentImg':'detailExerciseImg').src=src;$(type==='equipo'?'equipmentNoPhoto':'exerciseNoPhoto').hidden=available}
-function install(){$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('progressExercise').addEventListener('change',()=>drawProgressChart(model.records));$('progressMetric').addEventListener('change',()=>drawProgressChart(model.records));$('progressRange').addEventListener('change',()=>drawProgressChart(model.records));$('historySearch').addEventListener('input',()=>drawHistory(true));$('historyExercise').addEventListener('change',()=>drawHistory(true));$('historyDateFrom').addEventListener('change',()=>drawHistory(true));$('historyDateTo').addEventListener('change',()=>drawHistory(true));$('historyClearFilters').addEventListener('click',()=>{resetHistoryFilters();drawHistory(true)});$('historyLoadMore').addEventListener('click',()=>{historyVisible+=60;drawHistory()});$('historyRefresh').addEventListener('click',refreshHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(b){deleteRecord(b.dataset.delete);return;}const progress=e.target.closest('[data-progress]');if(progress){const exercise=progress.dataset.progress;showPage('dashboard');if(model.records.some(r=>r.exercise===exercise)){$('progressExercise').value=exercise;drawProgressChart(model.records);}}})}
+function install(){$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('resetSubdivisions').addEventListener('click',()=>changeSeriesMode('normal'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('progressExercise').addEventListener('change',()=>drawProgressChart(model.records));$('progressMetric').addEventListener('change',()=>drawProgressChart(model.records));$('progressRange').addEventListener('change',()=>drawProgressChart(model.records));document.querySelectorAll('[data-history-field]').forEach(field=>field.addEventListener('change',()=>drawHistory(true)));$('historyView').addEventListener('change',()=>drawHistory(true));$('historyDateFrom').addEventListener('change',()=>drawHistory(true));$('historyDateTo').addEventListener('change',()=>drawHistory(true));$('historyClearFilters').addEventListener('click',()=>{resetHistoryFilters();drawHistory(true)});$('historyLoadMore').addEventListener('click',()=>{historyVisible+=60;drawHistory()});$('historyRefresh').addEventListener('click',refreshHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.querySelector('#addOptionForm [name="tipo"]').addEventListener('change',renderIndependentCatalog);
+document.querySelectorAll('[data-catalog-existing]').forEach(select=>select.addEventListener('change',()=>{
+ const kind=select.dataset.catalogExisting;
+ const item=existingCatalogItems(kind).find(x=>x.id===select.value);
+ const field=$(kind+'EditName');if(field)field.value=item?.nombre||'';
+}));
+document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEventListener('click',async()=>{
+ const kind=button.dataset.catalogModify;
+ const select=$({gym:'gymExistingSelect',site:'siteExistingSelect',machine:'machineExistingSelect',option:'optionExistingSelect',exercise:'exerciseExistingSelect'}[kind]);
+ const name=$(kind+'EditName')?.value.trim()||'',feedback=$(kind==='exercise'?'exerciseEditFeedback':{gym:'gymFeedback',site:'siteFeedback',machine:'machineFeedback',option:'optionFeedback'}[kind]);
+ if(!select.value||!name){feedback.textContent='Selecciona un elemento y escribe su nuevo nombre.';return;}
+ if(!window.GymCloud?.canWrite()){feedback.textContent='Inicia sesión para modificar.';return;}
+ const stamp=window.GymCloud.getSessionStamp?.(),current=()=>stamp===window.GymCloud.getSessionStamp?.()&&window.GymCloud.canWrite();
+ button.disabled=true;
+ try{await window.GymCloud.updateCatalogItem(kind,select.value,name);if(current())feedback.textContent='Nombre actualizado correctamente en Supabase.';}
+ catch(error){if(current())feedback.textContent='No se pudo modificar: '+error.message;}
+ finally{button.disabled=false;}
+}));
+document.addEventListener('click',e=>{const detail=e.target.closest('[data-history-detail]');if(detail){expandedHistoryId=expandedHistoryId===detail.dataset.historyDetail?null:detail.dataset.historyDetail;drawHistory();return;}const b=e.target.closest('[data-delete]');if(b){deleteRecord(b.dataset.delete);return;}const progress=e.target.closest('[data-progress]');if(progress){const exercise=progress.dataset.progress;showPage('dashboard');if(model.records.some(r=>r.exercise===exercise)){$('progressExercise').value=exercise;drawProgressChart(model.records);}}})}
 $('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();install();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
