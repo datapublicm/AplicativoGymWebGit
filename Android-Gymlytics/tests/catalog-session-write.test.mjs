@@ -63,7 +63,7 @@ test('Catálogo sin cambio de sesión conserva su carga y estadísticas',async()
  assert.equal(h.state().stats,1);
 });
 
-const eventMethods=extract('for(const [formId,kind,feedbackId] of [',"document.querySelector('#addOptionForm [name=\"tipo\"]')");
+const eventMethods=extract('for(const [formId,kind,feedbackId] of [','// Bloquear navegación antes');
 function formFixture(){
  const code=`
 let session='A',resolve,started,resetCount=0;
