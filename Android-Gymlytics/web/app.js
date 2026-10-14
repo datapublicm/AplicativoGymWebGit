@@ -206,8 +206,9 @@ function setupCatalogCompact(){
  }
  const optionForm=$('addOptionForm');
  if(optionForm){
+  const optionTotal=$('optionCount');
   optionForm.querySelector('h3')?.remove();
-  const advanced=makeCard('Editar listas','≡',$('optionExistingSelect'),$('optionCount'),[optionForm],holder);
+  const advanced=makeCard('Editar listas','≡',$('optionExistingSelect'),optionTotal,[optionForm],holder);
   advanced.classList.add('catalog-advanced-options');advanced.hidden=true;advanced.id='catalogAdvancedOptions';
   for(const item of [
    {id:'zone',name:'AnotaciónV2',type:'zona',icon:'▤'},
