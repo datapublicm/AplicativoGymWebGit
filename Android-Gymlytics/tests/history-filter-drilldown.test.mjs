@@ -28,7 +28,7 @@ function fixture(records){
   'Object.assign(elements,{historyView:{value:"short"},historyDateFrom:{value:""},historyDateTo:{value:""},historyRecords:{innerHTML:""},historyPagination:{hidden:true},historyPageInfo:{textContent:""},historyFilterSummary:{textContent:""}});',
   'const $=id=>elements[id];',
   'const Option=function(text,value){this.text=text;this.value=value};',
-  'const esc=s=>String(s??"").replace(/[&<>"\x27]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",\x27"\x27":"&#39;"}[ch]));',
+  'const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");',
   'const fmtDate=s=>s?.split("-").reverse().join("/")||"—";',
   'const uniq=a=>[...new Set(a)].filter(Boolean).sort((a,b)=>String(a).localeCompare(String(b),"es"));',
   'const orderedRecords=()=>records;',
