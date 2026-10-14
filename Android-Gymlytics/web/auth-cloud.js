@@ -188,6 +188,7 @@ async function findOrCreate(table,fields,insertExtra={}) {
   if(insertErr) throw insertErr;
   return newRow.id;
 }
+const normalizeCatalogName=s=>String(s||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es');
 const cloud={
  canWrite:()=>owns(),
  getSessionStamp:()=>owns()?signedIn.id+':'+authEpoch:null,
@@ -373,6 +374,12 @@ const cloud={
   if(!owns())throw Error('Inicia sesión antes de agregar elementos');
   const user_id=signedIn.id,epoch=authEpoch,nombre=(values.nombre||'').trim();
   if(!nombre)throw Error('Introduce un nombre válido');
+  const entities=window.GymEntities||{gyms:[],sites:[],machines:[],options:[]};
+  const candidates=kind==='gym'?entities.gyms:kind==='site'?entities.sites:kind==='machine'?entities.machines:kind==='option'?entities.options:[];
+  if(candidates.some(x=>normalizeCatalogName(x.nombre)===normalizeCatalogName(nombre)&&
+    (kind!=='site'||x.gimnasio_id===values.gimnasio_id)&&
+    (kind!=='option'||x.tipo===values.tipo)))
+   throw Error('Ese elemento ya existe. Selecciónalo en la lista desplegable.');
   if(kind==='gym')await findOrCreate('tbl_gimnasios',{user_id,nombre});
   else if(kind==='site'){
    const gym=(window.GymEntities?.gyms||[]).find(g=>g.id===values.gimnasio_id);
@@ -414,7 +421,7 @@ const cloud={
     (kind!=='site'||x.gimnasio_id===original.gimnasio_id)&&
     (kind!=='option'||x.tipo===original.tipo)))
    throw Error('Ese nombre ya existe en la lista. Selecciónalo en el desplegable.');
-  if(comparable(original.nombre)===comparable(nombre))throw Error('El nombre ya coincide con el existente.');
+  if(original.nombre===nombre)throw Error('El nombre ya coincide con el existente.');
   const {data,error}=await db.from(group.table).update({nombre}).eq('id',id).eq('user_id',user_id).select('id');
   must(data,error);assertCurrentSession(user_id,epoch);
   if(data?.length!==1)throw Error('No se pudo confirmar la modificación del elemento.');
@@ -438,6 +445,9 @@ const cloud={
   if(!owns())throw Error('Inicia sesión para editar tu catálogo');
   const user_id=signedIn.id,epoch=authEpoch,nombre=String(values.e||'').trim();
   if(!nombre)throw Error('Introduce un nombre de ejercicio');
+  if([...(window.GymExerciseLibrary||[]).map(x=>x.nombre),...(window.GymCustomCatalog||[]).map(x=>x.e)]
+      .some(x=>normalizeCatalogName(x)===normalizeCatalogName(nombre)))
+   throw Error('Ya existe un ejercicio con ese nombre en tu catálogo. Selecciónalo en el desplegable.');
   // No asociar gimnasio, sede ni máquina hasta registrar el entrenamiento.
   await findOrCreate('tbl_ejercicios',{
    user_id,origen:'usuario',nombre,gimnasio_id:null,sede_id:null
@@ -459,6 +469,13 @@ const cloud={
    const {count,error}=await q;
    assertCurrentSession(uid,epoch);
    $(id).textContent=error?'Sin conexión':String(count??0);
+  }
+  const selector=$('muscleExistingSelect');
+  if(selector){
+   const {data,error}=await db.from('tbl_musculos').select('id,nombre').order('nombre');
+   assertCurrentSession(uid,epoch);
+   selector.replaceChildren(new Option(error?'No se pudo consultar el listado':'Selecciona un músculo…',''));
+   if(!error)for(const item of data||[])selector.add(new Option(item.nombre,item.id));
   }
  },
  async signedPath(bucket,path){
