@@ -1,8 +1,10 @@
-# Inicio autorizado de compilación debug de pruebas (2026-10-11). Nunca compilar main ni integrar el modelo 3D.
-name: Gymlytics - compilar APK debug (Supabase Pruebas)
+# Compilación autorizada por el usuario: entrega 01.04 de apk/pruebas.
+# No modifica ramas principales ni incorpora el modelo 3D pendiente.
+name: Gymlytics - APK 01.04 Pruebas
 on:
   push:
-    branches: [Android-Gymlytics]
+    branches:
+      - apk/pruebas
     paths:
       - '.github/workflows/compilar-gymlytics-debug.yml'
   workflow_dispatch:
@@ -10,9 +12,10 @@ permissions:
   contents: read
 jobs:
   compilar-apk:
-    name: Generar APK instalable sin modelo 3D
+    name: Construir APK debug Gymlytics 01.04
+    if: github.ref == 'refs/heads/apk/pruebas'
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 55
     defaults:
       run:
         working-directory: Android-Gymlytics
@@ -23,65 +26,85 @@ jobs:
       VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_sQH_z37OD2mzNMoL4M3Lwg_jF8Lpmx2
       VITE_GYMLYTICS_RECOVERY_URL: ''
     steps:
-      - name: Extraer rama autorizada
+      - name: Descargar exclusivamente apk/pruebas
         uses: actions/checkout@v4
-      - name: Preparar Node.js 22
+        with:
+          ref: apk/pruebas
+      - name: Comprobar rama, proyecto y version
+        run: |
+          test "${GITHUB_REF_NAME}" = "apk/pruebas"
+          test ! -d android/app
+          test -f android/README.md
+          node -e 'const p=require("./package.json"); const c=require("./capacitor.config.json");if(p.name!=="gymlytics"||p.version!=="0.1.4"||c.appId!=="com.datapublicm.gymlytics")process.exit(1)'
+          test "${VITE_SUPABASE_SCHEMA}" = sch_android_gymlytics
+      - name: Configurar Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Preparar Java 21
+      - name: Configurar Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-      - name: Usar SDK Android preinstalado en GitHub
+      - name: Preparar SDK Android
         run: |
-          SDK=${ANDROID_HOME:-/usr/local/lib/android/sdk}
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
           test -x "$SDK/cmdline-tools/latest/bin/sdkmanager"
-          "$SDK/cmdline-tools/latest/bin/sdkmanager" --list_installed | head -60
           "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
-      - name: Validar que no se compilen modificaciones del modelo 3D
-        run: |
-          test "${GITHUB_REF_NAME}" = "Android-Gymlytics"
-          test ! -d android/app
-          test -f capacitor.config.json
-      - name: Instalar dependencias web y Capacitor
+      - name: Instalar dependencias de JavaScript
         run: npm install --no-package-lock --no-audit --no-fund
-      - name: Compilar recursos web con conexión de Pruebas
+      - name: Ejecutar pruebas del codigo
+        run: npm run test:static
+      - name: Construir web con datos de Supabase Pruebas
         run: |
-          node -e "if(!process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.startsWith('sb_publishable_'))process.exit(1)"
+          node -e 'if(!process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.startsWith("sb_publishable_"))process.exit(1)'
           npm run build:web
-          test -f dist/index.html
-          test -f dist/assets/jalon-pecho.webp
-      - name: Generar proyecto Android con Capacitor
+          test -s dist/index.html
+      - name: Crear plataforma Android temporal
         run: |
-          # El repositorio solo guarda android/README.md; retirar esa carpeta
-          # reservada en el runner efímero para permitir crear la plataforma.
           test -f android/README.md
           test "$(find android -mindepth 1 -maxdepth 1 | wc -l)" -eq 1
           mv android/README.md android-notas-de-plataforma.txt
           rmdir android
           npx cap add android
-      - name: Sincronizar archivos a Android
-        run: npx cap sync android
-      - name: Construir APK debug
+          npx cap sync android
+      - name: Establecer version interna 01.04 y codigo 4
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const file = 'android/app/build.gradle';
+          let gradle = fs.readFileSync(file,'utf8');
+          if (!/versionCode\s+\d+/.test(gradle) || !/versionName\s+["'][^"']+["']/.test(gradle))
+            throw Error('No se encontró versión Android en Gradle');
+          gradle = gradle.replace(/versionCode\s+\d+/,'versionCode 4')
+                         .replace(/versionName\s+["'][^"']+["']/,'versionName "01.04"');
+          fs.writeFileSync(file,gradle);
+          if (!gradle.includes('versionCode 4') || !gradle.includes('versionName "01.04"'))
+            throw Error('La numeración Android no se aplicó');
+          NODE
+      - name: Compilar APK Android debug
         working-directory: Android-Gymlytics/android
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace assembleDebug
-      - name: Verificar archivo e identificar su tamaño
+      - name: Verificar APK y firma digital
         run: |
           APK=android/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
-          ls -lh "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep '^package:' | tee /tmp/gymlytics-package.txt
+          grep -q "name='com.datapublicm.gymlytics'" /tmp/gymlytics-package.txt
+          grep -q "versionCode='4'" /tmp/gymlytics-package.txt
+          grep -q "versionName='01.04'" /tmp/gymlytics-package.txt
           mkdir -p entregables
-          cp "$APK" entregables/Gymlytics-v0.1.3-Pruebas-debug.apk
-          sha256sum entregables/Gymlytics-v0.1.3-Pruebas-debug.apk > entregables/SHA256.txt
-      - name: Publicar APK descargable
+          cp "$APK" entregables/Gymlytics_01.04_Pruebas.apk
+          (cd entregables && sha256sum Gymlytics_01.04_Pruebas.apk > SHA256.txt)
+          ls -lh entregables/
+      - name: Publicar APK para descarga
         uses: actions/upload-artifact@v4
         with:
-          name: Gymlytics-v0.1.3-Pruebas-APK
+          name: Gymlytics_01.04_Pruebas_APK
           path: Android-Gymlytics/entregables/
           if-no-files-found: error
           retention-days: 30
