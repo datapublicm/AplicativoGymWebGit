@@ -24,6 +24,15 @@ jobs:
           node --check tools/validar-data-api.mjs
       - name: Ejecutar pruebas unitarias y de regresion
         run: npm run test:static
+      - name: Validar 24 escenarios Chrome movil sin APK
+        run: node tools/verificar-layout-mobile.mjs
+      - name: Guardar capturas moviles para revision
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gymlytics-apk-pruebas-mockups-reales
+          path: Android-Gymlytics/mobile-check/*.png
+          if-no-files-found: ignore
       - name: Confirmar que no se generaron binarios
         run: |
           test ! -d dist
