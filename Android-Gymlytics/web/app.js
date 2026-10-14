@@ -169,6 +169,61 @@ function closeDraft(id){
 function refreshActiveDraftTitle(){const tab=draftTabs.find(t=>t.id===activeDraftId);if(!tab)return;tab.title=getValue('e')||tab.title;showDraftTabs();}
 function resetExerciseTabs(){draftTabs=[];activeDraftId=null;draftSeq=0;newDraft(false);}
 function hasSeriesData(){return getEntries().length>0}
+/* Una sola tarjeta por catálogo: selector y total visibles, edición y alta desplegables. */
+function setupCatalogCompact(){
+ const holder=document.querySelector('.catalog-independent');
+ if(!holder||holder.dataset.compactReady)return;
+ holder.dataset.compactReady='1';
+ const defs=[
+  {id:'addGymForm',select:'gymExistingSelect',total:'gymCount',label:'Gimnasios',symbol:'▣'},
+  {id:'addSiteForm',select:'siteExistingSelect',total:'siteCount',label:'Sedes',symbol:'⌖'},
+  {id:'addMachineForm',select:'machineExistingSelect',total:'machineCount',label:'Instrumentos / equipos',symbol:'⚙'},
+  {id:'addOptionForm',select:'optionExistingSelect',total:'optionCount',label:'AnotaciónV2 · Agarre · Técnica',symbol:'≡'}
+ ];
+ function makeCard(label,symbol,select,total,contents,insertAt){
+  const card=document.createElement('section');card.className='catalog-compact-card';
+  const bar=document.createElement('div');bar.className='catalog-compact-bar';
+  const heading=document.createElement('strong');heading.className='catalog-compact-label';
+  const glyph=document.createElement('span');glyph.className='catalog-compact-symbol';glyph.textContent=symbol;
+  const name=document.createElement('span');name.textContent=label;heading.append(glyph,name);
+  const picker=select?.closest('label')||null;
+  if(picker){picker.classList.add('catalog-compact-picker');bar.append(heading,picker)}
+  else bar.append(heading);
+  const count=total||document.createElement('span');count.classList.add('catalog-total');bar.append(count);
+  const add=document.createElement('button');add.type='button';add.className='catalog-compact-toggle';add.textContent='＋';add.setAttribute('aria-label','Agregar o modificar '+label);
+  const detail=document.createElement('div');detail.className='catalog-compact-detail';detail.hidden=true;detail.id='catalogManage'+label.replace(/[^a-z]/gi,'');
+  add.setAttribute('aria-controls',detail.id);add.setAttribute('aria-expanded','false');
+  add.addEventListener('click',()=>{detail.hidden=!detail.hidden;add.setAttribute('aria-expanded',String(!detail.hidden));add.textContent=detail.hidden?'＋':'−';if(!detail.hidden)detail.querySelector('input:not([type=hidden])')?.focus()});
+  bar.append(add);card.append(bar,detail);
+  for(const item of contents)if(item)detail.append(item);
+  insertAt.append(card);
+  return card;
+ }
+ for(const d of defs){
+  const form=$(d.id),select=$(d.select),count=$(d.total),heading=form?.querySelector('h3');
+  if(!form||!select||!count)continue;
+  heading?.remove();
+  makeCard(d.label,d.symbol,select,count,[form],holder);
+ }
+ const exercise=$('catalogForm'),exerciseSel=$('exerciseExistingSelect'),exerciseCount=$('exerciseCount');
+ if(exercise&&exerciseSel&&exerciseCount){
+  const editing=document.querySelector('.catalog-exercise-selector');
+  document.querySelector('.catalog-create>h3')?.remove();
+  makeCard('Ejercicios','▣',exerciseSel,exerciseCount,[editing,exercise,$('catalogEntries')],holder);
+ }
+ const muscle=document.querySelector('.catalog-muscles');
+ if(muscle){
+  const select=$('muscleExistingSelect'),count=$('muscleCount'),head=muscle.querySelector('h3');
+  const card=document.createElement('section');card.className='catalog-compact-card catalog-compact-readonly';
+  const bar=document.createElement('div');bar.className='catalog-compact-bar';
+  bar.innerHTML='<strong class="catalog-compact-label"><span class="catalog-compact-symbol">◈</span><span>Músculos</span></strong>';
+  const label=select?.previousElementSibling;if(label)label.remove();
+  if(select){select.classList.add('catalog-muscle-select');bar.append(select)}
+  if(count)bar.append(count);
+  const note=document.createElement('span');note.className='catalog-readonly-note';note.textContent='Consulta';
+  bar.append(note);card.append(bar);muscle.replaceWith(card);head?.remove();
+ }
+}
 function populateCatalogSelect(selectId,items,labelFn){
  const select=$(selectId);if(!select)return;
  const selected=select.value;
@@ -535,7 +590,7 @@ document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEve
  finally{button.disabled=false;}
 }));
 document.addEventListener('click',e=>{const detail=e.target.closest('[data-history-detail]');if(detail){expandedHistoryId=expandedHistoryId===detail.dataset.historyDetail?null:detail.dataset.historyDetail;drawHistory();return;}const b=e.target.closest('[data-delete]');if(b){deleteRecord(b.dataset.delete);return;}const progress=e.target.closest('[data-progress]');if(progress){const exercise=progress.dataset.progress;showPage('dashboard');if(model.records.some(r=>r.exercise===exercise)){$('progressExercise').value=exercise;drawProgressChart(model.records);}}})}
-$('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();install();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+$('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();setupCatalogCompact();install();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
 // Vista anatómica 2D; visor 3D reservado hasta conectar un modelo real.
