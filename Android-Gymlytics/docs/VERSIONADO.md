@@ -5,7 +5,7 @@ Ejemplos de mantenimiento: `01.01` → `01.02` → `01.03` → `01.04`.
 Al pasar a una etapa principal: `02.01` → `02.02` (no `02.00`).
 
 ## Versión vigente
-**01.03 — Pruebas Android** (11/10/2026).
+**01.04 — Pruebas Android** (14/10/2026).
 
 La APK original `Gymlytics-v0.1.3-Pruebas-debug.apk` se distribuyó inicialmente con una denominación ajena a este formato.
 Se corrigió el **nombre externo de distribución**, sin alterar ni recompilar sus bytes, a `Gymlytics_01.03_Pruebas.apk`.
@@ -18,4 +18,4 @@ Su versión **interna** todavía corresponde a la generación anterior; el cambi
 4. Incrementar la subversión solo cuando haya una nueva entrega; reiniciarla en `01` al cambiar de etapa principal.
 5. Mantener la rama `main` intacta y no integrar el modelo humano 3D hasta nueva autorización.
 
-> Esta actualización solo formaliza la nomenclatura. No se inició una nueva compilación.
+> Se autorizó compilar la entrega 01.04 desde `apk/pruebas`. VersionCode 4 y versionName 01.04. Dashboard avanzado se mantiene pospuesto.
