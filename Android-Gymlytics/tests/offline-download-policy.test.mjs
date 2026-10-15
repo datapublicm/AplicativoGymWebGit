@@ -27,6 +27,7 @@ const catalogue=()=>prepareDownloadedCatalog({
  gyms:[{id:'g1',nombre:'Evolution'}],sites:[{id:'s1',gimnasio_id:'g1',nombre:'VES'}],
  machines:[{id:'m1',nombre:'Máquina de remo',tipo_equipo:'Máquina'}],
  options:[{id:'t1',tipo:'tecnica',nombre:'02 - Controlado (3-5 seg)'}],
+ muscles:[{id:'mus-1',nombre:'Dorsal ancho',activo:true}],
  exercises:[{id:'e1',nombre:'Remo',gimnasio_id:'g1',sede_id:'s1',
   instrumento:'Máquina de remo',tecnica_actualizada:'02 - Controlado (3-5 seg)'}]
 });
@@ -63,6 +64,7 @@ test('La descarga convierte todos los catálogos y conserva la técnica con segu
  assert.equal(c.entities.sites[0].nombre,'VES');
  assert.equal(c.entities.options[0].tipo,'tecnica');
  assert.equal(c.baseCatalog.length,1);
+ assert.equal(c.muscles.length,1);
  assert.equal(c.baseCatalog[0].t[0],'02 - Controlado (3-5 seg)');
  assert.equal(c.custom[0].e,'Remo');
 });
@@ -82,6 +84,7 @@ test('Descargar cuenta personal: catálogo y series son visibles en el perfil lo
  const data=h.read();assert.equal(h.writes(),1);
  assert.equal(data.records.length,1);assert.equal(data.entities.gyms.length,1);
  assert.equal(data.custom.length,1);assert.equal(data.baseCatalog.length,1);
+ assert.equal(data.muscles.length,1);
  assert.equal(data.readOnly,false);assert.equal(data.cloudUserId,uid);
 }));
 test('Descargar cuenta de prueba: todos los datos se conservan en consulta, sin edición',async()=>online(async()=>{
