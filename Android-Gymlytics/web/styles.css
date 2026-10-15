@@ -892,3 +892,30 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
  #page-registro .registro-series-panel .series-table th{font-size:8px!important}
  #page-registro .registro-compact-panel .split-choice-list{grid-template-columns:1fr}
 }
+
+
+/* Ajuste final de densidad: Registro debe mostrar tabla y acciones cuanto antes. */
+#page-registro .registro-compact-panel{padding:8px!important;margin-bottom:6px!important}
+#page-registro .registro-field-grid{column-gap:8px;row-gap:5px!important}
+#page-registro .registro-field-grid>.field{gap:2px!important}
+#page-registro .registro-field-grid .field>select,
+#page-registro .registro-field-grid label.field select{
+ min-height:32px!important;height:32px!important;padding:3px 6px!important;font-size:11px!important
+}
+#page-registro .registro-secondary-control{margin-top:0}
+#page-registro .registro-secondary-control summary{font-size:8px;line-height:1.15}
+#page-registro .registro-subdiv-button .subdivision-toggle{min-height:32px!important;height:32px!important;font-size:9.5px!important}
+#page-registro .registro-compact-panel .registro-details-extra{margin-top:3px}
+#page-registro .registro-table-head{margin-bottom:4px}
+#page-registro .registro-series-panel .series-table td{height:37px!important;padding:2px!important}
+#page-registro .registro-series-panel .series-table input,
+#page-registro .registro-series-panel .series-table select{height:28px!important;min-height:28px!important}
+#page-registro .registro-series-panel .series-table th{padding:6px 2px!important}
+#page-registro .registro-series-actions{margin-top:5px}
+#page-registro .registro-add-serie{min-height:34px!important}
+#page-registro .registro-series-panel .observations{padding-top:4px}
+#page-registro .registro-series-panel .observations textarea{min-height:35px!important;height:35px!important}
+#page-registro .registro-series-panel .save-row{margin-top:6px!important}
+@media(max-width:760px){
+ #page-registro .registro-field-grid{row-gap:5px!important}
+}
