@@ -1,4 +1,4 @@
-# Compilación 01.06 autorizada por el usuario el 2026-10-15; push exclusivo de este workflow para iniciarla.
+# Compilación 01.06 autorizada por el usuario el 2026-10-15; segunda ejecución con prueba preflight actualizada.
 # Instalación paralela a 01.05, sin reemplazarla ni tocar main.
 name: Gymlytics - APK 01.06 Pruebas (instalación paralela)
 on:
