@@ -22,6 +22,7 @@ jobs:
           node --check web/app.js
           node --check web/auth-cloud.js
           node --check web/offline-first.js
+          node --check web/profile-policy.js
           node --check web/cloud-sync.js
           node --check web/sync-engine.js
           node --check web/catalogo.js
