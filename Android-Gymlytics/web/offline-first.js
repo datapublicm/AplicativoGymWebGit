@@ -409,13 +409,19 @@ function renderConflictButtons(){
  holder.replaceChildren();
  for(const c of latest?.data?.conflicts||[]){
   const box=document.createElement('div');box.className='offline-conflict';
-  const title=document.createElement('p');title.textContent='Conflicto · '+c.sourceKey;
+  const title=document.createElement('p');title.textContent=(c.kind==='legacy_unversioned'?'Alerta de cliente antiguo · ':'Conflicto de versiones · ')+c.sourceKey;
   const local=document.createElement('button');local.type='button';local.textContent='Conservar este dispositivo';
   const cloud=document.createElement('button');cloud.type='button';cloud.textContent='Usar datos de la nube';
   const action=async choice=>{
    try{await syncController.resolve(remoteSession?.user?.id,stamp(),c.sourceKey,choice);}
    catch(e){status('Error de conflicto: '+e.message)}
   };
+  if(c.kind==='legacy_unversioned'){
+   const warning=document.createElement('p');
+   warning.textContent=c.message||'Este cambio se realizó con una versión antigua. No se sobrescribirán datos.';
+   local.disabled=true;cloud.disabled=true;
+   box.append(title,warning);holder.append(box);continue;
+  }
   local.addEventListener('click',()=>action('local'));
   cloud.addEventListener('click',()=>action('cloud'));
   box.append(title,local,cloud);holder.append(box);
