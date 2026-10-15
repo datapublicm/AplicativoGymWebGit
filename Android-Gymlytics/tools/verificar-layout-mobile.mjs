@@ -91,7 +91,7 @@ async function check(width,page){
   const folder=resolve(root,'../mobile-check');mkdirSync(folder,{recursive:true});
   const openShot=await request('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
   writeFileSync(join(folder,'gymlytics-catalogos-editor-390.png'),Buffer.from(openShot.data,'base64'));
-  await request('Runtime.evaluate',{expression:'window.scrollTo({top:0,behavior:"instant"});document.scrollingElement.scrollTop=0;',returnByValue:true});
+  await request('Runtime.evaluate',{expression:'document.querySelector("[data-catalog-kind=grip] .catalog-compact-toggle").click();window.scrollTo({top:0,behavior:"instant"});document.scrollingElement.scrollTop=0;',returnByValue:true});
  }
  if((width===320&&page==='dashboard')||(width===390&&['registro-series','catalogos','tablas'].includes(page))){
   const path=resolve(root,'../mobile-check');mkdirSync(path,{recursive:true});
