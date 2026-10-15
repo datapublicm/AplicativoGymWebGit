@@ -149,7 +149,7 @@ function openDraft(id,saveCurrent=true){
   row.querySelector('select').value=v.unit;row.querySelector('.weight').value=v.weight;
   row.querySelector('.reps').value=v.reps;row.querySelector('.help').value=v.help;
  }
- updateSeriesCount();showDraftTabs();updateRecordDate();
+ updateSeriesCount();showDraftTabs();if(typeof updateRecordDate==='function')updateRecordDate();
  setMobileStep(tab.stage||'context');
 }
 function newDraft(saveCurrent=true){
