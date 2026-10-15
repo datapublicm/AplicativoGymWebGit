@@ -41,3 +41,12 @@
 - `npm run build:web`
 - `node tools/verificar-integridad-offline.mjs` (requiere `dist` y Chrome/Chromium)
 - No ejecutar `android:sync`, Gradle ni workflow de compilación APK sin autorización.
+
+## Preparación posterior: compatibilidad y paquete paralelo
+
+- Se añadió `web/legacy-compat.js` para **detectar modificaciones y eliminaciones hechas por clientes antiguos** en `vw_historial_series`. Cuando esas operaciones no disponen de versión compatible, se bloquea su resolución automática y se exige actualización de los clientes antes de conciliar. No se modificó `tbl_series`.
+- Un historial recibido mediante el espejo conserva una línea base del historial heredado para evitar falsos conflictos en descargas sucesivas.
+- Se preparó `.github/workflows/compilar-gymlytics-01.06-pruebas.yml` como **ejecución exclusivamente manual**. Generará `com.datapublicm.gymlytics.pruebas` en paralelo con la instalación 01.05, preservando su información y sin reemplazar `Android-Gymlytics`.
+- No se ha verificado la actualización del paquete original 01.05 a 01.06: la firma de depuración del 01.05 no está documentada como reutilizable, por lo que una actualización directa podría ser rechazada. No prometer actualización in situ sin una firma compatible.
+- Queda pendiente probar en dispositivo físico la entrega paralela y, con usuarios exclusivamente de prueba, la vinculación real de cuentas, el RPC y la reconciliación entre web y Android.
+- La transferencia de catálogos y fotografías sigue pendiente; esas operaciones deben mostrarse como locales.
