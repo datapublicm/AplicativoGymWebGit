@@ -69,7 +69,7 @@ export function mergeDownload(data,remoteRows){
      kind:'concurrent_change'});
    continue;
   }
-  if(removed.has(key))continue;
+  if(conflicts.has(key)||removed.has(key))continue;
   if(remote.deleted){
    if(current){records.splice(records.indexOf(current),1);hidden++}
    deleted.push({syncKey:key,remoteId:key.startsWith('legacy:')?key.slice(7):null,
