@@ -2,12 +2,13 @@ import {sourceKey,remoteToRow,planUpload,mergeDownload,acknowledge} from './sync
 
 // Adaptador de red sin sincronización automática. Las mutaciones se confirman
 // primero en IndexedDB y los conflictos requieren decisión humana.
-export function createCloudSync({remote,getState,mutate,refresh,isCurrent,confirmAction,notify}){
+export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLinkedElsewhere,confirmAction,notify}){
  let busy=false;
  const isBusy=()=>busy;
  function validate(uid,stamp){
   if(!uid||!isCurrent(uid,stamp))throw Error('Cambió la cuenta o el perfil');
   const {data}=getState();
+  if(isLinkedElsewhere?.(uid))throw Error('Esta cuenta ya pertenece a otro perfil local del dispositivo.');
   if(data.cloudUserId&&data.cloudUserId!==uid)
    throw Error('Este perfil está vinculado a otra cuenta. No se mezclará información.');
  }
