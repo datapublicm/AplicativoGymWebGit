@@ -34,6 +34,7 @@ jobs:
           node --check web/profile-policy.js
           node --check web/cloud-sync.js
           node --check web/sync-engine.js
+          node --check web/legacy-compat.js
       - name: Construir SOLO paquete web de pruebas
         run: npm run build:web
       - name: Verificar salida modular sin Android ni APK
@@ -43,6 +44,7 @@ jobs:
           test -s dist/profile-policy.js
           test -s dist/cloud-sync.js
           test -s dist/sync-engine.js
+          test -s dist/legacy-compat.js
           test -s dist/offline-first.js
           test -s dist/app.js
           test -n "$(find dist/assets -type f -name '*.js' -print -quit)"
