@@ -1014,3 +1014,16 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 #offlineLinkAccount{width:100%;min-height:45px;padding:9px;margin:10px 0 3px;border-color:#5c91b1;color:#c6f5ff}
 #offlineProfileCount{font-size:12px;color:#88ddf1;font-weight:700}
 @media(max-width:480px){.offline-rename-profile button{width:100%}}
+
+
+/* Perfiles de consulta: diferenciación visible y controles de descarga segura. */
+.offline-readonly-warning{margin:12px 0;padding:12px;border-radius:10px;
+ border:1px solid #d49e46;background:#3a2b203d;color:#ffd9a2;
+ font-weight:700;font-size:13px;line-height:1.55}
+.offline-readonly-warning[hidden]{display:none!important}
+.offline-sync-actions{display:grid;grid-template-columns:1fr;gap:10px}
+.offline-sync-actions button{width:100%;min-height:48px;white-space:normal;line-height:1.4}
+.offline-sync-actions button[hidden]{display:none!important}
+.offline-demo-download{border-color:#bf954b!important;color:#ffdca2!important;background:#271f1f!important}
+#page-catalogos button:disabled,#page-registro button:disabled{cursor:not-allowed;opacity:.55}
+.offline-profile-panel .offline-note,.auth-panel .offline-note{line-height:1.55}
