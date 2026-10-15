@@ -87,6 +87,12 @@ async function check(width,page){
   }
  }
  console.log('OK',width,page,'documento',d.documentWidth);
+ if(width===390&&page==='catalogos'){
+  const folder=resolve(root,'../mobile-check');mkdirSync(folder,{recursive:true});
+  const openShot=await request('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+  writeFileSync(join(folder,'gymlytics-catalogos-editor-390.png'),Buffer.from(openShot.data,'base64'));
+  await request('Runtime.evaluate',{expression:'window.scrollTo({top:0,behavior:"instant"});document.scrollingElement.scrollTop=0;',returnByValue:true});
+ }
  if((width===320&&page==='dashboard')||(width===390&&['registro-series','catalogos','tablas'].includes(page))){
   const path=resolve(root,'../mobile-check');mkdirSync(path,{recursive:true});
   const shot=await request('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
