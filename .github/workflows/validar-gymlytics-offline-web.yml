@@ -31,6 +31,7 @@ jobs:
       - name: Comprobar sintaxis antes del build web
         run: |
           node --check web/offline-first.js
+          node --check web/profile-policy.js
           node --check web/cloud-sync.js
           node --check web/sync-engine.js
       - name: Construir SOLO paquete web de pruebas
@@ -39,6 +40,7 @@ jobs:
         run: |
           test -s dist/index.html
           test -s dist/catalogo.js
+          test -s dist/profile-policy.js
           test -s dist/cloud-sync.js
           test -s dist/sync-engine.js
           test -s dist/offline-first.js
