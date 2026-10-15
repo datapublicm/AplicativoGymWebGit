@@ -81,7 +81,7 @@ test('Corte de Internet justo después de aplicar RPC: reintento no duplica ni m
  const originalNav=globalThis.navigator;
  Object.defineProperty(globalThis,'navigator',{value:{onLine:true},configurable:true});
  try{
-  h.cutAfterCommit();await assert.rejects(h.sync.upload(uid,'perfil-A'),/Timeout/);
+  h.cutAfterCommit();await assert.rejects(h.sync.upload(uid,'perfil-A'),err=>err?.message?.includes('Timeout'));
   assert.equal(h.read().pending.length,1);
   assert.equal(h.rows.get('local:'+original.id).version,1);
   const result=await h.sync.upload(uid,'perfil-A');
