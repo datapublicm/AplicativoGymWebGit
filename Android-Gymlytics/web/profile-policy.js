@@ -3,6 +3,7 @@
 export const profileMeta=p=>({
  id:p.id,name:p.name,modifiedAt:p.modifiedAt||null,
  cloudUserId:p.data?.cloudUserId||null,
+ readOnly:!!p.data?.readOnly,
  records:Number(p.data?.records?.length||0),
  pending:Number(p.data?.pending?.length||0)
 });
