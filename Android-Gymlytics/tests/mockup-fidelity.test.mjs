@@ -40,3 +40,17 @@ test('Se mantienen Tablas y Dashboard independientes, sin cambiar su vista',()=>
  assert.match(html,/id="page-dashboard"/);
  assert.match(html,/id="dash-resumen"/);
 });
+
+test('Catálogo deja claros los valores de referencia y los personales',()=>{
+ assert.match(app,/select\.title=select\.selectedOptions\?\.\[0\]\?\.textContent/);
+ assert.match(app,/Referencia: puedes consultarla, pero no modificarla ni eliminarla\./);
+ assert.match(app,/Elemento personal: puedes modificarlo o eliminarlo\./);
+ assert.match(app,/select\.value\.startsWith\('base:'\)/);
+});
+test('Pestañas múltiples mantienen borradores independientes sin tocar tablas históricas',()=>{
+ assert.match(app,/function storeActiveDraft\(/);
+ assert.match(app,/function snapshotExerciseRows\(/);
+ assert.match(app,/function openDraft\(/);
+ assert.match(app,/const rows=new Map\(\(tab\.rows\|\|\[\]\)/);
+ assert.match(html,/id="historyRecords"/);
+});
