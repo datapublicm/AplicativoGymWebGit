@@ -81,6 +81,7 @@ const get=async id=>{reads++;return {id,name:'Usuario B',data:{
 const all=async()=>[await get('B')];
 const profileMeta=p=>({id:p.id,name:p.name,cloudUserId:p.data.cloudUserId||null});
 const rotateCloudClient=()=>{rotations++;remoteSession=null};
+const structuredClone=x=>JSON.parse(JSON.stringify(x));
 const localStorage={setItem:(k,v)=>savedId=v};
 const invalidatePendingSave=()=>{},showHistoryLoadProgress=()=>{},setHistoryReady=()=>{};
 const catalogInit=()=>[],resetHistoryFilters=()=>{},resetExerciseTabs=()=>{},renderOwnCatalog=()=>{};
