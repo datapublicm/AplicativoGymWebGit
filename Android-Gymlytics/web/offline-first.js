@@ -83,7 +83,7 @@ function renderSyncStatus(){
 }
 function catalogInit(){
  // Nunca precargar datos de otro usuario: los perfiles nuevos empiezan vacíos.
- const source=latest?.data?.baseCatalog||[];
+ const source=Array.isArray(latest?.data?.baseCatalog)?latest.data.baseCatalog:[];
  return source.map(x=>({
   g:x.g,s:x.s,z:x.z,kind:x.kind,i:x.i,a:x.a,gr:x.gr,e:x.e,
   t:[...(x.t||[])],m:x.m,ms:x.ms,n:0,last:null
@@ -112,7 +112,7 @@ async function activate(id,initial=false){
   const p=await get(id);
   if(!p||epoch!==profileEpoch)throw Error('No se pudo abrir el nuevo perfil.');
   activeId=id;latest=p;profiles=(await all()).map(profileMeta);
-  $('offlineProfiles').replaceChildren(...profiles.map(x=>new Option(x.name,x.id)));
+  $('offlineProfiles').replaceChildren(...profiles.map(x=>new Option(x.readOnly?'🔒 '+x.name+' · prueba':x.name,x.id)));
   $('offlineProfiles').value=id;
   window.GymBaseCatalog=catalogInit();
   window.GymEntities=structuredClone(p.data.entities||EMPTY().entities);
@@ -173,7 +173,7 @@ async function renameProfile(){
  if(id!==activeId||epoch!==profileEpoch||transitioning)return;
  latest=profile;profiles=profiles.map(x=>x.id===profile.id?profileMeta(profile):x);
  const item=[...$('offlineProfiles').options].find(x=>x.value===profile.id);
- if(item)item.textContent=name;
+ if(item)item.textContent=latest?.data?.readOnly?'🔒 '+name+' · prueba':name;
  renderSyncStatus();renderProfileControls();
  status('Perfil renombrado sin modificar registros ni vínculos de nube.');
 }
@@ -357,7 +357,7 @@ function refreshCloudControls(){
  $('offlineCloudDownload').disabled=!linked||!!syncController?.isBusy();
  // No publicar modificaciones: todo el trabajo de esta versión se queda offline.
  $('offlineCloudUpload').hidden=true;$('offlineCloudUpload').disabled=true;
- $('offlineDemoDownload').disabled=!linked||!!syncController?.isBusy()||!!latest?.data?.readOnly;
+ $('offlineDemoDownload').disabled=!linked||!!syncController?.isBusy();
  $('authLogout').hidden=!linked;
 }
 function requireCloudIdentity(uid,ownerStamp,ownerClient=client){
