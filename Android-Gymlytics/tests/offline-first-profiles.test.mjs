@@ -20,6 +20,7 @@ const flush=async update=>update(latest.data);
 const catalogUpdate=()=>{};
 const snapshot=()=>structuredClone(latest.data);
 const activeId='local-uno',profileEpoch=1,window={GymBaseCatalog:[]};
+const stamp=()=>activeId+':'+profileEpoch;
 const catalogInit=()=>[];
 ${methods}
 ({save:entry=>api.saveWorkout(entry),remove:id=>api.deleteSeries(id),
