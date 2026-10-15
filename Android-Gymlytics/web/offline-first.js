@@ -323,10 +323,30 @@ const api={
 function refreshCloudControls(){
  const linked=!!remoteSession?.user&&!transitioning;
  $('offlineRemoteUser').textContent=linked?'Conectado: '+(remoteSession.user.email||remoteSession.user.id):'Sin sesión de nube';
+ $('offlineLinkAccount').disabled=!linked||!!syncController?.isBusy()||!!latest?.data?.cloudUserId;
+ $('offlineLinkAccount').textContent=latest?.data?.cloudUserId?'Perfil ya vinculado a esta cuenta':'Vincular este perfil con esta cuenta';
  $('offlineCloudDownload').disabled=!linked||!!syncController?.isBusy();
  $('offlineCloudUpload').disabled=!linked||!!syncController?.isBusy()||
   !(latest?.data?.pending||[]).some(x=>['create_series','delete_series','update_series'].includes(x.kind));
  $('authLogout').hidden=!linked;
+}
+function requireCloudIdentity(uid,ownerStamp,ownerClient=client){
+ if(ownerStamp!==stamp()||ownerClient!==client||!uid||transitioning)
+  throw Error('Cambiaste de perfil durante la autenticación.');
+ validateProfileBinding(profiles,activeId,uid);
+}
+async function linkAccount(){
+ const user=remoteSession?.user;
+ if(!user)throw Error('Inicia sesión en la nube primero.');
+ requireCloudIdentity(user.id,stamp());
+ if(latest?.data?.cloudUserId===user.id)return status('Perfil ya vinculado a esta cuenta.');
+ if(!confirm('¿Vincular '+latest.name+' con esta cuenta? No se subirán ni descargarán datos automáticamente. La asociación permanecerá en este perfil.'))return;
+ await flush(data=>{
+  validateProfileBinding(profiles,activeId,user.id);
+  data.cloudUserId=user.id;
+ });
+ renderSyncStatus();refreshCloudControls();
+ status('Cuenta vinculada. Las series permanecen locales hasta que solicites sincronización.');
 }
 async function provisionGymlyticsAccount(ownerStamp){
  if(!remote)throw Error('No está configurada la base de datos');
@@ -336,16 +356,16 @@ async function provisionGymlyticsAccount(ownerStamp){
  if(!data?.activo)throw Error('La cuenta Gymlytics está desactivada; no se reactivó automáticamente.');
 }
 async function cloudLogin(email,password,register=false){
- const ownerStamp=stamp();
+ const ownerStamp=stamp(),ownerClient=client;
  if(!client)throw Error('No hay conexión de Supabase configurada');
  if(!navigator.onLine)throw Error('Sin conexión a Internet. Tus registros locales siguen disponibles');
  if(!register&&!email.includes('@')){
-  const {data,error}=await client.functions.invoke('gymlytics-login-usuario',{body:{username:email,password}});
+  const {data,error}=await ownerClient.functions.invoke('gymlytics-login-usuario',{body:{username:email,password}});
   if(error)throw error;
   if(!data?.access_token||!data?.refresh_token)throw Error(data?.error||'Nombre de usuario o contraseña inválidos');
-  const set=await client.auth.setSession({access_token:data.access_token,refresh_token:data.refresh_token});
+  const set=await ownerClient.auth.setSession({access_token:data.access_token,refresh_token:data.refresh_token});
   if(set.error)throw set.error;
-  if(ownerStamp!==stamp())throw Error('Cambiaste de perfil durante la autenticación.');
+  requireCloudIdentity(set.data.session?.user?.id,ownerStamp,ownerClient);
   remoteSession=set.data.session;
   await provisionGymlyticsAccount(ownerStamp);
   refreshCloudControls();
@@ -353,13 +373,13 @@ async function cloudLogin(email,password,register=false){
   return;
  }
  if(register&&(!email.includes('@')||password.length<6))throw Error('Para registrarte, introduce un correo válido y contraseña de al menos 6 caracteres.');
- const result=register?await client.auth.signUp({email,password}):await client.auth.signInWithPassword({email,password});
+ const result=register?await ownerClient.auth.signUp({email,password}):await ownerClient.auth.signInWithPassword({email,password});
  if(result.error)throw result.error;
  if(register&&!result.data.session){
   status('Revisa tu correo para confirmar la cuenta. Tu perfil local no se modificó.');
   return;
  }
- if(ownerStamp!==stamp())throw Error('Cambiaste de perfil durante la autenticación.');
+ requireCloudIdentity(result.data.session?.user?.id,ownerStamp,ownerClient);
  remoteSession=result.data.session;
  if(!remoteSession?.user)throw Error('No se obtuvo la sesión de la nube');
  await provisionGymlyticsAccount(ownerStamp);
@@ -467,6 +487,9 @@ async function init(){
   catch(error){status('No se pudo registrar: '+error.message)}
   finally{$('authPassword').value=''}
  });
+ $('offlineLinkAccount').addEventListener('click',async()=>{
+  try{await linkAccount()}catch(error){status('No se pudo vincular: '+error.message)}
+ });
  $('offlineCloudUpload').addEventListener('click',async()=>{
   const button=$('offlineCloudUpload');button.disabled=true;
   try{await remoteAction('upload')}catch(e){status('Subida no completada: '+e.message+'. Los registros siguen locales.')}
@@ -478,7 +501,7 @@ async function init(){
   finally{button.disabled=false;refreshCloudControls()}
  });
  $('authLogout').addEventListener('click',async()=>{
-  if(client)await client.auth.signOut();remoteSession=null;refreshCloudControls();
+  rotateCloudClient();refreshCloudControls();
   status('Sesión de nube cerrada. Todos los registros locales siguen disponibles.');
  });
  // Las credenciales nunca se conservan al alternar perfiles.
