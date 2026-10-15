@@ -85,7 +85,13 @@ try{
  assert.equal(await evaluate('document.querySelector("#authForm")!==null'),true);
  assert.equal(await evaluate('document.body.classList.contains("auth-locked")'),false);
  assert.equal(await evaluate('document.querySelector("#offlineProfiles").options.length'),1);
- console.log('PASS 1: instalación web sin login y perfil creado automáticamente');
+ assert.equal(await evaluate('(window.GymBaseCatalog||[]).length'),0,'Un perfil nuevo no importa datos de ningún Excel');
+ assert.equal(await evaluate('(window.GymCustomCatalog||[]).length'),0);
+ assert.equal(await evaluate('(window.GymEntities?.gyms||[]).length'),0);
+ assert.equal(await evaluate('model.records.length'),0,'Tablas y Dashboard empiezan vacíos');
+ assert.equal(await evaluate('document.querySelector("#offlineCloudUpload").hidden'),true);
+ assert.equal(await evaluate('!!document.querySelector("#offlineDemoDownload")'),true);
+ console.log('PASS 1: instalación web vacía, sin login, sin catálogo ajeno ni subida automática');
 
  await until('navigator.serviceWorker?.ready.then(()=>true).catch(()=>false)','registro Service Worker');
  // Online=false no puede disparar subidas, pero permite entradas offline en IndexedDB.
@@ -167,7 +173,39 @@ try{
   beforeUpdate.map(p=>({id:p.id,records:p.records.length,tombstones:p.tombstones.length})));
  console.log('PASS 8: actualización de recursos web sin destruir perfiles ni lápidas');
 
- console.log('8 escenarios Chromium+IndexedDB reales superados, sin compilar ni desplegar APK.');
+ // Un perfil de prueba descargado debe bloquear escrituras sin ocultar sus datos.
+ await evaluate(`(async()=>{
+  const req=indexedDB.open('gymlytics_offline_profiles_v1',1);
+  const database=await new Promise((ok,fail)=>{req.onsuccess=()=>ok(req.result);req.onerror=()=>fail(req.error)});
+  const tx=database.transaction('profiles','readwrite');
+  tx.objectStore('profiles').put({
+   id:'perfil-demo-chrome',name:'Cuenta prueba',modifiedAt:new Date().toISOString(),
+   data:{records:[{id:'demo-serie-1',date:'2026-10-15',gym:'G',sede:'S',exercise:'Remo',technique:'Base',
+    series:'Serie 1',subdivision:'-',weight:80,reps:10,unit:'kg'}],photos:{},baseCatalog:[],muscles:[],
+    entities:{gyms:[],sites:[],machines:[],options:[]},library:[],custom:[],
+    pending:[],tombstones:[],conflicts:[],readOnly:true,demo:true,cloudUserId:null}
+  });
+  await new Promise((ok,fail)=>{tx.oncomplete=ok;tx.onerror=()=>fail(tx.error)});
+  database.close();return true;
+ })()`);
+ await navigate(url);
+ await until('document.querySelector("#offlineProfiles").options.length===3','cuenta demo aislada');
+ await evaluate(`(()=>{const x=document.querySelector('#offlineProfiles');
+  x.value='perfil-demo-chrome';x.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
+ await until('!window.GymCloud?.canWrite?.()&&model.records.length===1','cuenta de prueba solo lectura');
+ assert.equal(await evaluate('document.querySelector("#saveRecords").disabled'),true);
+ assert.equal(await evaluate('document.querySelector("#offlineReadOnlyWarning").hidden'),false);
+ assert.equal(await evaluate('model.records[0].weight'),80);
+ const blocked=await evaluate('window.GymCloud.saveWorkout('+JSON.stringify(workout('2026-10-15',200))+').then(()=>false,e=>/solo lectura/.test(e.message))');
+ assert.equal(blocked,true);
+ await navigate(url);await until('window.GymCloud?.canWrite?.()','se mantiene perfil personal al reiniciar');
+ await evaluate(`(()=>{const x=document.querySelector('#offlineProfiles');
+  x.value='perfil-demo-chrome';x.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
+ await until('!window.GymCloud?.canWrite?.()','perfil prueba sigue bloqueado');
+ assert.equal((await db()).find(x=>x.name==='Cuenta prueba').records.length,1);
+ console.log('PASS 9: demostración solo lectura mantiene registros offline e impide guardar series');
+
+ console.log('9 escenarios Chromium+IndexedDB reales superados, sin compilar ni desplegar APK.');
 }finally{
  try{await cd('Network.emulateNetworkConditions',{offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1})}catch{}
  try{ws?.close()}catch{}
