@@ -10,6 +10,18 @@ function copyPreviewAssets(){return {name:'copy-gymlytics-assets',closeBundle(){
   const from=path.join(here,'web',directory),to=path.join(here,'dist',directory);
   fs.cpSync(from,to,{recursive:true,force:true});
  }
+ // Incluir en la caché inicial los bundles con hash generados por Vite.
+ // De otro modo, tras instalar y perder Internet antes del segundo arranque
+ // IndexedDB seguiría intacta, pero no se podría ejecutar la interfaz.
+ const dist=path.join(here,'dist'),assetDir=path.join(dist,'assets');
+ const chunks=fs.readdirSync(assetDir).filter(name=>/\\.(js|css)$/.test(name))
+  .map(name=>'./assets/'+name);
+ if(!chunks.length||!chunks.some(name=>name.endsWith('.js')))
+  throw Error('No se generaron scripts aptos para el funcionamiento offline');
+ const swPath=path.join(dist,'sw.js'),worker=fs.readFileSync(swPath,'utf8');
+ if(!worker.includes('const STATIC_URLS='))throw Error('No se encontró el manifiesto del Service Worker');
+ fs.writeFileSync(swPath,worker.replace('const STATIC_URLS=',
+  'ASSETS.push(...'+JSON.stringify(chunks)+');\nconst STATIC_URLS='));
  // No entregar otra APK con una interfaz distinta a la aprobada en apk/pruebas.
  const page=fs.readFileSync(path.join(here,'dist','index.html'),'utf8');
  for(const marker of ['gym-mock-header','mockup-catalog','catalogCompactRows','registro-compact-panel','exerciseTabs','seriesRows','dash-resumen']){
