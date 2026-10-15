@@ -149,7 +149,7 @@ function openDraft(id,saveCurrent=true){
   row.querySelector('select').value=v.unit;row.querySelector('.weight').value=v.weight;
   row.querySelector('.reps').value=v.reps;row.querySelector('.help').value=v.help;
  }
- updateSeriesCount();showDraftTabs();
+ updateSeriesCount();showDraftTabs();updateRecordDate();
  setMobileStep(tab.stage||'context');
 }
 function newDraft(saveCurrent=true){
@@ -262,6 +262,40 @@ function catalogOpenCard(kind,action='add'){
   const field=detail.querySelector('[id$="EditName"]');field?.focus();
  }
  detail.scrollIntoView?.({block:'nearest'});
+}
+/* Encabezados del mockup y acciones funcionales; no altera los datos guardados. */
+function updateRecordDate(){
+ const input=$('fecha'),display=$('recordDateDisplay');
+ if(!input||!display)return;
+ const date=input.value?new Date(input.value+'T12:00:00'):null;
+ display.textContent=date&&!Number.isNaN(date.getTime())?new Intl.DateTimeFormat('es-PE',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(date).replace(/^./,x=>x.toUpperCase()):'Selecciona una fecha';
+}
+function setupMockupHeaders(){
+ const searchBtn=$('catalogSearchToggle'),searchPanel=$('catalogSearchPanel'),searchInput=$('catalogSearchInput');
+ const menuBtn=$('catalogMenuToggle'),menuPanel=$('catalogMenuPanel');
+ const actions=document.querySelector('#page-catalogos .catalog-main-actions');
+ if(actions&&menuPanel)menuPanel.append(actions);
+ searchBtn?.addEventListener('click',()=>{
+  searchPanel.hidden=!searchPanel.hidden;searchBtn.setAttribute('aria-expanded',String(!searchPanel.hidden));
+  if(!searchPanel.hidden)searchInput?.focus();
+  else {if(searchInput)searchInput.value='';filterCatalogSearch('');}
+ });
+ menuBtn?.addEventListener('click',()=>{menuPanel.hidden=!menuPanel.hidden;menuBtn.setAttribute('aria-expanded',String(!menuPanel.hidden));});
+ searchInput?.addEventListener('input',()=>filterCatalogSearch(searchInput.value));
+ $('fecha')?.addEventListener('change',updateRecordDate);
+ updateRecordDate();
+}
+function filterCatalogSearch(text){
+ const needle=catalogNorm(text);
+ let found=0;
+ document.querySelectorAll('#catalogCompactRows .catalog-compact-card').forEach(card=>{
+  const kind=card.dataset.catalogKind,label=card.querySelector('.catalog-compact-label')?.textContent||'';
+  const match=!needle||catalogNorm(label).includes(needle)||catalogChoices(kind).some(x=>catalogNorm(x.name).includes(needle));
+  card.hidden=!match;if(match)found++;
+ });
+ const status=$('catalogStatus');
+ if(status&&needle)status.textContent=found+' categorías coincidentes';
+ else if(status&&status.textContent?.includes('categorías coincidentes'))status.textContent='';
 }
 function setupCatalogCompact(){
  const holder=$('catalogCompactRows');
@@ -720,7 +754,7 @@ document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEve
  finally{button.disabled=false;}
 }));
 document.addEventListener('click',e=>{const detail=e.target.closest('[data-history-detail]');if(detail){expandedHistoryId=expandedHistoryId===detail.dataset.historyDetail?null:detail.dataset.historyDetail;drawHistory();return;}const b=e.target.closest('[data-delete]');if(b){deleteRecord(b.dataset.delete);return;}const progress=e.target.closest('[data-progress]');if(progress){const exercise=progress.dataset.progress;showPage('dashboard');if(model.records.some(r=>r.exercise===exercise)){$('progressExercise').value=exercise;drawProgressChart(model.records);}}})}
-$('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();setupCatalogCompact();install();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+$('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();setupCatalogCompact();setupMockupHeaders();install();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
 // Vista anatómica 2D; visor 3D reservado hasta conectar un modelo real.
