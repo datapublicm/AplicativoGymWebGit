@@ -438,10 +438,39 @@ function renderOwnCatalog(){
 
 function changeSeriesMode(mode){if(!['normal','sub','lateral'].includes(mode))return;if(mode!==seriesMode&&hasSeriesData()&&!confirm('Cambiar el tipo de subdivisión borrará los valores aún no guardados. ¿Continuar?'))return;seriesMode=mode;if(!seriesCustomized)seriesGroups=mode==='normal'?4:3;renderSeries();$('splitOptions').hidden=true;$('toggleSubdivisions').setAttribute('aria-expanded','false');$('resetSubdivisions').hidden=mode==='normal'}
 function resizeSeries(delta){const next=Math.max(1,Math.min(12,seriesGroups+delta));if(next===seriesGroups)return;if(delta<0&&[...$('seriesRows').querySelectorAll('tr')].slice(-1*(seriesMode==='normal'?1:2)).some(row=>[...row.querySelectorAll('input')].some(i=>i.value.trim()))&&!confirm('La última serie tiene datos sin guardar. ¿Quitarla?'))return;seriesGroups=next;seriesCustomized=true;renderSeries(true)}
+
+function refreshRegistroSelectors(){
+ const count=$('registroNumeroSerie'),mode=$('registroModoSubdivision'),type=$('registroTipoLabel');
+ if(type)type.textContent=getValue('kind')||'No especificado';
+ if(mode)mode.value=seriesMode;
+ if(count){
+  const old=count.value;count.replaceChildren();
+  for(let n=1;n<=seriesGroups;n++)count.add(new Option('Serie '+n,String(n)));
+  count.value=Number(old)>0&&Number(old)<=seriesGroups?old:'1';
+ }
+}
+function installRegistroCompact(){
+ const seriesSelect=$('registroNumeroSerie'),mode=$('registroModoSubdivision'),rows=$('seriesRows');
+ seriesSelect?.addEventListener('change',()=>{
+  const target=[...rows.querySelectorAll('tr')].find(r=>r.dataset.serie==='Serie '+seriesSelect.value);
+  if(target){target.scrollIntoView({block:'center',behavior:'smooth'});target.querySelector('.weight')?.focus({preventScroll:true});}
+ });
+ mode?.addEventListener('change',()=>{changeSeriesMode(mode.value);mode.value=seriesMode;});
+ rows?.addEventListener('click',event=>{
+  const clear=event.target.closest('.registro-row-clear');if(!clear)return;
+  const row=clear.closest('tr');if(!row)return;
+  for(const input of row.querySelectorAll('input.entry'))input.value='';
+  updateSeriesCount();
+  toast('Valores de '+row.dataset.serie+(row.dataset.sub==='-'?'':' · '+row.dataset.sub)+' limpiados');
+ });
+ document.querySelectorAll('input[name="tipo"]').forEach(r=>r.addEventListener('change',refreshRegistroSelectors));
+ refreshRegistroSelectors();
+}
+
 function renderSeries(preserve=false){const retained=preserve?new Map([...$('seriesRows').querySelectorAll('tr')].map(row=>[row.dataset.serie+'|'+row.dataset.sub,{unit:row.querySelector('select')?.value||'kg',weight:row.querySelector('.weight')?.value||'',reps:row.querySelector('.reps')?.value||'',help:row.querySelector('.help')?.value||''}])):new Map();const subs=seriesMode==='normal'?['-']:seriesMode==='sub'?['Sub1','Sub2']:['Derecha','Izquierda'];const rows=[];
- for(let n=1;n<=seriesGroups;n++){const label=`Serie ${n}`;subs.forEach((sub,index)=>{const v=retained.get(label+'|'+sub)||{};const tag=label+(sub==='-'?'':' · '+sub);rows.push(`<tr class="${index===0?'group-start ':''}" data-serie="${esc(label)}" data-sub="${esc(sub)}">${index===0?`<td class="series-name" rowspan="${subs.length}">${esc(label)}</td>`:''}${seriesMode!=='normal'?`<td class="division division-col">${esc(sub)}</td>`:''}<td class="unit-cell"><select aria-label="Unidad, ${esc(tag)}"><option${v.unit==='kg'||!v.unit?' selected':''}>kg</option><option${v.unit==='lb'?' selected':''}>lb</option></select></td><td class="number-cell"><input class="entry weight" type="number" min="0" step="any" inputmode="decimal" placeholder="—" value="${esc(v.weight||'')}" aria-label="Peso, ${esc(tag)}"></td><td class="number-cell"><input class="entry reps" type="number" min="0" step="any" inputmode="decimal" placeholder="—" value="${esc(v.reps||'')}" aria-label="Repeticiones, ${esc(tag)}"></td><td class="number-cell"><input class="entry help" type="number" min="0" step="any" inputmode="decimal" placeholder="—" value="${esc(v.help||'')}" aria-label="Asistencias, ${esc(tag)}"></td></tr>`)});}
+ for(let n=1;n<=seriesGroups;n++){const label=`Serie ${n}`;subs.forEach((sub,index)=>{const v=retained.get(label+'|'+sub)||{};const tag=label+(sub==='-'?'':' · '+sub);rows.push(`<tr class="${index===0?'group-start ':''}" data-serie="${esc(label)}" data-sub="${esc(sub)}">${index===0?`<td class="series-name" rowspan="${subs.length}">${esc(label)}</td>`:''}${seriesMode!=='normal'?`<td class="division division-col">${esc(sub)}</td>`:''}<td class="registro-weight-cell"><div class="registro-weight-wrap"><input class="entry weight" type="number" min="0" step="any" inputmode="decimal" placeholder="—" value="${esc(v.weight||'')}" aria-label="Peso, ${esc(tag)}"><select aria-label="Unidad, ${esc(tag)}"><option${v.unit==='kg'||!v.unit?' selected':''}>kg</option><option${v.unit==='lb'?' selected':''}>lb</option></select></div></td><td class="number-cell"><input class="entry reps" type="number" min="0" step="any" inputmode="decimal" placeholder="—" value="${esc(v.reps||'')}" aria-label="Repeticiones, ${esc(tag)}"></td><td class="number-cell"><input class="entry help" type="number" min="0" step="any" inputmode="decimal" placeholder="—" value="${esc(v.help||'')}" aria-label="Asistencias, ${esc(tag)}"></td><td class="registro-row-actions"><button class="registro-row-clear" type="button" aria-label="Limpiar esta fila" title="Limpiar esta serie"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg></button></td></tr>`)});}
  $('seriesRows').innerHTML=rows.join('');$('seriesGroupCount').textContent=seriesGroups===1?'1 serie':`${seriesGroups} series`;$('removeSeriesGroup').disabled=seriesGroups===1;$('addSeriesGroup').disabled=seriesGroups===12;$('seriesModeLabel').textContent=seriesMode==='normal'?`${seriesGroups} series normales · sin subdivisiones`:seriesMode==='sub'?`${seriesGroups} series · Sub1 y Sub2`:`${seriesGroups} series · Derecha e Izquierda`;$('toggleSubdivisions').textContent=seriesMode==='normal'?'⊞ Adicionar subdivisiones':'⇄ Cambiar subdivisiones';
- document.querySelector('.series-panel').classList.toggle('mode-normal',seriesMode==='normal');$('resetSubdivisions').hidden=seriesMode==='normal';updateSeriesCount();}
+ document.querySelector('.series-panel').classList.toggle('mode-normal',seriesMode==='normal');$('resetSubdivisions').hidden=seriesMode==='normal';updateSeriesCount();refreshRegistroSelectors();}
 function getEntries(){return [...$('seriesRows').querySelectorAll('tr')].map(row=>{const weight=row.querySelector('.weight').value.trim(),reps=row.querySelector('.reps').value.trim(),help=row.querySelector('.help').value.trim();return {el:row,series:row.dataset.serie,sub:row.dataset.sub,unit:row.querySelector('select').value,weight,reps,assistance:help,dirty:!!(weight||reps||help)}}).filter(x=>x.dirty)}
 function validSeriesDecimal(value,limit){
  const s=String(value).trim();
@@ -755,7 +784,7 @@ document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEve
  finally{button.disabled=false;}
 }));
 document.addEventListener('click',e=>{const detail=e.target.closest('[data-history-detail]');if(detail){expandedHistoryId=expandedHistoryId===detail.dataset.historyDetail?null:detail.dataset.historyDetail;drawHistory();return;}const b=e.target.closest('[data-delete]');if(b){deleteRecord(b.dataset.delete);return;}const progress=e.target.closest('[data-progress]');if(progress){const exercise=progress.dataset.progress;showPage('dashboard');if(model.records.some(r=>r.exercise===exercise)){$('progressExercise').value=exercise;drawProgressChart(model.records);}}})}
-$('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();setupCatalogCompact();setupMockupHeaders();install();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+$('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();setupCatalogCompact();setupMockupHeaders();install();installRegistroCompact();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
 // Vista anatómica 2D; visor 3D reservado hasta conectar un modelo real.
