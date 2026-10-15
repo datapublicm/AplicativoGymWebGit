@@ -60,7 +60,8 @@ function setup(initial=base()){
   remote,getState:()=>({data:state,profileName:'Pruebas'}),
   mutate:async fn=>{const next=structuredClone(state);await fn(next);state=next;mutations++},
   refresh:()=>{},isCurrent:(account,token)=>current&&account===uid&&token==='perfil-A',
-  isLinkedElsewhere:()=>false,confirmAction:()=>allow,notify:text=>notices.push(text)
+  isLinkedElsewhere:()=>false,confirmAction:()=>allow,notify:text=>notices.push(text),
+  catalogFetch:async()=>({baseCatalog:[],library:[],custom:[],entities:{gyms:[],sites:[],machines:[],options:[]}})
  });
  return {sync,uid,view,rows,notices,read:()=>structuredClone(state),
   editLocal:fn=>fn(state),
