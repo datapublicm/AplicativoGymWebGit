@@ -24,7 +24,7 @@ const $=id=>(elements[id]??={
  showModal(){this.open=true},querySelector(){return {textContent:''}}
 });
 const window={GymCloud:{
- getSessionStamp:()=>session,canWrite:()=>true,
+ getSessionStamp:()=>session,canRead:()=>true,canWrite:()=>true,
  loadAnatomy:()=>new Promise(resolve=>finish=resolve)
 }};
 const chosenRow=()=>({g:'Gym A',s:'Sede A',i:'Máquina A',e:'Ejercicio A',
