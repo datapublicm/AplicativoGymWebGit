@@ -146,6 +146,7 @@ const api={
  async loadHistory(){return structuredClone(latest.data.records)},
  async loadCatalogStats(){catalogUpdate()},
  async saveWorkout({exercise,date,technique,notes,entries}){
+  if(syncController?.isBusy())throw Error('Sincronización en curso; espera antes de editar o registrar series');
   if(!/^\d{4}-\d\d-\d\d$/.test(date)||!Array.isArray(entries)||!entries.length)
    throw Error('Fecha o series inválidas');
   const records=entries.map(entry=>{
@@ -165,6 +166,7 @@ const api={
   return records.length;
  },
  async deleteSeries(id){
+  if(syncController?.isBusy())throw Error('Sincronización en curso; espera antes de editar o registrar series');
   await flush(data=>{
    const index=data.records.findIndex(x=>String(x.id)===String(id));
    if(index<0)throw Error('La serie no pertenece al perfil');
@@ -178,6 +180,7 @@ const api={
   });return id;
  },
  async updateSeries(id,patch){
+  if(syncController?.isBusy())throw Error('Sincronización en curso; espera antes de editar o registrar series');
   await flush(data=>{
    const row=data.records.find(x=>x.id===id);
    if(!row)throw Error('Serie no encontrada');
