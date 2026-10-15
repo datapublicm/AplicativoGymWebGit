@@ -93,14 +93,23 @@ export function acknowledge(data,submitted,results){
    continue;
   }
   if(!['applied','duplicate'].includes(result.status))throw Error('Respuesta desconocida de Supabase');
-  accepted.add(op.op_id);done++;if(result.status==='duplicate')duplicate++;
+  // Un ACK confirma la última operación enviada y cualquier modificación anterior
+  // del mismo registro, pero NO una modificación posterior al envío.
+  const related=(data.pending||[]).filter(x=>x.localId===op.source_key.slice(6)||
+   x.remoteId&&op.source_key==='legacy:'+x.remoteId||
+   x.syncKey===op.source_key);
+  for(const item of related){
+   accepted.add(item.id);
+   if(item.id===op.op_id)break;
+  }
+  done++;if(result.status==='duplicate')duplicate++;
   const record=data.records.find(r=>sourceKey(r)===op.source_key);
   if(record){
    record.cloudVersion=Number(result.version);
    record.syncKey=op.source_key;record.lastServerPayload=payloadOf(record);
   }
   for(const t of data.tombstones||[]){
-   if(t.syncKey===op.source_key||op.action==='delete'&&t.localId===op.source_key.slice(6))
+   if(t.syncKey===op.source_key||op.action==='delete'&&(t.localId===op.source_key.slice(6)||t.remoteId&&op.source_key==='legacy:'+t.remoteId))
     t.cloudVersion=Number(result.version);
   }
   conflicts.delete(op.source_key);
