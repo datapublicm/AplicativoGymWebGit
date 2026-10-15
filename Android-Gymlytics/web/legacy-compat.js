@@ -31,7 +31,7 @@ export function legacyAlerts(data,history,mirror=[]){
   const reference=row.lastLegacyPayload;
   const altered=incoming&&reference&&fingerprint(incoming)!==fingerprint(reference);
   const uncertain=incoming&&!reference&&fingerprint(incoming)!==fingerprint(row);
-  const disappeared=!incoming&&!shadow;
+  const disappeared=!incoming;
   if(!altered&&!uncertain&&!disappeared)continue;
   const conflict={
    sourceKey:key,kind:'legacy_unversioned',local:canonical(row),
