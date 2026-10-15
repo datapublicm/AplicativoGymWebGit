@@ -575,3 +575,21 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
  #page-registro .date-label input{width:112px}
  #page-registro .type-options{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* Corrección visual validación Android: nombres completos e iconos sin glifos cuadrados. */
+#page-catalogos .catalog-compact-label{word-break:normal;overflow-wrap:normal}
+#page-catalogos .catalog-compact-card[data-catalog-kind="technique"] .catalog-compact-label span:last-child{overflow-wrap:anywhere;font-size:10px}
+#page-catalogos .catalog-compact-toggle{font-family:Arial,system-ui,sans-serif;font-weight:500;line-height:1}
+@media(max-width:760px){
+ #page-catalogos .catalog-compact-bar{grid-template-columns:minmax(112px,1.2fr) minmax(77px,1.3fr) 32px 40px;gap:5px}
+ #page-catalogos .catalog-compact-label{font-size:10.5px;gap:4px}
+ #page-catalogos .catalog-compact-symbol{width:23px;height:26px;flex-basis:23px}
+ #page-catalogos .catalog-compact-toggle{min-width:40px;width:40px}
+}
+@media(max-width:380px){
+ #page-catalogos .catalog-compact-bar{grid-template-columns:minmax(92px,1.1fr) minmax(70px,1.3fr) 28px 34px;gap:4px}
+ #page-catalogos .catalog-compact-toggle{min-width:34px;width:34px}
+ #page-catalogos .catalog-compact-symbol{display:none}
+ #page-catalogos .catalog-compact-label{font-size:10px}
+}
