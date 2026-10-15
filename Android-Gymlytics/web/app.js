@@ -564,7 +564,7 @@ async function saveSeries(){
  }catch(err){
   if(!current())return;
   feedback.textContent='✅ Series guardadas localmente. No se pudo releer el historial; no las guardes otra vez.';feedback.hidden=false;
-  toast('Series guardadas localmente; comprueba el historial antes de repetir.');
+  toast('Series GUARDADAS localmente; comprueba el historial antes de repetir.');
  }
  finally{if(current()){btn.disabled=false;btn.textContent='Guardar series'}}
 }
