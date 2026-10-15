@@ -20,6 +20,8 @@ const flush=async update=>update(latest.data);
 const catalogUpdate=()=>{};
 const snapshot=()=>structuredClone(latest.data);
 const activeId='local-uno',profileEpoch=1,window={GymBaseCatalog:[]};
+const syncController=null;
+const sourceKey=r=>r.syncKey||(r.origin==='cloud'?'legacy:'+r.remoteId:'local:'+r.id);
 const stamp=()=>activeId+':'+profileEpoch;
 const catalogInit=()=>[];
 ${methods}
@@ -69,9 +71,10 @@ test('Eliminar registro descargado conserva remoteId para no reimportarlo',async
  assert.equal(data.pending[0].kind,'delete_series');
 });
 test('Sin sincronización automática; descarga voluntaria y separada por cuenta',()=>{
- assert.match(src,/if\(!confirm\('¿Descargar y unir/);
- assert.match(src,/if\(data.cloudUserId&&data.cloudUserId!==uid\)/);
- assert.match(src,/removed.has\(id\)/);
- assert.match(src,/remoteId:id,origin:'cloud'/);
+ const sync=file('../web/cloud-sync.js');
+ assert.match(sync,/confirmAction/);
+ assert.match(sync,/local.cloudUserId&&local.cloudUserId!==uid/);
+ assert.match(sync,/mergeDownload\(local,mirror\)/);
+ assert.match(sync,/acknowledge\(local,chunk,response.data\)/);
  assert.match(src,/data.pending.push/);
 });
