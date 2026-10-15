@@ -22,7 +22,7 @@ function fixture(){
   "const download=(name,body,mime)=>downloads.push({name,body,mime});",
   "const orderedRecords=()=>model.records;",
   "const drawRecent=()=>{},drawHistory=()=>{},drawReports=()=>{};",
-  "const window={GymCloud:{canWrite:()=>signedIn,getSessionStamp:()=>session,loadHistory:()=>{requests++;return new Promise((resolve,reject)=>{resolveFetch=resolve;rejectFetch=reject;})}}};",
+  "const window={GymCloud:{canRead:()=>signedIn,canWrite:()=>signedIn,getSessionStamp:()=>session,loadHistory:()=>{requests++;return new Promise((resolve,reject)=>{resolveFetch=resolve;rejectFetch=reject;})}}};",
   implementation,
   "({init:()=>setHistoryReady(false),allow:()=>setHistoryReady(true),json:()=>exportJson(),csv:()=>exportCsv(),refresh:()=>refreshHistory(),",
   "succeed:records=>resolveFetch(records),fail:()=>rejectFetch(Error('Sin conexión')),",
