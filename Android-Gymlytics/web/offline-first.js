@@ -257,6 +257,7 @@ function refreshCloudControls(){
  $('authLogout').hidden=!linked;
 }
 async function cloudLogin(email,password,register=false){
+ const ownerStamp=stamp();
  if(!client)throw Error('No hay conexión de Supabase configurada');
  if(!navigator.onLine)throw Error('Sin conexión a Internet. Tus registros locales siguen disponibles');
  if(!register&&!email.includes('@')){
@@ -265,6 +266,7 @@ async function cloudLogin(email,password,register=false){
   if(!data?.access_token||!data?.refresh_token)throw Error(data?.error||'Nombre de usuario o contraseña inválidos');
   const set=await client.auth.setSession({access_token:data.access_token,refresh_token:data.refresh_token});
   if(set.error)throw set.error;
+  if(ownerStamp!==stamp())throw Error('Cambiaste de perfil durante la autenticación.');
   remoteSession=set.data.session;
   refreshCloudControls();
   status('Cuenta autenticada. Para descargar debes confirmar la operación.');
@@ -277,6 +279,7 @@ async function cloudLogin(email,password,register=false){
   status('Revisa tu correo para confirmar la cuenta. Tu perfil local no se modificó.');
   return;
  }
+ if(ownerStamp!==stamp())throw Error('Cambiaste de perfil durante la autenticación.');
  remoteSession=result.data.session;
  if(!remoteSession?.user)throw Error('No se obtuvo la sesión de la nube');
  refreshCloudControls();
