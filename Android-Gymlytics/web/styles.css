@@ -964,3 +964,32 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
  #page-catalogos .catalog-compact-toggle{width:37px!important;min-width:37px!important}
  #page-catalogos .catalog-compact-bar .catalog-total{min-width:32px!important}
 }
+
+/* 01.06 - perfiles independientes, offline-first */
+#offlineCloudPanel[hidden], .offline-profile-panel[hidden]{display:none!important}
+.offline-profile-panel{max-width:720px;margin:0 auto 15px;padding:22px;border:1px solid #294f74;background:linear-gradient(155deg,#102a45,#102037 72%);color:#eef8ff}
+.offline-profile-panel h2{margin:3px 0 12px;font-size:24px;color:#f7fcff}
+.offline-profile-panel p{color:#b8cde4;line-height:1.5}
+.offline-profile-controls{display:grid;gap:14px;margin:20px 0}
+.offline-profile-controls .field span{color:#d9f5ff;font-weight:650}
+.offline-profile-controls select,.offline-profile-controls input{min-height:46px;background:#112f4b;border:1px solid #4a7199;border-radius:12px;color:#effaff;font-size:16px}
+.offline-profile-controls input::placeholder{color:#afc4d8}
+.offline-new-profile{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.offline-new-profile .field{flex:1;min-width:160px}
+.offline-new-profile button{min-height:46px}
+.offline-profile-panel button{white-space:normal}
+.offline-profile-panel .eyebrow{color:#57d9fb}
+.offline-note{margin:9px 0;color:#acc6dc;font-size:13px;line-height:1.5}
+#offlinePending{font-weight:700;color:#7de0f5}
+#offlineCloudToggle{width:100%;margin-top:12px;padding:13px;font-size:14px;border-color:#4c94d6;background:#153351;color:#a0eaff}
+#offlineCloudPanel{max-width:720px;margin:0 auto 14px}
+#offlineCloudPanel #offlineCloudDownload{width:100%;margin:9px 0;white-space:normal;min-height:46px}
+#offlineCloudPanel #authLogout{width:100%;margin:5px 0}
+@media(max-width:650px){
+ .offline-profile-panel{padding:17px 15px;margin:12px 2px 20px;border-radius:20px}
+ .offline-profile-panel h2{font-size:22px}
+ #offlineCloudPanel{margin:0 2px 20px}
+ .offline-new-profile{align-items:stretch}
+ .offline-new-profile button{width:100%}
+ .offline-profile-panel .auth-status{font-size:13px}
+}
