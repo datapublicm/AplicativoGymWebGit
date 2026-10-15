@@ -127,6 +127,22 @@ async function check(width,page){
   writeFileSync(join(folder,'gymlytics-registro-parte-inferior-390.png'),Buffer.from(r2.data,'base64'));
   await request('Runtime.evaluate',{expression:'window.scrollTo(0,0);',returnByValue:true});
  }
+
+ if(width===390&&page==='registro-series'){
+  const expr='(async()=>{'+
+   'const first=document.querySelector("#seriesRows tr"),weight=first.querySelector(".weight"),reps=first.querySelector(".reps");'+
+   'weight.value="80";reps.value="12";const currentRecords=model.records.slice();'+
+   'window.__testWorkout=null;window.GymCloud={canWrite:()=>true,getSessionStamp:()=>"gym-browser-fixture",saveWorkout:async payload=>{window.__testWorkout=payload;},loadHistory:async()=>currentRecords};'+
+   'document.getElementById("saveRecords").click();'+
+   'for(let i=0;i<30&&!window.__testWorkout;i++)await new Promise(r=>setTimeout(r,10));'+
+   'const x=window.__testWorkout;const data={sent:!!x,count:x?.entries?.length,weight:x?.entries?.[0]?.weight,reps:x?.entries?.[0]?.reps,exercise:x?.exercise?.e,technique:x?.technique};'+
+   'return JSON.stringify(data)'+
+  '})()';
+  const saved=await request('Runtime.evaluate',{expression:expr,returnByValue:true,awaitPromise:true});
+  if(saved.exceptionDetails)throw Error('Registro: el botón Guardar registro falló '+JSON.stringify(saved.exceptionDetails));
+  const result=JSON.parse(saved.result.value);
+  assert.ok(result.sent&&result.count===1&&result.weight==='80'&&result.reps==='12'&&result.exercise&&result.technique,'Registro: payload guardado no coincide con el formulario '+JSON.stringify(result));
+ }
  if((width===320&&page==='dashboard')||(width===390&&['registro-series','catalogos','tablas'].includes(page))){
   const path=resolve(root,'../mobile-check');mkdirSync(path,{recursive:true});
   const shot=await request('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
