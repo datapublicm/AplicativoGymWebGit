@@ -724,3 +724,27 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
  #page-registro .gym-mock-titles>strong{font-size:18px}
  #page-registro .gym-record-date>strong{font-size:11px}
 }
+
+
+/* Ajustes después de comparar visualmente las 2 capturas con el mockup original. */
+#page-catalogos .catalog-compact-bar{grid-template-columns:127px minmax(0,1fr) 35px 37px;gap:5px}
+#page-catalogos .catalog-compact-label{font-size:11px}
+#page-catalogos [data-catalog-kind="technique"] .catalog-compact-label span:last-child{font-family:Arial,system-ui,sans-serif;font-size:9px;letter-spacing:-.35px;white-space:nowrap;overflow-wrap:normal}
+#page-catalogos .catalog-compact-bar .catalog-total{flex-direction:column;gap:0;font-size:11px;line-height:1}
+#page-catalogos .catalog-compact-bar .catalog-total:after{content:"total";display:block;font-size:8px;color:#9ac4e2;font-weight:400;margin-top:1px}
+#page-catalogos .gym-mock-menu .catalog-muscles{display:block;padding:10px 3px;color:#c6e8fa}
+#page-catalogos .gym-mock-menu .catalog-muscles h3{margin:0 0 8px;font-size:13px}
+#page-catalogos .gym-mock-menu .catalog-muscles select{background:#071b30;color:#dcf7ff;width:100%;min-height:38px;border:1px solid #42769c;border-radius:8px;padding:6px}
+#page-catalogos .gym-mock-menu .catalog-muscles p{font-size:11px;color:#90afc6}
+#page-registro .exercise-tab-add{font-family:Arial,system-ui,sans-serif;font-size:32px!important;line-height:1}
+@media(max-width:760px){
+ #page-catalogos .catalog-compact-bar{grid-template-columns:125px minmax(0,1fr) 34px 37px;gap:5px}
+ #page-catalogos .catalog-compact-label{font-size:10.5px}
+ #page-catalogos [data-catalog-kind="technique"] .catalog-compact-label span:last-child{font-size:9px}
+}
+@media(max-width:380px){
+ #page-catalogos .catalog-compact-bar{grid-template-columns:107px minmax(0,1fr) 29px 33px;gap:3px}
+ #page-catalogos .catalog-compact-label{font-size:10px}
+ #page-catalogos [data-catalog-kind="technique"] .catalog-compact-label span:last-child{font-size:8px}
+ #page-catalogos .catalog-compact-symbol{width:18px;flex-basis:18px;font-size:17px}
+}
