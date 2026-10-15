@@ -52,6 +52,19 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
    for(let i=0;i<plan.ops.length;i+=50){
     validate(uid,stamp);
     const chunk=plan.ops.slice(i,i+50);
+    // Persistir en IndexedDB el sobre exacto de solicitud ANTES de enviarlo.
+    // Si el servidor confirma pero la respuesta se pierde, reusar estos
+    // mismos bytes y UUID permite un reintento estrictamente idempotente.
+    await mutate(local=>{
+     validate(uid,stamp);
+     for(const op of chunk){
+      const item=local.pending.find(p=>p.id===op.op_id);
+      if(!item)throw Error('La operación pendiente cambió antes de enviarse.');
+      if(item.submittedRequest&&JSON.stringify(item.submittedRequest)!==JSON.stringify(op))
+       throw Error('No se puede alterar una operación de nube ya enviada.');
+      if(!item.submittedRequest){item.submittedRequest=structuredClone(op);item.attemptedAt=new Date().toISOString();}
+     }
+    });
     const response=await remote.rpc('aplicar_cambios_offline',{p_changes:chunk});
     if(response.error)throw response.error;
     if(!Array.isArray(response.data))throw Error('El servidor devolvió una respuesta inválida');
