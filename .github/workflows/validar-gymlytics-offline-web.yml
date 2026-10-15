@@ -40,7 +40,8 @@ jobs:
       - name: Verificar salida modular sin Android ni APK
         run: |
           test -s dist/index.html
-          test -s dist/catalogo.js
+          test ! -f dist/catalogo.js
+          test -s dist/offline-catalog-download.js
           test -s dist/profile-policy.js
           test -s dist/cloud-sync.js
           test -s dist/sync-engine.js
@@ -48,7 +49,7 @@ jobs:
           test -s dist/offline-first.js
           test -s dist/app.js
           test -n "$(find dist/assets -type f -name '*.js' -print -quit)"
-          grep -q 'src="./catalogo.js"' dist/index.html
+          ! grep -q 'src="./catalogo.js"' dist/index.html
           test ! -d android/app
           test ! -d android/app/build/outputs/apk
 
