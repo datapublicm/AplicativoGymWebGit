@@ -80,8 +80,7 @@ async function activate(id,initial=false){
  if(typeof invalidatePendingSave==='function')invalidatePendingSave();
  if(typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(null,null);
  if(typeof setHistoryReady==='function')setHistoryReady(false);
- remoteSession=null;
- if(client)await client.auth.signOut().catch(()=>{});
+ remoteSession=null; // Desvincular la nube en pantalla; cambiar perfiles no depende de la red.
  const p=await get(id);
  if(epoch!==profileEpoch||!p) return;
  activeId=id;latest=p;profiles=await all();
