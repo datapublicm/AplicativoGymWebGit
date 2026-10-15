@@ -200,6 +200,7 @@ function presentCatalog(kind){
 const assertEditable=()=>{if(!latest||latest.data?.readOnly)throw Error('Cuenta de prueba: solo lectura. Crea un perfil personal para editar.');};
 const api={
  canWrite:()=>!!activeId&&!latest?.data?.readOnly,
+ canRead:()=>!!activeId&&!!latest,
  getSessionStamp:stamp,
  async refreshCatalog(){window.GymBaseCatalog=catalogInit();if(typeof cascade==='function')cascade(0);return window.GymBaseCatalog.length},
  async loadInitialCatalog(){return catalogInit()},
@@ -384,7 +385,7 @@ async function linkAccount(){
   data.cloudUserId=user.id;
  });
  renderSyncStatus();refreshCloudControls();
- status('Cuenta vinculada. Las series permanecen locales hasta que solicites sincronización.');
+ status('Cuenta vinculada. Tus cambios permanecen offline; la subida a Supabase está deshabilitada.');
 }
 async function provisionGymlyticsAccount(ownerStamp){
  if(!remote)throw Error('No está configurada la base de datos');
@@ -399,8 +400,18 @@ async function completeCloudLogin(session,ownerStamp,ownerClient,register=false)
   if(register)await provisionGymlyticsAccount(ownerStamp);
   // Consultar la identidad autorizada por el servidor: NUNCA inferir la cuenta
   // de prueba del nombre de perfil ni del botón que pulsó el usuario.
-  const {data,error}=await remote.from('tbl_usuarios')
+  let result=await remote.from('tbl_usuarios')
    .select('id,usuario,activo').eq('id',session.user.id).maybeSingle();
+  if(result.error)throw Error('No se pudo verificar la cuenta Gymlytics: '+result.error.message);
+  // Con confirmación por correo, signUp carece de sesión. La primera
+  // autenticación provisiona únicamente si la fila de usuario falta.
+  // Una cuenta existente deshabilitada NUNCA se reactiva.
+  if(!result.data){
+   await provisionGymlyticsAccount(ownerStamp);
+   result=await remote.from('tbl_usuarios')
+    .select('id,usuario,activo').eq('id',session.user.id).maybeSingle();
+  }
+  const {data,error}=result;
   if(error||!data?.activo)throw Error('La cuenta todavía no está habilitada en Gymlytics.');
   const kind=String(data.usuario||'').trim().toLocaleLowerCase('es')==='prueba'?'demo':'personal';
   requireCloudIdentity(session.user.id,ownerStamp,ownerClient);
