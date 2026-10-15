@@ -219,10 +219,14 @@ const api={
    const index=data.records.findIndex(x=>String(x.id)===String(id));
    if(index<0)throw Error('La serie no pertenece al perfil');
    const [row]=data.records.splice(index,1),key=sourceKey(row),version=Number(row.cloudVersion||0);
-   data.pending=data.pending.filter(x=>x.localId!==row.id);
+   // Nunca olvidar un alta enviada si se perdió su ACK. El servidor
+   // puede haberla recibido; primero reintentar la creación inmutable y
+   // después enviar una eliminación versionada.
+   const inFlight=data.pending.some(x=>x.localId===row.id&&x.submittedRequest);
+   data.pending=data.pending.filter(x=>x.localId!==row.id||x.submittedRequest);
    data.tombstones.push({localId:row.id,remoteId:row.remoteId||null,syncKey:key,
     at:new Date().toISOString(),cloudVersion:version});
-   if(version||row.origin==='cloud')
+   if(inFlight||version||row.origin==='cloud')
     data.pending.push({id:uuid(),kind:'delete_series',localId:row.id,remoteId:row.remoteId||null,
      syncKey:key,expectedVersion:version});
   });return id;
@@ -240,8 +244,12 @@ const api={
      throw Error('Valor inválido');
     row[field]=value;
    }
-   if(!data.pending.some(x=>x.localId===id&&x.kind==='create_series')){
-    data.pending=data.pending.filter(x=>!(x.localId===id&&x.kind==='update_series'));
+   // Las operaciones ya enviadas no se reescriben; si hubo corte de
+   // red, la modificación posterior recibe un UUID nuevo y espera el ACK.
+   const pending=data.pending.filter(x=>x.localId===id);
+   const queued=pending.find(x=>!x.submittedRequest&&
+    (x.kind==='create_series'||x.kind==='update_series'));
+   if(!queued){
     data.pending.push({id:uuid(),kind:'update_series',localId:id,syncKey:sourceKey(row),
      expectedVersion:Number(row.cloudVersion||0)});
    }
