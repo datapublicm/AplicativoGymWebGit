@@ -5,9 +5,11 @@ import { createClient } from '@supabase/supabase-js';
 import {sourceKey} from './sync-engine.js';
 import {createCloudSync} from './cloud-sync.js';
 import {profileMeta,validateProfileName,validateProfileBinding,verifyRestoreBackup} from './profile-policy.js';
+import {prepareDownloadedCatalog} from './offline-catalog-download.js';
 const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
- records:[],photos:{},custom:[],library:[],entities:{gyms:[],sites:[],machines:[],options:[]},
+ records:[],photos:{},baseCatalog:[],custom:[],library:[],readOnly:false,demo:false,
+ entities:{gyms:[],sites:[],machines:[],options:[]},
  tombstones:[],pending:[],conflicts:[],cloudUserId:null,lastPull:null
 });
 const uuid=()=>crypto.randomUUID();
@@ -73,14 +75,15 @@ function renderSyncStatus(){
  if(!latest)return;
  const data=latest.data,counts=(data.pending||[]).length,deleted=(data.tombstones||[]).length;
  $('offlinePending').textContent=counts+' operaciones pendientes · '+deleted+' eliminaciones conservadas';
- $('offlineProfileInfo').textContent='Datos locales de '+latest.name+' · '+data.records.length+' series visibles';
+ $('offlineProfileInfo').textContent=(data.readOnly?'🔒 PRUEBA · SOLO CONSULTA · ':'Perfil personal offline · ')+latest.name+' · '+data.records.length+' series visibles';
  $('offlineConflictSummary').textContent=(data.conflicts||[]).length+' conflictos por revisar';
- $('offlineSyncState').textContent=data.cloudUserId
-  ?'Cuenta vinculada: '+data.cloudUserId.slice(0,8)+'… · Ningún cambio se sube ni descarga automáticamente.'
-  :'Solo en este dispositivo. Puedes crear una cuenta más adelante sin perder tus registros.';
+ $('offlineSyncState').textContent=data.readOnly?'Cuenta de prueba descargada: datos visibles offline. Edición y eliminación BLOQUEADAS.':
+  data.cloudUserId?'Cuenta vinculada: '+data.cloudUserId.slice(0,8)+'… · Los cambios permanecen solamente en este dispositivo.':
+  'Solo en este dispositivo. Puedes crear una cuenta más adelante sin perder tus registros.';
 }
 function catalogInit(){
- const source=window.GymBundledCatalog||[];
+ // Nunca precargar datos de otro usuario: los perfiles nuevos empiezan vacíos.
+ const source=latest?.data?.baseCatalog||[];
  return source.map(x=>({
   g:x.g,s:x.s,z:x.z,kind:x.kind,i:x.i,a:x.a,gr:x.gr,e:x.e,
   t:[...(x.t||[])],m:x.m,ms:x.ms,n:0,last:null
@@ -128,11 +131,11 @@ async function activate(id,initial=false){
   $('offlineCloudPanel').hidden=true;$('offlineRemoteUser').textContent='';
   localStorage.setItem('gymlytics-active-profile',id);
   renderSyncStatus();renderProfileControls();
-  status('Perfil local activo · '+p.name+' · funciona sin conexión');
+  status((p.data?.readOnly?'Perfil de PRUEBA solo lectura':'Perfil local editable')+' · '+p.name+' · funciona sin conexión');
   document.body.classList.remove('auth-locked');
   document.querySelectorAll('[data-page]').forEach(x=>{x.disabled=false;x.setAttribute('aria-disabled','false');});
   renderConflictButtons();refreshCloudControls();
-  if(initial)showPage('registro');
+  if(initial)showPage('sesion');
  }catch(error){
   $('offlineProfiles').value=previous||'';
   status('No se completó el cambio de perfil: '+error.message);
@@ -151,6 +154,11 @@ function renderProfileControls(){
  const control=$('offlineRenameName');if(control)control.value=latest?.name||'';
  const count=$('offlineProfileCount');
  if(count)count.textContent=profiles.length+' perfiles locales independientes';
+ const locked=!!latest?.data?.readOnly;
+ document.querySelectorAll('#page-catalogos [data-catalog-quick],#page-catalogos .catalog-compact-toggle,#page-catalogos [data-catalog-modify],#page-catalogos .catalog-form button[type=submit],#page-registro #saveRecords,#page-registro #clearSeries,#page-registro #addSeriesGroup,#page-registro #removeSeriesGroup').forEach(b=>{
+  b.disabled=locked;b.title=locked?'Cuenta de prueba: edición bloqueada':'';
+ });
+ const hint=$('offlineReadOnlyWarning');if(hint)hint.hidden=!locked;
 }
 async function renameProfile(){
  if(transitioning||syncController?.isBusy())throw Error('Termina la operación actual.');
@@ -184,8 +192,9 @@ function presentCatalog(kind){
  return kind==='exercise'?[...latest.data.library,...latest.data.custom.map(x=>({id:x.cloud_id,nombre:x.e}))]:
   latest.data.entities[groups[kind]];
 }
+const assertEditable=()=>{if(!latest||latest.data?.readOnly)throw Error('Cuenta de prueba: solo lectura. Crea un perfil personal para editar.');};
 const api={
- canWrite:()=>!!activeId,
+ canWrite:()=>!!activeId&&!latest?.data?.readOnly,
  getSessionStamp:stamp,
  async refreshCatalog(){window.GymBaseCatalog=catalogInit();if(typeof cascade==='function')cascade(0);return window.GymBaseCatalog.length},
  async loadInitialCatalog(){return catalogInit()},
@@ -194,6 +203,7 @@ const api={
  async loadHistory(){return structuredClone(latest.data.records)},
  async loadCatalogStats(){catalogUpdate()},
  async saveWorkout({exercise,date,technique,notes,entries}){
+  assertEditable();
   if(syncController?.isBusy())throw Error('Sincronización en curso; espera antes de editar o registrar series');
   if(!/^\d{4}-\d\d-\d\d$/.test(date)||!Array.isArray(entries)||!entries.length)
    throw Error('Fecha o series inválidas');
@@ -214,6 +224,7 @@ const api={
   return records.length;
  },
  async deleteSeries(id){
+  assertEditable();
   if(syncController?.isBusy())throw Error('Sincronización en curso; espera antes de editar o registrar series');
   await flush(data=>{
    const index=data.records.findIndex(x=>String(x.id)===String(id));
@@ -232,6 +243,7 @@ const api={
   });return id;
  },
  async updateSeries(id,patch){
+  assertEditable();
   if(syncController?.isBusy())throw Error('Sincronización en curso; espera antes de editar o registrar series');
   await flush(data=>{
    const row=data.records.find(x=>x.id===id);
@@ -256,6 +268,7 @@ const api={
   });return id;
  },
  async addIndependentItem(kind,values){
+  assertEditable();
   const group=groups[kind];if(!group||kind==='exercise')throw Error('Tipo no válido');
   const nombre=tidy(values.nombre);
   if(!nombre||nombre.length>180)throw Error('Escribe un nombre válido');
@@ -273,6 +286,7 @@ const api={
   }).then(result=>{catalogUpdate();return result;});
  },
  async saveCustomExercise(values){
+  assertEditable();
   const nombre=tidy(values.e);
   if(!nombre)throw Error('Escribe un nombre de ejercicio');
   await flush(data=>{
@@ -285,6 +299,7 @@ const api={
   });catalogUpdate();return structuredClone(latest.data.custom);
  },
  async updateCatalogItem(kind,id,name){
+  assertEditable();
   name=tidy(name);if(!name)throw Error('Introduce el nombre nuevo');
   await flush(data=>{
    const list=kind==='exercise'?data.library:data.entities[groups[kind]];
@@ -296,6 +311,7 @@ const api={
   });catalogUpdate();return id;
  },
  async deleteCatalogItem(kind,id){
+  assertEditable();
   await flush(data=>{
    const list=kind==='exercise'?data.library:data.entities[groups[kind]];
    if(!list)throw Error('Categoría inválida');
@@ -319,6 +335,7 @@ const api={
   return {id:null,primary:[],secondary:[],images:{},zones3d:[],photos};
  },
  async uploadUserPhoto({exercise,type,side,blob}){
+  assertEditable();
   const ownerStamp=stamp();
   if(!blob||blob.size>3*1024*1024)throw Error('Fotografía demasiado grande (máximo 3 MB)');
   const key=type==='maquina'?`${exercise.g}|${exercise.s}|${exercise.i}`:`${exercise.g}|${exercise.s}|${exercise.i}|${exercise.e}`;
@@ -335,11 +352,12 @@ const api={
 function refreshCloudControls(){
  const linked=!!remoteSession?.user&&!transitioning;
  $('offlineRemoteUser').textContent=linked?'Conectado: '+(remoteSession.user.email||remoteSession.user.id):'Sin sesión de nube';
- $('offlineLinkAccount').disabled=!linked||!!syncController?.isBusy()||!!latest?.data?.cloudUserId;
+ $('offlineLinkAccount').disabled=!linked||!!syncController?.isBusy()||!!latest?.data?.cloudUserId||!!latest?.data?.readOnly;
  $('offlineLinkAccount').textContent=latest?.data?.cloudUserId?'Perfil ya vinculado a esta cuenta':'Vincular este perfil con esta cuenta';
  $('offlineCloudDownload').disabled=!linked||!!syncController?.isBusy();
- $('offlineCloudUpload').disabled=!linked||!!syncController?.isBusy()||
-  !(latest?.data?.pending||[]).some(x=>['create_series','delete_series','update_series'].includes(x.kind));
+ // No publicar modificaciones: todo el trabajo de esta versión se queda offline.
+ $('offlineCloudUpload').hidden=true;$('offlineCloudUpload').disabled=true;
+ $('offlineDemoDownload').disabled=!linked||!!syncController?.isBusy()||!!latest?.data?.readOnly;
  $('authLogout').hidden=!linked;
 }
 function requireCloudIdentity(uid,ownerStamp,ownerClient=client){
@@ -350,6 +368,7 @@ function requireCloudIdentity(uid,ownerStamp,ownerClient=client){
 async function linkAccount(){
  const user=remoteSession?.user;
  if(!user)throw Error('Inicia sesión en la nube primero.');
+ if(latest?.data?.readOnly)throw Error('Una cuenta de prueba no puede vincularse como personal.');
  requireCloudIdentity(user.id,stamp());
  if(latest?.data?.cloudUserId===user.id)return status('Perfil ya vinculado a esta cuenta.');
  if(!confirm('¿Vincular '+latest.name+' con esta cuenta? No se subirán ni descargarán datos automáticamente. La asociación permanecerá en este perfil.'))return;
@@ -367,10 +386,15 @@ async function provisionGymlyticsAccount(ownerStamp){
  if(error)throw Error('No se pudo habilitar la cuenta: '+error.message);
  if(!data?.activo)throw Error('La cuenta Gymlytics está desactivada; no se reactivó automáticamente.');
 }
-async function completeCloudLogin(session,ownerStamp,ownerClient){
+async function completeCloudLogin(session,ownerStamp,ownerClient,register=false){
  requireCloudIdentity(session?.user?.id,ownerStamp,ownerClient);
  try{
-  await provisionGymlyticsAccount(ownerStamp);
+  if(register)await provisionGymlyticsAccount(ownerStamp);
+  else{
+   // Inicio de sesión existente, incluido el de prueba: no modifica Supabase.
+   const {data,error}=await remote.from('tbl_usuarios').select('id,activo').eq('id',session.user.id).maybeSingle();
+   if(error||!data?.activo)throw Error('La cuenta todavía no está habilitada en Gymlytics.');
+  }
   requireCloudIdentity(session.user.id,ownerStamp,ownerClient);
  }catch(error){
   if(ownerStamp===stamp()&&ownerClient===client)rotateCloudClient();
@@ -402,7 +426,7 @@ async function cloudLogin(email,password,register=false){
   status('Revisa tu correo para confirmar la cuenta. Tu perfil local no se modificó.');
   return;
  }
- await completeCloudLogin(result.data.session,ownerStamp,ownerClient);
+ await completeCloudLogin(result.data.session,ownerStamp,ownerClient,register);
 }
 function renderConflictButtons(){
  const holder=$('offlineConflicts');if(!holder)return;
@@ -428,14 +452,17 @@ function renderConflictButtons(){
  }
 }
 function updateFromProfile(){
+ window.GymBaseCatalog=catalogInit();
+ catalogUpdate();
  model.records=structuredClone(latest.data.records||[]);
  drawRecent();drawHistory(true);drawReports();
  renderSyncStatus();renderConflictButtons();refreshCloudControls();
 }
-async function remoteAction(action){
+async function remoteAction(action,options={}){
  if(!remoteSession?.user)throw Error('Inicia sesión o crea tu cuenta de nube primero');
  if(!syncController)throw Error('La sincronización no está disponible');
- await syncController[action](remoteSession.user.id,stamp());
+ if(action==='upload')throw Error('Los cambios de esta versión se conservan únicamente offline; subida deshabilitada.');
+ await syncController[action](remoteSession.user.id,stamp(),options);
 }
 
 function downloadLocal(name,data){
@@ -474,10 +501,41 @@ async function importProfileBackup(event){
  }catch(error){status('No se pudo restaurar: '+error.message)}
 }
 
+// Leer todas las categorías y comprobar recuentos ANTES de escribir en IndexedDB.
+async function downloadAllCatalogs(uid,ownerStamp){
+ const fetchTable=async(table,{shared=false}={})=>{
+  const scope=q=>shared?q.eq('activo',true):q.eq('user_id',uid);
+  const count=await scope(remote.from(table).select('id',{count:'exact',head:true}));
+  if(count.error||!Number.isSafeInteger(count.count)||count.count<0)
+   throw Error('No se pudo comprobar el total de '+table);
+  const result=[],seen=new Set();
+  for(let offset=0;offset<count.count;offset+=500){
+   if(ownerStamp!==stamp()||remoteSession?.user?.id!==uid)throw Error('El perfil o la cuenta cambió durante la descarga.');
+   const q=scope(remote.from(table).select('*')).order('id',{ascending:true}).range(offset,offset+499);
+   const {data,error}=await q;
+   if(error||!Array.isArray(data)||data.length!==Math.min(500,count.count-offset))
+    throw Error('Descarga incompleta de '+table+'; no se guardó nada.');
+   for(const row of data){
+    if(!row?.id||seen.has(row.id)||!shared&&row.user_id!==uid)throw Error('Se recibió una fila repetida o ajena de '+table);
+    seen.add(row.id);result.push(row);
+   }
+  }
+  return result;
+ };
+ const [base,exercises,gyms,sites,machines,options]=await Promise.all([
+  fetchTable('tbl_catalogo_predeterminado',{shared:true}),fetchTable('tbl_ejercicios'),
+  fetchTable('tbl_gimnasios'),fetchTable('tbl_sedes'),fetchTable('tbl_maquinas'),
+  fetchTable('tbl_opciones_personales')
+ ]);
+ if(ownerStamp!==stamp()||remoteSession?.user?.id!==uid)throw Error('Se cambió de cuenta durante la descarga.');
+ return prepareDownloadedCatalog({base,exercises,gyms,sites,machines,options:options.filter(x=>x.activo!==false)});
+}
+
 async function init(){
  db=await openDB();profiles=(await all()).map(profileMeta);
  syncController=createCloudSync({
   remote:remoteGateway,getState:()=>({data:latest?.data||EMPTY(),profileName:latest?.name||'Perfil'}),
+  catalogFetch:downloadAllCatalogs,
   mutate:update=>flush(update),refresh:updateFromProfile,
   isCurrent:(uid,token)=>stamp()===token&&remoteSession?.user?.id===uid,
   isLinkedElsewhere:uid=>profiles.some(p=>p.id!==activeId&&p.cloudUserId===uid),
@@ -527,6 +585,12 @@ async function init(){
  $('offlineCloudDownload').addEventListener('click',async()=>{
   const button=$('offlineCloudDownload');button.disabled=true;
   try{await remoteAction('download')}catch(error){status('Descarga cancelada: '+error.message)}
+  finally{button.disabled=false;refreshCloudControls()}
+ });
+ $('offlineDemoDownload').addEventListener('click',async()=>{
+  const button=$('offlineDemoDownload');button.disabled=true;
+  try{await remoteAction('download',{readOnly:true})}
+  catch(error){status('Cuenta de prueba: '+error.message)}
   finally{button.disabled=false;refreshCloudControls()}
  });
  $('authLogout').addEventListener('click',async()=>{
