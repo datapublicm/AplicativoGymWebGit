@@ -206,6 +206,9 @@ function catalogFillSelect(select,choices,placeholder){
  choices.forEach(x=>select.add(new Option(x.name+(x.own?'':' · referencia'),x.id)));
  select.value=choices.some(x=>x.id===before)?before:(choices.find(x=>x.own)?.id||choices[0]?.id||'');
  select.disabled=false;
+ // Mostrar el nombre completo al consultar cada categoría, incluso si el
+ // desplegable queda estrecho en dispositivos pequeños.
+ select.title=select.selectedOptions?.[0]?.textContent||'';
 }
 function catalogUpdateCounters(){
  const kinds=['gym','site','zone','machine','exercise','grip','technique'];
@@ -215,7 +218,16 @@ function catalogUpdateCounters(){
 function catalogActiveCard(kind){
  catalogActiveKind=kind;
  document.querySelectorAll('#catalogCompactRows .catalog-compact-card').forEach(row=>row.classList.toggle('catalog-chosen',row.dataset.catalogKind===kind));
- const quick=$('catalogQuickFeedback');if(quick)quick.textContent='Categoría seleccionada: '+(document.querySelector('[data-catalog-kind="'+kind+'"] .catalog-compact-label')?.textContent||kind)+'.';
+ const quick=$('catalogQuickFeedback');
+ if(quick){
+  const card=document.querySelector('[data-catalog-kind="'+kind+'"]'),title=card?.querySelector('.catalog-compact-label')?.textContent||kind;
+  const picker=card?.querySelector('.catalog-compact-picker select'),id=picker?.value||'';
+  const item=catalogChoices(kind).find(x=>x.id===id);
+  quick.textContent=kind==='series'||kind==='subdivision'
+   ?title+': estos valores se gestionan dentro de Registro, no como un catálogo independiente.'
+   :item?title+' · '+item.name+(item.own?' · Elemento personal: puedes modificarlo o eliminarlo.':' · Referencia: puedes consultarla, pero no modificarla ni eliminarla.')
+   :'Categoría seleccionada: '+title+'.';
+ }
 }
 function catalogOpenCard(kind,action='add'){
  const row=document.querySelector('[data-catalog-kind="'+kind+'"]');
@@ -348,7 +360,14 @@ function setupCatalogCompact(){
   if(item.kind==='zone')detail.append(forms.option);
   bar.append(heading,wrapper,count,add);row.append(bar,detail);holder.append(row);
   select.addEventListener('focus',()=>catalogActiveCard(item.kind));
-  select.addEventListener('change',()=>{catalogActiveCard(item.kind);if(['zone','grip','technique'].includes(item.kind)&&select.value)catalogOpenCard(item.kind,'edit')});
+  select.addEventListener('change',()=>{
+   select.title=select.selectedOptions?.[0]?.textContent||'';
+   catalogActiveCard(item.kind);
+   // El selector muestra los existentes; solo los elementos personales
+   // pueden abrirse en modo de modificación.
+   if(['zone','grip','technique'].includes(item.kind)&&select.value&&!select.value.startsWith('base:'))
+    catalogOpenCard(item.kind,'edit');
+  });
   add.addEventListener('click',()=>catalogOpenCard(item.kind,item.readOnly?'configure':'toggle'));
   heading.addEventListener('click',()=>catalogActiveCard(item.kind));
  }
