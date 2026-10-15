@@ -5,7 +5,7 @@ Ejemplos de mantenimiento: `01.01` → `01.02` → `01.03` → `01.04`.
 Al pasar a una etapa principal: `02.01` → `02.02` (no `02.00`).
 
 ## Versión vigente
-**01.05 — Pruebas Android** (15/10/2026).
+**01.05 — Última APK compilada y versión principal Android** (15/10/2026).\n\n**01.06 — En desarrollo exclusivo en `apk/pruebas` (sin compilar).**\nModo offline-first, varios perfiles por dispositivo, catálogo de referencia incorporado, historial en IndexedDB, eliminaciones con lápidas de sincronización, respaldo/restauración por perfil, alta de cuenta opcional y descarga manual sin sobrescrituras. La subida bidireccional queda pendiente de RPC idempotente de servidor; nunca sincronizar o purgar por simple conexión.
 
 La APK original `Gymlytics-v0.1.3-Pruebas-debug.apk` se distribuyó inicialmente con una denominación ajena a este formato.
 Se corrigió el **nombre externo de distribución**, sin alterar ni recompilar sus bytes, a `Gymlytics_01.03_Pruebas.apk`.
@@ -18,4 +18,4 @@ Su versión **interna** todavía corresponde a la generación anterior; el cambi
 4. Incrementar la subversión solo cuando haya una nueva entrega; reiniciarla en `01` al cambiar de etapa principal.
 5. Mantener la rama `main` intacta y no integrar el modelo humano 3D hasta nueva autorización.
 
-> Entrega 01.04 conservada en `apk/versiones-anteriores/v01.04` y rama principal Android. Nueva entrega **01.05** autorizada en `apk/pruebas` con Dashboard de tres vistas (Resumen, Progreso y Análisis), filtros, técnicas y comparación entre series. Android `versionCode 5`, `versionName 01.05`; sin modelo humano 3D.
+> 01.04 conservada en `apk/versiones-anteriores/v01.04`. La compilación 01.05 está en `Android-Gymlytics` y `apk/pruebas_01.05`. Los cambios 01.06 existen únicamente en `apk/pruebas`; el workflow de compilación sigue fijado deliberadamente a 01.05 y no debe ejecutarse para esta rama hasta autorizar la próxima APK.
