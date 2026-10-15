@@ -155,7 +155,19 @@ try{
  assert.equal((await evaluate('window.GymCloud.loadHistory()')).length,1);
  console.log('PASS 7: reinicio web completamente offline sin pérdida ni login');
 
- console.log('7 escenarios Chromium+IndexedDB reales superados, sin compilar ni desplegar APK.');
+ // Simulación de actualización web: reconstruir los recursos estáticos
+ // sin tocar IndexedDB ni cambiar el origen. No equivale a reinstalar la APK.
+ await cd('Network.emulateNetworkConditions',{offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1});
+ const beforeUpdate=await db();
+ await evaluate('(async()=>{for(const key of await caches.keys())await caches.delete(key);return true})()');
+ await navigate(url);
+ await until('!!window.GymCloud?.canWrite?.()','apertura después de renovar caché de recursos');
+ const afterUpdate=await db();
+ assert.deepEqual(afterUpdate.map(p=>({id:p.id,records:p.records.length,tombstones:p.tombstones.length})),
+  beforeUpdate.map(p=>({id:p.id,records:p.records.length,tombstones:p.tombstones.length})));
+ console.log('PASS 8: actualización de recursos web sin destruir perfiles ni lápidas');
+
+ console.log('8 escenarios Chromium+IndexedDB reales superados, sin compilar ni desplegar APK.');
 }finally{
  try{await cd('Network.emulateNetworkConditions',{offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1})}catch{}
  try{ws?.close()}catch{}
