@@ -73,7 +73,7 @@ test('Eliminar registro descargado conserva remoteId para no reimportarlo',async
 test('Sin sincronización automática; descarga voluntaria y separada por cuenta',()=>{
  const sync=file('../web/cloud-sync.js');
  assert.match(sync,/confirmAction/);
- assert.match(sync,/local.cloudUserId&&local.cloudUserId!==uid/);
+ assert.match(sync,/data.cloudUserId&&data.cloudUserId!==uid/);
  assert.match(sync,/mergeDownload\(local,mirror\)/);
  assert.match(sync,/acknowledge\(local,chunk,response.data\)/);
  assert.match(src,/data.pending.push/);
