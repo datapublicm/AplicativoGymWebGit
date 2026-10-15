@@ -154,12 +154,16 @@ function renderProfileControls(){
 }
 async function renameProfile(){
  if(transitioning||syncController?.isBusy())throw Error('Termina la operación actual.');
- const name=validateProfileName($('offlineRenameName').value,profiles,activeId);
- if(!activeId)throw Error('Selecciona un perfil.');
+ const id=activeId,epoch=profileEpoch,name=validateProfileName($('offlineRenameName').value,profiles,activeId);
+ if(!id)throw Error('Selecciona un perfil.');
  await queue;
- const profile=await get(activeId);if(!profile)throw Error('Perfil inexistente.');
+ if(id!==activeId||epoch!==profileEpoch||transitioning)throw Error('El perfil cambió antes de renombrar.');
+ const profile=await get(id);if(!profile)throw Error('Perfil inexistente.');
+ if(id!==activeId||epoch!==profileEpoch||transitioning)throw Error('El perfil cambió durante el renombrado.');
  profile.name=name;profile.modifiedAt=new Date().toISOString();
- await put(profile);latest=profile;profiles=profiles.map(x=>x.id===profile.id?profileMeta(profile):x);
+ await put(profile);
+ if(id!==activeId||epoch!==profileEpoch||transitioning)return;
+ latest=profile;profiles=profiles.map(x=>x.id===profile.id?profileMeta(profile):x);
  const item=[...$('offlineProfiles').options].find(x=>x.value===profile.id);
  if(item)item.textContent=name;
  renderSyncStatus();renderProfileControls();
@@ -428,7 +432,9 @@ function downloadLocal(name,data){
 }
 async function saveProfileBackup(){
  if(transitioning||syncController?.isBusy())throw Error('Espera a que termine la operación actual.');
+ const id=activeId,epoch=profileEpoch;
  await queue;
+ if(id!==activeId||epoch!==profileEpoch||transitioning)throw Error('El perfil cambió antes de crear el respaldo.');
  if(!latest)return;
  downloadLocal('Gymlytics_perfil_'+latest.name.replace(/[^a-z0-9-_]/gi,'_')+'_'+new Date().toISOString().slice(0,10)+'.json',
   {format:'gymlytics-profile-backup',version:1,name:latest.name,data:latest.data,
