@@ -85,7 +85,7 @@ const structuredClone=x=>JSON.parse(JSON.stringify(x));
 const localStorage={setItem:(k,v)=>savedId=v};
 const invalidatePendingSave=()=>{},showHistoryLoadProgress=()=>{},setHistoryReady=()=>{};
 const catalogInit=()=>[],resetHistoryFilters=()=>{},resetExerciseTabs=()=>{},renderOwnCatalog=()=>{};
-const renderIndependentCatalog=()=>{},cascade=()=>{},renderSyncStatus=()=>{},renderProfileControls=()=>{};
+const renderIndependentCatalog=()=>{},catalogUpdate=()=>{},cascade=()=>{},renderSyncStatus=()=>{},renderProfileControls=()=>{};
 const drawRecent=()=>{draws++},drawHistory=()=>{draws++},drawReports=()=>{draws++};
 const renderConflictButtons=()=>{},refreshCloudControls=()=>{},status=()=>{},showPage=()=>{};
 const document={body:{classList:{remove:()=>{}}},querySelectorAll:()=>[]};
