@@ -56,6 +56,8 @@ jobs:
         run: npm run test:static
       - name: Instalar dependencias de JavaScript
         run: npm install --no-package-lock --no-audit --no-fund
+      - name: Verificar versión de Supabase JS reproducible
+        run: node -e 'const v=require("./node_modules/@supabase/supabase-js/package.json").version;if(v!=="2.76.1")process.exit(1)'
       - name: Construir web con datos de Supabase Pruebas
         run: |
           node -e 'if(!process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.startsWith("sb_publishable_"))process.exit(1)'
