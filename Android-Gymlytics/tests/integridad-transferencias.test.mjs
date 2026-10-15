@@ -166,3 +166,23 @@ test('Borrar una serie después de perder ACK evita resurrecciones al reconectar
   assert.equal(h.read().pending.length,0);
  }finally{Object.defineProperty(globalThis,'navigator',{value:original,configurable:true})}
 });
+
+test('Descarga paginada de 9.263 series conserva el historial completo sin duplicados',async()=>{
+ const h=setup();
+ for(let i=0;i<9263;i++)h.view.push({id:randomUUID(),user_id:uid,
+  date:'2026-10-15',gym:'Gimnasio',sede:'Sede',
+  exercise:'Remo',series:'Serie '+(i%4+1),reps:10,weight:20+i/100,unit:'kg'});
+ const original=globalThis.navigator;
+ Object.defineProperty(globalThis,'navigator',{value:{onLine:true},configurable:true});
+ try{
+  await h.sync.download(uid,'perfil-A');
+  const a=h.read();
+  assert.equal(a.records.length,9263);
+  assert.equal(new Set(a.records.map(x=>x.remoteId)).size,9263);
+  assert.equal(h.mutations(),1);
+  await h.sync.download(uid,'perfil-A');
+  const b=h.read();
+  assert.equal(b.records.length,9263,'Descargar dos veces no duplica series');
+  assert.equal(new Set(b.records.map(x=>x.id)).size,9263);
+ }finally{Object.defineProperty(globalThis,'navigator',{value:original,configurable:true})}
+});
