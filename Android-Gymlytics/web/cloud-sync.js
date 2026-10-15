@@ -1,4 +1,5 @@
-import {sourceKey,remoteToRow,planUpload,mergeDownload,acknowledge} from './sync-engine.js';
+import {sourceKey,payloadOf,remoteToRow,planUpload,mergeDownload,acknowledge} from './sync-engine.js';
+import {legacyAlerts,normalizeLegacySnapshot} from './legacy-compat.js';
 
 // Adaptador de red sin sincronización automática. Las mutaciones se confirman
 // primero en IndexedDB y los conflictos requieren decisión humana.
@@ -91,6 +92,7 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
    let summary;
    await mutate(local=>{
     validate(uid,stamp);
+    const alert=legacyAlerts(local,legacy,mirror);
     const known=new Set(local.records.map(sourceKey));
     const removed=new Set(local.tombstones.map(t=>t.syncKey||t.remoteId&&'legacy:'+t.remoteId||t.localId&&'local:'+t.localId));
     const modified=new Set(local.pending.map(x=>x.syncKey||x.remoteId&&'legacy:'+x.remoteId||x.localId&&'local:'+x.localId));
@@ -100,15 +102,17 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
      const key='legacy:'+r.id;
      if(known.has(key)||removed.has(key)||modified.has(key)||overlaid.has(key))continue;
      local.records.push({...r,id:'cloud:'+r.id,origin:'cloud',remoteId:r.id,syncKey:key,
+      lastLegacyPayload:normalizeLegacySnapshot(r),
       cloudVersion:0,weight:Number(r.weight||0),reps:Number(r.reps||0),assistance:Number(r.assistance||0)});
      known.add(key);oldAdded++;
     }
     summary=mergeDownload(local,mirror);
     summary.added+=oldAdded;
+    summary.legacyAlerts=alert.changed+alert.missing;
     local.cloudUserId=uid;local.lastPull=new Date().toISOString();
    });
    refresh();
-   notify('Descarga completada: '+summary.added+' nuevas, '+summary.updated+' actualizadas, '+summary.conflicts+' conflictos. No se perdieron cambios locales.');
+   notify('Descarga completada: '+summary.added+' nuevas, '+summary.updated+' actualizadas, '+summary.conflicts+' conflictos; '+summary.legacyAlerts+' alertas de clientes antiguos. No se perdieron cambios locales.');
    return summary;
   }finally{busy=false;refresh();}
  }
@@ -120,6 +124,7 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
   const message=choice==='local'
    ?'¿Conservar los cambios del dispositivo? Quedarán pendientes de una nueva subida manual con la versión actual del servidor.'
    :'¿Descartar tus cambios locales y aceptar la copia remota? Es recomendable guardar antes una copia de seguridad.';
+  if(c.kind==='legacy_unversioned')throw Error('Se detectó una modificación hecha desde una versión antigua sin control de versiones. No es seguro resolverla aquí: guarda un respaldo y actualiza los clientes antes de reconciliarla.');
   if(!confirmAction(message))return;
   await mutate(local=>{
    const item=local.conflicts.find(x=>x.sourceKey===key);
