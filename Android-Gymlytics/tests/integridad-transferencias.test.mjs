@@ -61,7 +61,7 @@ function setup(initial=base()){
   mutate:async fn=>{const next=structuredClone(state);await fn(next);state=next;mutations++},
   refresh:()=>{},isCurrent:(account,token)=>current&&account===uid&&token==='perfil-A',
   isLinkedElsewhere:()=>false,confirmAction:()=>allow,notify:text=>notices.push(text),
-  catalogFetch:async()=>({baseCatalog:[],library:[],custom:[],entities:{gyms:[],sites:[],machines:[],options:[]}})
+  catalogFetch:async()=>({baseCatalog:[],muscles:[],library:[],custom:[],entities:{gyms:[],sites:[],machines:[],options:[]}})
  });
  return {sync,uid,view,rows,notices,read:()=>structuredClone(state),
   editLocal:fn=>fn(state),
