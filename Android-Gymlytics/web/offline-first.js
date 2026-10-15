@@ -321,7 +321,7 @@ const api={
  }
 };
 function refreshCloudControls(){
- const linked=!!remoteSession?.user;
+ const linked=!!remoteSession?.user&&!transitioning;
  $('offlineRemoteUser').textContent=linked?'Conectado: '+(remoteSession.user.email||remoteSession.user.id):'Sin sesión de nube';
  $('offlineCloudDownload').disabled=!linked||!!syncController?.isBusy();
  $('offlineCloudUpload').disabled=!linked||!!syncController?.isBusy()||
@@ -413,43 +413,44 @@ async function importProfileBackup(event){
  if(file.size>50*1024*1024)return status('Respaldo excesivamente grande.');
  try{
   const backup=JSON.parse(await file.text());
-  if(backup.format!=='gymlytics-profile-backup'||backup.version!==1||
-     !backup.data||!Array.isArray(backup.data.records)||!Array.isArray(backup.data.tombstones)||
-     !Array.isArray(backup.data.pending)||!backup.data.entities||
-     !Array.isArray(backup.data.library)||!Array.isArray(backup.data.custom))
-    throw Error('No es una copia compatible y completa');
+  verifyRestoreBackup(backup,profiles);
   if(!confirm('Se restaurará como un perfil NUEVO, sin reemplazar ningún perfil existente. ¿Continuar?'))return;
-  const name='Restaurado - '+String(backup.name||'Gymlytics').slice(0,42);
-  const profile={id:uuid(),name,modifiedAt:new Date().toISOString(),data:backup.data};
-  await put(profile);
+  let name='Restaurado - '+String(backup.name||'Gymlytics').slice(0,38),suffix=2;
+  while(profiles.some(p=>p.name.toLocaleLowerCase('es')===name.toLocaleLowerCase('es')))
+   name='Restaurado ('+(suffix++)+') - '+String(backup.name||'Gymlytics').slice(0,32);
+  const profile={id:uuid(),name,modifiedAt:new Date().toISOString(),data:structuredClone(backup.data)};
+  await put(profile);profiles.push(profileMeta(profile));
   await activate(profile.id);
-  localStorage.setItem('gymlytics-active-profile',profile.id);
   status('Copia restaurada en un perfil independiente; no se reemplazó ningún registro.');
  }catch(error){status('No se pudo restaurar: '+error.message)}
 }
 
 async function init(){
- db=await openDB();profiles=await all();
+ db=await openDB();profiles=(await all()).map(profileMeta);
  syncController=createCloudSync({
-  remote,getState:()=>({data:latest?.data||EMPTY(),profileName:latest?.name||'Perfil'}),
+  remote:remoteGateway,getState:()=>({data:latest?.data||EMPTY(),profileName:latest?.name||'Perfil'}),
   mutate:update=>flush(update),refresh:updateFromProfile,
   isCurrent:(uid,token)=>stamp()===token&&remoteSession?.user?.id===uid,
-  isLinkedElsewhere:uid=>profiles.some(p=>p.id!==activeId&&p.data?.cloudUserId===uid),
+  isLinkedElsewhere:uid=>profiles.some(p=>p.id!==activeId&&p.cloudUserId===uid),
   confirmAction:message=>confirm(message),notify:status
  });
  if(!profiles.length){
   const profile={id:uuid(),name:'Mi perfil',modifiedAt:new Date().toISOString(),data:EMPTY()};
-  await put(profile);profiles=[profile];
+  await put(profile);profiles=[profileMeta(profile)];
  }
  const last=localStorage.getItem('gymlytics-active-profile');
  const selected=profiles.find(x=>x.id===last)?.id||profiles[0].id;
  window.GymCloud=api;
  await activate(selected,true);
  $('offlineProfiles').addEventListener('change',async event=>{
-  localStorage.setItem('gymlytics-active-profile',event.target.value);
-  await activate(event.target.value);
+  const chosen=event.target.value,previous=activeId;
+  try{await activate(chosen)}
+  catch(error){event.target.value=previous||'';status('No se pudo cambiar: '+error.message)}
  });
- $('offlineCreate').addEventListener('click',async()=>{try{await createProfile();localStorage.setItem('gymlytics-active-profile',activeId)}catch(e){status(e.message)}});
+ $('offlineRename').addEventListener('click',async()=>{
+  try{await renameProfile()}catch(error){status('No se pudo renombrar: '+error.message)}
+ });
+ $('offlineCreate').addEventListener('click',async()=>{try{await createProfile()}catch(e){status(e.message)}});
  $('offlineBackup').addEventListener('click',saveProfileBackup);
  $('offlineImport').addEventListener('change',importProfileBackup);
  $('offlineCloudToggle').addEventListener('click',()=>{
