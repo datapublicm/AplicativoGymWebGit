@@ -24,14 +24,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Pruebas estáticas antes de crear node_modules
+        run: npm run test:static
       - name: Instalar dependencias de prueba
         run: npm install --no-package-lock --no-audit --no-fund
-      - name: Comprobar sintaxis y pruebas antes del build web
+      - name: Comprobar sintaxis antes del build web
         run: |
           node --check web/offline-first.js
           node --check web/cloud-sync.js
           node --check web/sync-engine.js
-          npm run test:static
       - name: Construir SOLO paquete web de pruebas
         run: npm run build:web
       - name: Verificar salida modular sin Android ni APK
