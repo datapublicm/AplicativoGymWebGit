@@ -1,4 +1,4 @@
-# Compilación 01.06 autorizada por el usuario el 2026-10-15; segunda ejecución con prueba preflight actualizada.
+# Compilación 01.06 autorizada por el usuario el 2026-10-15; verificar empaquetado offline-first íntegro.
 # Instalación paralela a 01.05, sin reemplazarla ni tocar main.
 name: Gymlytics - APK 01.06 Pruebas (instalación paralela)
 on:
@@ -64,6 +64,9 @@ jobs:
           npm run build:web
           test -s dist/index.html
           test -s dist/legacy-compat.js
+          test -s dist/offline-first.js
+          test -s dist/offline-catalog-download.js
+          test ! -e dist/catalogo.js
           test -s dist/app.js
           test -s dist/dashboard.js
           test -s dist/styles.css
@@ -94,6 +97,8 @@ jobs:
           test -s android/app/src/main/assets/public/dashboard.js
           test -s android/app/src/main/assets/public/legacy-compat.js
           test -s android/app/src/main/assets/public/offline-first.js
+          test -s android/app/src/main/assets/public/offline-catalog-download.js
+          test ! -e android/app/src/main/assets/public/catalogo.js
           test -s android/app/src/main/assets/public/app.js
           grep -q 'dashboard.js' android/app/src/main/assets/public/index.html
           grep -q 'id="registroModoSubdivision"' android/app/src/main/assets/public/index.html
@@ -122,6 +127,7 @@ jobs:
           test -s "$APK"
           unzip -Z1 "$APK" | grep -Fxq 'assets/public/dashboard.js'
           unzip -Z1 "$APK" | grep -Fxq 'assets/public/offline-first.js'
+          unzip -Z1 "$APK" | grep -Fxq 'assets/public/offline-catalog-download.js'
           unzip -Z1 "$APK" | grep -Fxq 'assets/public/legacy-compat.js'
           unzip -Z1 "$APK" | grep -Fxq 'assets/public/app.js'
           unzip -Z1 "$APK" | grep -Fxq 'assets/public/index.html'
