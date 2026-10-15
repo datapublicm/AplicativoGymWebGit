@@ -568,7 +568,7 @@ async function saveSeries(){
  }
  finally{if(current()){btn.disabled=false;btn.textContent='Guardar series'}}
 }
-function recordHtml(r){return `<div class="record-item"><div><strong>${esc(r.exercise)}</strong><p>${esc(fmtDate(r.date))} · ${esc(r.gym)} · ${esc(r.sede)}<br>${esc(r.series)}${r.subdivision!=='-'?' · '+esc(r.subdivision):''} · ${esc(r.technique)}${r.assistance!==null&&r.assistance!==undefined?' · Asist.: '+esc(r.assistance):''}</p></div><aside><strong>${esc(r.weight)} ${esc(r.unit)} × ${esc(r.reps)}</strong><small>repeticiones</small><div class="record-actions"><button type="button" data-delete="${esc(r.id)}" title="Eliminar serie">Eliminar</button><button type="button" data-progress="${esc(r.exercise)}" title="Mostrar evolución de este ejercicio">Ver progreso</button></div></aside></div>`}
+function recordHtml(r){return `<div class="record-item"><div><strong>${esc(r.exercise)}</strong><p>${esc(fmtDate(r.date))} · ${esc(r.gym)} · ${esc(r.sede)}<br>${esc(r.series)}${r.subdivision!=='-'?' · '+esc(r.subdivision):''} · ${esc(r.technique)}${r.assistance!==null&&r.assistance!==undefined?' · Asist.: '+esc(r.assistance):''}</p></div><aside><strong>${esc(r.weight)} ${esc(r.unit)} × ${esc(r.reps)}</strong><small>repeticiones</small><div class="record-actions"><button type="button" data-edit="${esc(r.id)}" title="Modificar serie">Modificar</button><button type="button" data-delete="${esc(r.id)}" title="Eliminar serie">Eliminar</button><button type="button" data-progress="${esc(r.exercise)}" title="Mostrar evolución de este ejercicio">Ver progreso</button></div></aside></div>`}
 function orderedRecords(){return [...model.records].sort((a,b)=>b.date.localeCompare(a.date)||(b.createdAt||'').localeCompare(a.createdAt||''))}
 function drawRecent(){const list=orderedRecords().slice(0,3);$('recentRecords').innerHTML=list.length?list.map(recordHtml).join(''):'<div class="empty">Aún no hay registros nuevos. Completa una fila y guárdala.</div>'}
 const HISTORY_FIELDS=[
@@ -636,7 +636,7 @@ function drawHistory(reset=false){
  }).join('');
  const container=$('historyRecords');
  container.innerHTML=shown.length?
-  '<div class="history-table-scroll" tabindex="0" role="region" aria-label="Tabla de historial desplazable"><table class="history-data-table"><thead><tr>'+heads+'</tr></thead><tbody>'+rows+'</tbody></table></div><p class="history-table-hint">Toca la fecha de una fila para eliminar esa serie o ver su progreso.</p>':
+  '<div class="history-table-scroll" tabindex="0" role="region" aria-label="Tabla de historial desplazable"><table class="history-data-table"><thead><tr>'+heads+'</tr></thead><tbody>'+rows+'</tbody></table></div><p class="history-table-hint">Toca la fecha de una fila para modificarla, eliminarla o ver su progreso.</p>':
   '<div class="empty">'+(invalid?'Revisa las fechas: «Desde» no puede superar «Hasta».':'No se encontraron series con los filtros seleccionados.')+'</div>';
  $('historyPagination').hidden=list.length<=historyVisible;
  $('historyPageInfo').textContent='Mostrando '+Math.min(historyVisible,list.length).toLocaleString('es-PE')+' de '+list.length.toLocaleString('es-PE')+' series';
@@ -648,6 +648,26 @@ function drawHistory(reset=false){
  $('historyFilterSummary').textContent=invalid?'Rango de fechas incorrecto.':n(list.length)+' de '+n(ordered.length)+' series · '+n(new Set(list.map(r=>r.date)).size)+' fechas · Volumen: '+Math.round(volume).toLocaleString('es-PE')+' kg × rep.';
 }
 
+async function editRecord(id){
+ const row=model.records.find(x=>x.id===id);
+ if(!row||!window.GymCloud?.updateSeries)return;
+ const weight=prompt('Peso ('+row.unit+'):',String(row.weight));
+ if(weight===null)return;
+ const reps=prompt('Repeticiones:',String(row.reps));
+ if(reps===null)return;
+ const patch={weight:Number(weight),reps:Number(reps)};
+ if(!Number.isFinite(patch.weight)||patch.weight<0||!Number.isFinite(patch.reps)||patch.reps<=0){
+  toast('Introduce valores válidos.');return;
+ }
+ if(!confirm('¿Guardar esta modificación únicamente en el perfil local? La nube se actualizará solo cuando tú lo solicites.'))return;
+ const stamp=window.GymCloud.getSessionStamp?.();
+ try{
+  await window.GymCloud.updateSeries(id,patch);
+  if(stamp!==window.GymCloud.getSessionStamp?.())return;
+  model.records=await window.GymCloud.loadHistory();
+  drawRecent();drawHistory();drawReports();toast('Serie modificada localmente ✓');
+ }catch(error){if(stamp===window.GymCloud.getSessionStamp?.())toast(error.message);}
+}
 async function deleteRecord(id){
  if(!window.GymCloud?.canWrite())return;
  const stamp=window.GymCloud.getSessionStamp?.();
@@ -813,7 +833,7 @@ document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEve
  catch(error){if(current())feedback.textContent='No se pudo modificar: '+error.message;}
  finally{button.disabled=false;}
 }));
-document.addEventListener('click',e=>{const detail=e.target.closest('[data-history-detail]');if(detail){expandedHistoryId=expandedHistoryId===detail.dataset.historyDetail?null:detail.dataset.historyDetail;drawHistory();return;}const b=e.target.closest('[data-delete]');if(b){deleteRecord(b.dataset.delete);return;}const progress=e.target.closest('[data-progress]');if(progress){const exercise=progress.dataset.progress;showPage('dashboard');if(model.records.some(r=>r.exercise===exercise)){$('progressExercise').value=exercise;drawProgressChart(model.records);}}})}
+document.addEventListener('click',e=>{const detail=e.target.closest('[data-history-detail]');if(detail){expandedHistoryId=expandedHistoryId===detail.dataset.historyDetail?null:detail.dataset.historyDetail;drawHistory();return;}const edit=e.target.closest('[data-edit]');if(edit){editRecord(edit.dataset.edit);return;}const b=e.target.closest('[data-delete]');if(b){deleteRecord(b.dataset.delete);return;}const progress=e.target.closest('[data-progress]');if(progress){const exercise=progress.dataset.progress;showPage('dashboard');if(model.records.some(r=>r.exercise===exercise)){$('progressExercise').value=exercise;drawProgressChart(model.records);}}})}
 $('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();setupCatalogCompact();setupMockupHeaders();install();installRegistroCompact();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
