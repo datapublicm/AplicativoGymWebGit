@@ -523,7 +523,13 @@ async function saveSeries(){
  if(entries.some(x=>!validSeriesEntry(x))){
   toast('Revisa peso, repeticiones y asistencias.');return;
  }
- if(!window.GymCloud?.canWrite()){toast('Selecciona un perfil local para guardar.');return}
+ if(!window.GymCloud?.canWrite?.()){
+  const message=window.GymCloud?.getWriteStatus?.()?.message||
+   'El almacenamiento offline aún no está disponible. Abre Perfil y revisa el mensaje de estado.';
+  const feedback=$('saveFeedback');
+  if(feedback){feedback.textContent=message;feedback.hidden=false;}
+  toast(message);return;
+ }
  const savedDraftId=activeDraftId;
  const requestId=(window.GymSaveAttempt||0)+1;
  window.GymSaveAttempt=requestId;
@@ -826,7 +832,7 @@ document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEve
  const select=$({gym:'gymExistingSelect',site:'siteExistingSelect',machine:'machineExistingSelect',option:'optionExistingSelect',exercise:'exerciseExistingSelect'}[kind]);
  const name=$(kind+'EditName')?.value.trim()||'',feedback=$(kind==='exercise'?'exerciseEditFeedback':{gym:'gymFeedback',site:'siteFeedback',machine:'machineFeedback',option:'optionFeedback'}[kind]);
  if(!select.value||!name){feedback.textContent='Selecciona un elemento y escribe su nuevo nombre.';return;}
- if(!window.GymCloud?.canWrite()){feedback.textContent='Selecciona un perfil para modificar.';return;}
+ if(!window.GymCloud?.canWrite?.()){feedback.textContent=window.GymCloud?.getWriteStatus?.()?.message||'El perfil local todavía no está disponible para modificar.';return;}
  const stamp=window.GymCloud.getSessionStamp?.(),current=()=>stamp===window.GymCloud.getSessionStamp?.()&&window.GymCloud.canWrite();
  button.disabled=true;
  try{await window.GymCloud.updateCatalogItem(kind,select.value,name);if(current())feedback.textContent='Nombre actualizado en este perfil.';}
