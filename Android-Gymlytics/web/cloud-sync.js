@@ -1,5 +1,6 @@
 import {sourceKey,payloadOf,remoteToRow,planUpload,mergeDownload,acknowledge} from './sync-engine.js';
 import {legacyAlerts,normalizeLegacySnapshot} from './legacy-compat.js';
+import {mergeDownloadedCatalog} from './offline-catalog-download.js';
 
 // Adaptador de red sin sincronización automática. Las mutaciones se confirman
 // primero en IndexedDB y los conflictos requieren decisión humana.
@@ -84,15 +85,15 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
   if(busy)throw Error('Hay otra sincronización activa');
   await authorized(uid,stamp);
   const {profileName,data}=getState();
-  if((data.pending||[]).some(x=>['add_catalog','update_catalog','delete_catalog'].includes(x.kind)))
-   throw Error('Este perfil tiene cambios locales de catálogos. Para descargar sin sobrescribirlos, crea otro perfil vacío o conserva una copia de seguridad.');
-  if(readOnly&&(data.records?.length||data.entities?.gyms?.length||data.entities?.sites?.length||
+  // Las modificaciones del catálogo se conservan primero en el dispositivo:
+  // la descarga añadirá referencias sin sobrescribir ni borrar dichos cambios.
+  if(readOnly&&!data.readOnly&&(data.records?.length||data.entities?.gyms?.length||data.entities?.sites?.length||
       data.entities?.machines?.length||data.entities?.options?.length||data.custom?.length||
       data.library?.length||data.baseCatalog?.length))
    throw Error('La cuenta de prueba solo se descarga en un perfil vacío; crea primero un perfil local nuevo.');
   if(data.readOnly&&!readOnly)throw Error('El perfil de prueba solo admite descargas en modo de consulta.');
   const mode=readOnly?'CUENTA DE PRUEBA: únicamente consulta, sin cambios':'CUENTA PERSONAL: cambios solamente offline';
-  if(!confirmAction('¿Descargar el historial completo, gimnasios, sedes, instrumentos, ejercicios y técnicas a «'+profileName+'»? '+mode+'. Los cambios locales de series nunca se sobrescribirán sin resolver conflictos.'))return null;
+  if(!confirmAction('¿Descargar el historial completo, gimnasios, sedes, instrumentos, ejercicios y técnicas a «'+profileName+'»? '+mode+'. Se conservarán las ediciones locales y no se sobrescribirán datos sin autorización.'))return null;
   busy=true;refresh();
   try{
    // Cargar ambos orígenes por completo ANTES de modificar IndexedDB.
@@ -105,15 +106,14 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
    let summary;
    await mutate(local=>{
     validate(uid,stamp);
-    if((local.pending||[]).some(x=>['add_catalog','update_catalog','delete_catalog'].includes(x.kind)))
-     throw Error('Se detectaron ediciones de catálogos durante la descarga. No se aplicó.');
-    if(readOnly&&(local.records?.length||local.baseCatalog?.length||local.library?.length||local.custom?.length||
+    if(readOnly&&!local.readOnly&&(local.records?.length||local.baseCatalog?.length||local.library?.length||local.custom?.length||
       Object.values(local.entities||{}).some(a=>Array.isArray(a)&&a.length)))
      throw Error('El perfil de prueba dejó de estar vacío. No se aplicó la descarga.');
-    local.baseCatalog=structuredClone(catalog.baseCatalog);
-    local.entities=structuredClone(catalog.entities);
-    local.library=structuredClone(catalog.library);
-    local.custom=structuredClone(catalog.custom);
+    const snap=readOnly?structuredClone(catalog):mergeDownloadedCatalog(local,catalog);
+    local.baseCatalog=snap.baseCatalog;
+    local.entities=snap.entities;
+    local.library=snap.library;
+    local.custom=snap.custom;
     local.readOnly=!!(readOnly||local.readOnly);
     local.demo=local.readOnly;
     const alert=legacyAlerts(local,legacy,mirror);
