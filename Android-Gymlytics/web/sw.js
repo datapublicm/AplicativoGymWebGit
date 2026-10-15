@@ -1,6 +1,6 @@
 const PREFIX='gymlytics-mobile-';
-const CACHE=PREFIX+'v0.9-20261014';
-const ASSETS=['./','./index.html','./styles.css','./app.js','./manifest.webmanifest','./assets/polea-alta.webp','./assets/jalon-pecho.webp','./icons/icon-192.png','./icons/icon-512.png'];
+const CACHE=PREFIX+'dashboard-pruebas-20261015';
+const ASSETS=['./','./index.html','./styles.css','./app.js','./dashboard.js','./manifest.webmanifest','./assets/polea-alta.webp','./assets/jalon-pecho.webp','./icons/icon-192.png','./icons/icon-512.png'];
 const STATIC_URLS=new Set(ASSETS.map(path=>new URL(path,self.location.href).href));
 
 self.addEventListener('install',event=>event.waitUntil(
