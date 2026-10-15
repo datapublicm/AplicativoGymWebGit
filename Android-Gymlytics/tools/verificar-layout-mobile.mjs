@@ -194,5 +194,5 @@ try{
  console.log('24 escenarios de navegador realizados, sin APK.');
 }finally{
  try{ws?.close()}catch{}browser?.kill('SIGKILL');server?.close();
- rmSync(work,{recursive:true,force:true,maxRetries:15,retryDelay:150});
+ try{rmSync(work,{recursive:true,force:true,maxRetries:30,retryDelay:250});}catch(error){console.warn('Chrome finalizó los escenarios, pero queda una carpeta temporal en el runner: '+error.message)}
 }
