@@ -93,7 +93,7 @@ try{
  browser.stderr?.on('data',chunk=>{chromeStderr+=String(chunk).slice(-2000)});
  console.log('Chrome binario:',chrome);
  let port;
- for(let i=0;i<100;i++){try{port=Number(readFileSync(join(work,'DevToolsActivePort'),'utf8').split('\n')[0]);break}catch{await delay(100)}}
+ for(let i=0;i<250;i++){try{port=Number(readFileSync(join(work,'DevToolsActivePort'),'utf8').split('\n')[0]);break}catch{await delay(100)}}
  assert.ok(port,'Chrome no inició DevTools; exit='+browser.exitCode+'; stderr='+chromeStderr.slice(-2500));
  const targets=await(await fetch('http://127.0.0.1:'+port+'/json/list')).json();
  ws=new WebSocket(targets.find(x=>x.type==='page').webSocketDebuggerUrl);
