@@ -93,7 +93,7 @@ function detailOpen(){const r=chosenRow();if(!r||!getValue('t'))return;const tec
  anatomyData=null;gymlyticsAnatomyView('frontal');$('detailModal').showModal();
  const token=++anatomyRequestId;
  const sessionStamp=window.GymCloud?.getSessionStamp?.();
- const current=()=>token===anatomyRequestId&&sessionStamp===window.GymCloud?.getSessionStamp?.()&&!!window.GymCloud?.canWrite();
+ const current=()=>token===anatomyRequestId&&sessionStamp===window.GymCloud?.getSessionStamp?.()&&!!window.GymCloud?.canRead?.();
  const status=$('anatomyCloudState');if(status)status.textContent='Consultando relaciones musculares en Supabase…';
  window.GymCloud?.loadAnatomy?.(r)?.then(data=>{
   if(!current())return;
@@ -750,14 +750,14 @@ function setHistoryReady(ready){
  }
 }
 function canExportHistory(){
- if(historyReady&&!!window.GymCloud?.canWrite())return true;
+ if(historyReady&&!!window.GymCloud?.canRead?.())return true;
  toast('Espera a que termine de cargar el perfil para exportarlo.');
  return false;
 }
 async function refreshHistory(){
- if(!window.GymCloud?.canWrite()){toast('Selecciona un perfil para consultar el historial.');return;}
+ if(!window.GymCloud?.canRead?.()){toast('Selecciona un perfil para consultar el historial.');return;}
  const stamp=window.GymCloud.getSessionStamp?.();
- const current=()=>stamp===window.GymCloud?.getSessionStamp?.()&&!!window.GymCloud?.canWrite();
+ const current=()=>stamp===window.GymCloud?.getSessionStamp?.()&&!!window.GymCloud?.canRead?.();
  const button=$('historyRefresh');button.disabled=true;
  setHistoryReady(false);
  if(typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(0,null);
