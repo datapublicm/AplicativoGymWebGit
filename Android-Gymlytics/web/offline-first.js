@@ -4,6 +4,7 @@
 import { createClient } from '@supabase/supabase-js';
 import {sourceKey} from './sync-engine.js';
 import {createCloudSync} from './cloud-sync.js';
+import {profileMeta,validateProfileName,validateProfileBinding,verifyRestoreBackup} from './profile-policy.js';
 const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
  records:[],photos:{},custom:[],library:[],entities:{gyms:[],sites:[],machines:[],options:[]},
@@ -11,13 +12,19 @@ const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
 });
 const uuid=()=>crypto.randomUUID();
 const tidy=v=>String(v??'').trim();
-let db,profiles=[],activeId=null,profileEpoch=0,latest=null,queue=Promise.resolve(),remoteSession=null,syncController=null;
+let db,profiles=[],activeId=null,profileEpoch=0,latest=null,queue=Promise.resolve(),remoteSession=null,syncController=null,transitioning=false;
 const config={url:import.meta.env.VITE_SUPABASE_URL,key:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
  schema:import.meta.env.VITE_SUPABASE_SCHEMA||'sch_android_gymlytics'};
-const client=config.url&&config.key?createClient(config.url,config.key,{
- auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,storageKey:'gymlytics-manual-transfer'}
+const newClient=()=>config.url&&config.key?createClient(config.url,config.key,{
+ auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,
+  storageKey:'gymlytics-profile-memory-'+crypto.randomUUID()}
 }):null;
-const remote=client?.schema(config.schema);
+let client=newClient(),remote=client?.schema(config.schema);
+function rotateCloudClient(){client=newClient();remote=client?.schema(config.schema);remoteSession=null;}
+const remoteGateway={
+ from:(...args)=>{if(!remote)throw Error('Supabase no está configurado');return remote.from(...args)},
+ rpc:(...args)=>{if(!remote)throw Error('Supabase no está configurado');return remote.rpc(...args)}
+};
 function openDB(){
  return new Promise((resolve,reject)=>{
   const request=indexedDB.open(DB_NAME,1);
@@ -43,6 +50,7 @@ const current=()=>profiles.find(p=>p.id===activeId);
 const stamp=()=>activeId+':'+profileEpoch;
 const snapshot=()=>structuredClone(latest?.data||EMPTY());
 const flush=(update)=>{
+ if(transitioning)return Promise.reject(Error('Espera a que termine el cambio de perfil.'));
  const captured=activeId,epoch=profileEpoch;
  const task=queue.then(async()=>{
   if(!captured||captured!==activeId||epoch!==profileEpoch)throw Error('Cambiaste de perfil durante la operación.');
@@ -53,7 +61,7 @@ const flush=(update)=>{
   if(epoch!==profileEpoch||captured!==activeId)throw Error('Cambiaste de perfil durante la operación.');
   profile.data=data;profile.modifiedAt=new Date().toISOString();
   await put(profile);latest=profile;
-  profiles=profiles.map(p=>p.id===profile.id?profile:p);
+  profiles=profiles.map(p=>p.id===profile.id?profileMeta(profile):p);
   renderSyncStatus();
   return result;
  });
@@ -79,49 +87,85 @@ function catalogInit(){
  }));
 }
 async function activate(id,initial=false){
- if(syncController?.isBusy())throw Error('Termina la sincronización antes de cambiar de perfil');
- const epoch=++profileEpoch;
- if(typeof invalidatePendingSave==='function')invalidatePendingSave();
- if(typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(null,null);
- if(typeof setHistoryReady==='function')setHistoryReady(false);
- remoteSession=null; // En pantalla, el usuario debe autenticarse de nuevo para asociar otro perfil.
- const p=await get(id);
- if(epoch!==profileEpoch||!p) return;
- activeId=id;latest=p;profiles=await all();
- $('offlineProfiles').replaceChildren(...profiles.map(x=>new Option(x.name,x.id)));
- $('offlineProfiles').value=id;
- window.GymBaseCatalog=catalogInit();
- window.GymEntities=structuredClone(p.data.entities||EMPTY().entities);
- window.GymExerciseLibrary=structuredClone(p.data.library||[]);
- window.GymCustomCatalog=structuredClone(p.data.custom||[]);
- model.records=structuredClone(p.data.records||[]);
- model.photos=structuredClone(p.data.photos||{});
- if(typeof resetHistoryFilters==='function')resetHistoryFilters();
- if(typeof resetExerciseTabs==='function')resetExerciseTabs();
- if(typeof renderOwnCatalog==='function')renderOwnCatalog();
- if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
- if(typeof cascade==='function')cascade(0);
- drawRecent();drawHistory();drawReports();
- if(typeof setHistoryReady==='function')setHistoryReady(true);
- $('historyRefresh').disabled=false;$('catalogRefresh').disabled=false;
- $('offlineCloudPanel').hidden=true;
- $('offlineRemoteUser').textContent='';
- renderSyncStatus();
- status('Perfil local activo · '+p.name+' · funciona sin conexión');
- document.body.classList.remove('auth-locked');
- document.querySelectorAll('[data-page]').forEach(x=>{x.disabled=false;x.setAttribute('aria-disabled','false');});
- renderConflictButtons();refreshCloudControls();
- if(initial)showPage('registro');
+ if(transitioning)throw Error('Hay un cambio de perfil en curso.');
+ if(syncController?.isBusy())throw Error('Termina la sincronización antes de cambiar de perfil.');
+ if(!profiles.some(p=>p.id===id))throw Error('Perfil inexistente');
+ transitioning=true;
+ const previous=activeId;
+ $('offlineProfiles').disabled=true;
+ try{
+  // Finalizar escrituras pendientes de A antes de invalidar su sello de sesión.
+  await queue;
+  const epoch=++profileEpoch;
+  if(typeof invalidatePendingSave==='function')invalidatePendingSave();
+  if(typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(null,null);
+  if(typeof setHistoryReady==='function')setHistoryReady(false);
+  rotateCloudClient();
+  activeId=null;latest=null;
+  model.records=[];model.photos={};
+  window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
+  window.GymEntities={gyms:[],sites:[],machines:[],options:[]};
+  drawRecent();drawHistory();drawReports();
+  const p=await get(id);
+  if(!p||epoch!==profileEpoch)throw Error('No se pudo abrir el nuevo perfil.');
+  activeId=id;latest=p;profiles=(await all()).map(profileMeta);
+  $('offlineProfiles').replaceChildren(...profiles.map(x=>new Option(x.name,x.id)));
+  $('offlineProfiles').value=id;
+  window.GymBaseCatalog=catalogInit();
+  window.GymEntities=structuredClone(p.data.entities||EMPTY().entities);
+  window.GymExerciseLibrary=structuredClone(p.data.library||[]);
+  window.GymCustomCatalog=structuredClone(p.data.custom||[]);
+  model.records=structuredClone(p.data.records||[]);
+  model.photos=structuredClone(p.data.photos||{});
+  if(typeof resetHistoryFilters==='function')resetHistoryFilters();
+  if(typeof resetExerciseTabs==='function')resetExerciseTabs();
+  if(typeof renderOwnCatalog==='function')renderOwnCatalog();
+  if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
+  if(typeof cascade==='function')cascade(0);
+  drawRecent();drawHistory();drawReports();
+  if(typeof setHistoryReady==='function')setHistoryReady(true);
+  $('historyRefresh').disabled=false;$('catalogRefresh').disabled=false;
+  $('offlineCloudPanel').hidden=true;$('offlineRemoteUser').textContent='';
+  localStorage.setItem('gymlytics-active-profile',id);
+  renderSyncStatus();renderProfileControls();
+  status('Perfil local activo · '+p.name+' · funciona sin conexión');
+  document.body.classList.remove('auth-locked');
+  document.querySelectorAll('[data-page]').forEach(x=>{x.disabled=false;x.setAttribute('aria-disabled','false');});
+  renderConflictButtons();refreshCloudControls();
+  if(initial)showPage('registro');
+ }catch(error){
+  $('offlineProfiles').value=previous||'';
+  status('No se completó el cambio de perfil: '+error.message);
+  throw error;
+ }finally{transitioning=false;$('offlineProfiles').disabled=false;}
 }
 async function createProfile(){
- const name=tidy($('offlineNewName').value);
- if(!name||name.length>60) return status('Escribe un nombre de perfil entre 1 y 60 caracteres.');
- if(profiles.some(x=>x.name.toLocaleLowerCase('es')===name.toLocaleLowerCase('es')))return status('Ya existe un perfil con ese nombre.');
- const profile={id:uuid(),name,modifiedAt:new Date().toISOString(),data:EMPTY()};
- await put(profile);profiles.push(profile);$('offlineNewName').value='';
- await activate(profile.id);
- status('Perfil local creado. Los registros de otros perfiles permanecen separados.');
+ if(transitioning||syncController?.isBusy())throw Error('Termina la operación actual.');
+ const name=validateProfileName($('offlineNewName').value,profiles);
+ const p={id:uuid(),name,modifiedAt:new Date().toISOString(),data:EMPTY()};
+ await put(p);profiles.push(profileMeta(p));$('offlineNewName').value='';
+ await activate(p.id);
+ status('Perfil local creado. Los registros de los demás perfiles se mantienen separados.');
 }
+function renderProfileControls(){
+ const control=$('offlineRenameName');if(control)control.value=latest?.name||'';
+ const count=$('offlineProfileCount');
+ if(count)count.textContent=profiles.length+' perfiles locales independientes';
+}
+async function renameProfile(){
+ if(transitioning||syncController?.isBusy())throw Error('Termina la operación actual.');
+ const name=validateProfileName($('offlineRenameName').value,profiles,activeId);
+ if(!activeId)throw Error('Selecciona un perfil.');
+ await queue;
+ const profile=await get(activeId);if(!profile)throw Error('Perfil inexistente.');
+ profile.name=name;profile.modifiedAt=new Date().toISOString();
+ await put(profile);latest=profile;profiles=profiles.map(x=>x.id===profile.id?profileMeta(profile):x);
+ const item=[...$('offlineProfiles').options].find(x=>x.value===profile.id);
+ if(item)item.textContent=name;
+ renderSyncStatus();renderProfileControls();
+ status('Perfil renombrado sin modificar registros ni vínculos de nube.');
+}
+
 function catalogUpdate(){
  window.GymEntities=structuredClone(latest.data.entities);
  window.GymExerciseLibrary=structuredClone(latest.data.library);
