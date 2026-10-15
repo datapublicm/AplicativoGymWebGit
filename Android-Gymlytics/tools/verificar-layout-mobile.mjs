@@ -53,6 +53,24 @@ async function check(width,page){
   if(r.visible)assert.ok(r.left>=-1&&r.right<=width+1,width+'px '+page+': desborda '+r.selector+' ('+r.left+', '+r.right+')');
  }
  assert.ok(d.nav.left>=-1&&d.nav.right<=width+1,'Barra inferior fuera de pantalla');
+
+ if(page==='catalogos'){
+  const ev='(()=>{const kinds=["gym","site","zone","machine","exercise","grip","technique","series","subdivision"];const cards=kinds.map(k=>document.querySelector("#catalogCompactRows [data-catalog-kind="+k+"]"));const zone=cards[2];zone.querySelector(".catalog-compact-toggle").click();const zOpen=!zone.querySelector(".catalog-compact-detail").hidden&&zone.querySelector("#addOptionForm")!==null;const grip=cards[5];grip.querySelector(".catalog-compact-toggle").click();const switched=!grip.querySelector(".catalog-compact-detail").hidden&&!!grip.querySelector("#addOptionForm")&&zone.querySelector(".catalog-compact-detail").hidden;const stat=document.getElementById("catalogShortcutCounttechnique").textContent;return JSON.stringify({cards:cards.every(Boolean),zOpen,switched,stat});})()';
+  const rv=await request('Runtime.evaluate',{expression:ev,returnByValue:true});
+  if(rv.exceptionDetails)throw Error('Fallo interactivo Catálogos: '+JSON.stringify(rv.exceptionDetails));
+  const state=JSON.parse(rv.result.value);
+  assert.ok(state.cards&&state.zOpen&&state.switched,'Catálogos: filas/editor compartido: '+JSON.stringify(state));
+  assert.ok(Number(state.stat)>0,'Catálogos: el listado de técnicas de referencia no se cargó');
+ }
+ if(page==='registro'){
+  const ev='(()=>{const first=document.querySelector("#exerciseTabs [data-exercise-switch]");const firstId=first.dataset.exerciseSwitch;const weight=document.querySelector("#seriesRows .weight"),reps=document.querySelector("#seriesRows .reps");weight.value="80";reps.value="10";document.getElementById("addExerciseTab").click();const count=document.querySelectorAll("#exerciseTabs [data-exercise-switch]").length;document.querySelector("#exerciseTabs [data-exercise-switch="+firstId+"]").click();const restored=document.querySelector("#seriesRows .weight").value==="80"&&document.querySelector("#seriesRows .reps").value==="10";document.querySelector("#seriesRows .weight").value="";document.querySelector("#seriesRows .reps").value="";return JSON.stringify({count,restored,context:getComputedStyle(document.querySelector(".context-panel")).display,series:getComputedStyle(document.querySelector(".series-panel")).display});})()';
+  const rv=await request('Runtime.evaluate',{expression:ev,returnByValue:true});
+  if(rv.exceptionDetails)throw Error('Fallo interactivo Registro: '+JSON.stringify(rv.exceptionDetails));
+  const state=JSON.parse(rv.result.value);
+  assert.ok(state.count>=2&&state.restored,'Registro: no conserva borradores en varias pestañas: '+JSON.stringify(state));
+  assert.notEqual(state.series,'none','Registro: se ocultan las series en el nuevo diseño');
+ }
+
  if(page==='dashboard'){
   assert.ok(d.chart,'Gráfico de compatibilidad no renderizado');assert.match(d.summary,/Último valor/);
   for(const [tab,chart] of [['resumen','#dashWeekly svg'],['progreso','#dashTrend svg'],['analisis','#dashStates svg']]){
