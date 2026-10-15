@@ -1,0 +1,48 @@
+name: Gymlytics 01.06 - paquete web sin compilar APK
+on:
+  push:
+    branches: [apk/pruebas]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validar-paquete-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Android-Gymlytics
+    env:
+      VITE_SUPABASE_URL: https://jasuqnxrskhqfobsazwd.supabase.co
+      VITE_SUPABASE_SCHEMA: sch_android_gymlytics
+      VITE_GYMLYTICS_ENVIRONMENT: pruebas
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_validacion_de_compilacion_sin_acceso_real
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: apk/pruebas
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias de prueba
+        run: npm install --no-package-lock --no-audit --no-fund
+      - name: Comprobar sintaxis y pruebas antes del build web
+        run: |
+          node --check web/offline-first.js
+          node --check web/cloud-sync.js
+          node --check web/sync-engine.js
+          npm run test:static
+      - name: Construir SOLO paquete web de pruebas
+        run: npm run build:web
+      - name: Verificar salida modular sin Android ni APK
+        run: |
+          test -s dist/index.html
+          test -s dist/catalogo.js
+          test -s dist/cloud-sync.js
+          test -s dist/sync-engine.js
+          test -s dist/offline-first.js
+          test -s dist/app.js
+          test -n "$(find dist/assets -type f -name '*.js' -print -quit)"
+          grep -q 'src="./catalogo.js"' dist/index.html
+          test ! -d android/app
+          test ! -d android/app/build/outputs/apk
