@@ -1,8 +1,8 @@
 // Transformación pura de tablas Supabase a catálogos offline. Sin escritura remota.
-export const emptyCatalogue=()=>({baseCatalog:[],custom:[],library:[],
+export const emptyCatalogue=()=>({baseCatalog:[],muscles:[],custom:[],library:[],
  entities:{gyms:[],sites:[],machines:[],options:[]}});
 const name=v=>String(v??'').trim();
-export function prepareDownloadedCatalog({base=[],exercises=[],gyms=[],sites=[],machines=[],options=[]}={}){
+export function prepareDownloadedCatalog({base=[],exercises=[],gyms=[],sites=[],machines=[],options=[],muscles=[]}={}){
  const byGym=new Map(gyms.map(x=>[x.id,name(x.nombre)]));
  const bySite=new Map(sites.map(x=>[x.id,name(x.nombre)]));
  const entities={gyms:gyms.map(x=>({id:x.id,nombre:x.nombre})),
@@ -33,7 +33,7 @@ export function prepareDownloadedCatalog({base=[],exercises=[],gyms=[],sites=[],
   t:[name(x.tecnica_actualizada)||'Ejecución base'],
   m:'No especificado',ms:'No especificado',n:0,last:null
  }));
- return {baseCatalog,entities,library,custom};
+ return {baseCatalog,entities,library,custom,muscles:muscles.filter(x=>x.activo!==false).map(x=>({id:x.id,nombre:x.nombre,codigo:x.codigo,grupo_muscular:x.grupo_muscular}))};
 }
 
 // Fusiona catálogos sin eliminar ni sobrescribir ediciones locales.
@@ -55,13 +55,22 @@ export function mergeDownloadedCatalog(local,download){
  };
  const current=local.entities||emptyCatalogue().entities;
  const fetched=download.entities;
+ const gyms=union(current.gyms,fetched.gyms,['nombre']);
+ // Un gimnasio existente puede tener otro UUID local. Reasociar las sedes
+ // descargadas evita referencias huérfanas y conserva la estructura offline.
+ const remap=new Map(fetched.gyms.map(g=>{
+  const present=gyms.find(x=>name(x.nombre).toLocaleLowerCase('es')===name(g.nombre).toLocaleLowerCase('es'));
+  return [g.id,present?.id||g.id];
+ }));
+ const remoteSites=fetched.sites.map(x=>({...x,gimnasio_id:remap.get(x.gimnasio_id)||x.gimnasio_id}));
  return {
   baseCatalog:union(local.baseCatalog,download.baseCatalog,['g','s','e','i','a','gr','z']),
+  muscles:union(local.muscles,download.muscles,['nombre']),
   custom:union(local.custom,download.custom,['g','s','i','e','a','gr']),
   library:union(local.library,download.library,['nombre']),
   entities:{
-   gyms:union(current.gyms,fetched.gyms,['nombre']),
-   sites:union(current.sites,fetched.sites,['nombre','gimnasio_id']),
+   gyms,
+   sites:union(current.sites,remoteSites,['nombre','gimnasio_id']),
    machines:union(current.machines,fetched.machines,['nombre','tipo_equipo']),
    options:union(current.options,fetched.options,['tipo','nombre'])
   }
