@@ -52,7 +52,21 @@ async function check(width,page){
   if(r.visible)assert.ok(r.left>=-1&&r.right<=width+1,width+'px '+page+': desborda '+r.selector+' ('+r.left+', '+r.right+')');
  }
  assert.ok(d.nav.left>=-1&&d.nav.right<=width+1,'Barra inferior fuera de pantalla');
- if(page==='dashboard'){assert.ok(d.chart,'Gráfico no renderizado');assert.match(d.summary,/Último valor/);}
+ if(page==='dashboard'){
+  assert.ok(d.chart,'Gráfico de compatibilidad no renderizado');assert.match(d.summary,/Último valor/);
+  for(const [tab,chart] of [['resumen','#dashWeekly svg'],['progreso','#dashTrend svg'],['analisis','#dashStates svg']]){
+   const expr='(()=>{const button=document.querySelector(\'[data-dash-tab="'+tab+'"]\');button.click();const panel=document.getElementById("dash-'+tab+'");return JSON.stringify({visible:!panel.hidden,svg:!!document.querySelector("'+chart+'"),chosen:button.getAttribute("aria-selected")});})()';
+   const result=await request('Runtime.evaluate',{expression:expr,returnByValue:true});
+   if(result.exceptionDetails)throw Error('Falló la interacción del Dashboard: '+JSON.stringify(result.exceptionDetails));
+   const state=JSON.parse(result.result.value);
+   assert.ok(state.visible&&state.svg&&state.chosen==='true',width+'px: la pestaña '+tab+' no funciona: '+JSON.stringify(state));
+   if(width===390){
+    const path=resolve(root,'../mobile-check');mkdirSync(path,{recursive:true});
+    const shot=await request('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+    writeFileSync(join(path,'gymlytics-dashboard-'+tab+'-390.png'),Buffer.from(shot.data,'base64'));
+   }
+  }
+ }
  console.log('OK',width,page,'documento',d.documentWidth);
  if((width===320&&page==='dashboard')||(width===390&&['registro-series','catalogos','tablas'].includes(page))){
   const path=resolve(root,'../mobile-check');mkdirSync(path,{recursive:true});
