@@ -69,6 +69,31 @@ async function check(width,page){
   const state=JSON.parse(rv.result.value);
   assert.ok(state.count>=2&&state.restored,'Registro: no conserva borradores en varias pestañas: '+JSON.stringify(state));
   assert.notEqual(state.series,'none','Registro: se ocultan las series en el nuevo diseño');
+
+  const checks='(()=>{'+
+   'window.confirm=()=>true;'+
+   'const date=document.getElementById("fecha"),button=document.getElementById("addExerciseTab");'+
+   'date.value="2026-10-16";date.dispatchEvent(new Event("change",{bubbles:true}));'+
+   'const first=document.querySelector("#exerciseTabs [data-exercise-switch]").dataset.exerciseSwitch;'+
+   'button.click();const dateShared=document.getElementById("fecha").value==="2026-10-16";'+
+   'document.querySelector("#exerciseTabs [data-exercise-switch="+first+"]").click();'+
+   'const dateRestored=document.getElementById("fecha").value==="2026-10-16";'+
+   'const qty=document.querySelectorAll("#seriesRows tr").length;document.getElementById("addSeriesGroup").click();'+
+   'const added=document.querySelectorAll("#seriesRows tr").length===qty+1;'+
+   'const sel=document.getElementById("registroModoSubdivision");sel.value="lateral";sel.dispatchEvent(new Event("change",{bubbles:true}));'+
+   'const lateral=document.querySelectorAll("#seriesRows tr").length===6;'+
+   'sel.value="normal";sel.dispatchEvent(new Event("change",{bubbles:true}));'+
+   'const returnNormal=document.querySelectorAll("#seriesRows tr").length===3;'+
+   'const row=document.querySelector("#seriesRows tr");row.querySelector(".weight").value="60";row.querySelector(".reps").value="10";'+
+   'row.querySelector(".registro-row-clear").click();const cleared=row.querySelector(".weight").value===""&&row.querySelector(".reps").value==="";'+
+   'const output={dateShared,dateRestored,added,lateral,returnNormal,cleared,selected:sel.value};'+
+   'return JSON.stringify(output)'+
+  '})()';
+  const checkResult=await request('Runtime.evaluate',{expression:checks,returnByValue:true});
+  if(checkResult.exceptionDetails)throw Error('Registro: controles no funcionan '+JSON.stringify(checkResult.exceptionDetails));
+  const functional=JSON.parse(checkResult.result.value);
+  assert.ok(functional.dateShared&&functional.dateRestored&&functional.added&&functional.lateral&&functional.returnNormal&&functional.cleared,'Registro: falla interacción de fecha, series, subdivisiones o limpieza: '+JSON.stringify(functional));
+
  }
 
  if(page==='dashboard'){
