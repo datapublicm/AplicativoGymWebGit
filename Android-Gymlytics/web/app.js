@@ -631,7 +631,7 @@ function drawHistory(reset=false){
    return '<td>'+ (key==='date'?'<button class="history-row-open" type="button" data-history-detail="'+esc(r.id)+'" aria-label="Ver acciones de serie del '+esc(fmtDate(r.date))+'">'+value+' ⋯</button>':value)+'</td>';
   }).join('');
   const expanded=expandedHistoryId===r.id;
-  const more=expanded?'<tr class="history-detail-actions"><td colspan="'+columns.length+'"><strong>'+esc(r.exercise)+'</strong> · '+esc(r.technique||'')+' <button type="button" data-delete="'+esc(r.id)+'">Eliminar</button><button type="button" data-progress="'+esc(r.exercise)+'">Ver progreso</button></td></tr>':'';
+  const more=expanded?'<tr class="history-detail-actions"><td colspan="'+columns.length+'"><strong>'+esc(r.exercise)+'</strong> · '+esc(r.technique||'')+' <button type="button" data-edit="'+esc(r.id)+'">Modificar</button><button type="button" data-delete="'+esc(r.id)+'">Eliminar</button><button type="button" data-progress="'+esc(r.exercise)+'">Ver progreso</button></td></tr>':'';
   return '<tr data-history-row="'+esc(r.id)+'">'+cells+'</tr>'+more;
  }).join('');
  const container=$('historyRecords');
