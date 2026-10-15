@@ -14,7 +14,7 @@ const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
 });
 const uuid=()=>crypto.randomUUID();
 const tidy=v=>String(v??'').trim();
-let db,profiles=[],activeId=null,profileEpoch=0,latest=null,queue=Promise.resolve(),remoteSession=null,cloudAccountKind=null,syncController=null,transitioning=false;
+let db,profiles=[],activeId=null,profileEpoch=0,latest=null,queue=Promise.resolve(),remoteSession=null,cloudAccountKind=null,syncController=null,transitioning=false,offlineInitError=null;
 const config={url:import.meta.env.VITE_SUPABASE_URL,key:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
  schema:import.meta.env.VITE_SUPABASE_SCHEMA||'sch_android_gymlytics'};
 const newClient=()=>config.url&&config.key?createClient(config.url,config.key,{
@@ -197,9 +197,20 @@ function presentCatalog(kind){
  return kind==='exercise'?[...latest.data.library,...latest.data.custom.map(x=>({id:x.cloud_id,nombre:x.e}))]:
   latest.data.entities[groups[kind]];
 }
-const assertEditable=()=>{if(!latest||latest.data?.readOnly)throw Error('Cuenta de prueba: solo lectura. Crea un perfil personal para editar.');};
+const writeStatus=()=>{
+ if(transitioning)return {code:'switching',message:'Se está cambiando de perfil. Espera a que finalice antes de guardar.'};
+ if(offlineInitError&&!latest)return {code:'error',message:'El almacenamiento local no pudo iniciarse: '+offlineInitError+'. Ve a Perfil para revisar el estado. No borres los datos de la aplicación.'};
+ if(!activeId||!latest)return {code:'loading',message:'El perfil local aún no termina de cargarse. Ve a Perfil y comprueba que diga «Perfil local editable».'};
+ if(latest.data?.readOnly)return {code:'read_only',message:'«'+latest.name+'» es una cuenta de prueba de solo lectura. En Perfil, crea o elige otro perfil personal para guardar.'};
+ return {code:'ready',message:'Perfil «'+latest.name+'» listo para guardar offline.'};
+};
+const assertEditable=()=>{
+ const state=writeStatus();
+ if(state.code!=='ready')throw Error(state.message);
+};
 const api={
- canWrite:()=>!!activeId&&!latest?.data?.readOnly,
+ canWrite:()=>!!activeId&&!latest?.data?.readOnly&&!transitioning,
+ getWriteStatus:writeStatus,
  canRead:()=>!!activeId&&!!latest,
  getSessionStamp:stamp,
  async refreshCatalog(){window.GymBaseCatalog=catalogInit();if(typeof cascade==='function')cascade(0);return window.GymBaseCatalog.length},
@@ -653,6 +664,18 @@ async function init(){
  $('authRecovery').addEventListener('click',()=>status('La recuperación de contraseña se habilitará cuando se configure una URL HTTPS segura. El perfil offline no se ve afectado.'));
 }
 init().catch(error=>{
- window.GymCloud={canWrite:()=>false};
- status('No se pudo abrir el almacenamiento local: '+error.message+'. No se guardarán entrenamientos.');
+ offlineInitError=String(error.message||error);
+ // Un fallo posterior a la activación (por ejemplo, un control opcional ausente)
+ // no debe anular el perfil IndexedDB que ya está listo ni bloquear Guardar.
+ if(activeId&&latest&&!transitioning){
+  window.GymCloud=api;
+  status('Perfil local «'+latest.name+'» activo. Una función adicional falló al iniciarse: '+offlineInitError+'. Tus registros locales siguen protegidos.');
+ }else{
+  window.GymCloud={
+   canWrite:()=>false,
+   canRead:()=>false,
+   getWriteStatus:()=>({code:'error',message:'No se pudo abrir el almacenamiento local: '+offlineInitError+'. Revisa Perfil. No borres los datos de la aplicación.'})
+  };
+  status('No se pudo abrir el almacenamiento local: '+offlineInitError+'. No se guardarán entrenamientos.');
+ }
 });
