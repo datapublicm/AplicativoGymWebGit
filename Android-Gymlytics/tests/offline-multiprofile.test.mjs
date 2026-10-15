@@ -74,7 +74,7 @@ const window={GymBaseCatalog:[{g:'A'}],GymEntities:{},GymCustomCatalog:[{id:'A'}
 const elements={offlineProfiles:{value:'A',disabled:false,replaceChildren(...xs){this.options=xs}},
  historyRefresh:{},catalogRefresh:{},offlineCloudPanel:{},offlineRemoteUser:{}};
 const $=id=>elements[id]||(elements[id]={});
-const Option=(name,id)=>({textContent:name,value:id});
+function Option(name,id){this.textContent=name;this.value=id}
 const get=async id=>{reads++;return {id,name:'Usuario B',data:{
  records:[{id:'serie-B'}],photos:{secret:'B'},entities:{gyms:[],sites:[],machines:[],options:[]},
  library:[],custom:[],pending:[],tombstones:[]}}};
