@@ -1,6 +1,6 @@
-# Compilación autorizada por el usuario: entrega 01.04 de apk/pruebas.
+# Compilación autorizada por el usuario: entrega 01.05 de apk/pruebas.
 # No modifica ramas principales ni incorpora el modelo 3D pendiente.
-name: Gymlytics - APK 01.04 Pruebas
+name: Gymlytics - APK 01.05 Pruebas
 on:
   push:
     branches:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 jobs:
   compilar-apk:
-    name: Construir APK debug Gymlytics 01.04
+    name: Construir APK debug Gymlytics 01.05
     if: github.ref == 'refs/heads/apk/pruebas'
     runs-on: ubuntu-latest
     timeout-minutes: 55
@@ -35,7 +35,7 @@ jobs:
           test "${GITHUB_REF_NAME}" = "apk/pruebas"
           test ! -d android/app
           test -f android/README.md
-          node -e 'const p=require("./package.json"); const c=require("./capacitor.config.json");if(p.name!=="gymlytics"||p.version!=="0.1.4"||c.appId!=="com.datapublicm.gymlytics")process.exit(1)'
+          node -e 'const p=require("./package.json"); const c=require("./capacitor.config.json");if(p.name!=="gymlytics"||p.version!=="0.1.5"||c.appId!=="com.datapublicm.gymlytics")process.exit(1)'
           test "${VITE_SUPABASE_SCHEMA}" = sch_android_gymlytics
       - name: Configurar Node.js 22
         uses: actions/setup-node@v4
@@ -69,7 +69,7 @@ jobs:
           rmdir android
           npx cap add android
           npx cap sync android
-      - name: Establecer version interna 01.04 y codigo 4
+      - name: Establecer version interna 01.05 y codigo 5
         run: |
           node <<'NODE'
           const fs = require('node:fs');
@@ -77,10 +77,10 @@ jobs:
           let gradle = fs.readFileSync(file,'utf8');
           if (!/versionCode\s+\d+/.test(gradle) || !/versionName\s+["'][^"']+["']/.test(gradle))
             throw Error('No se encontró versión Android en Gradle');
-          gradle = gradle.replace(/versionCode\s+\d+/,'versionCode 4')
-                         .replace(/versionName\s+["'][^"']+["']/,'versionName "01.04"');
+          gradle = gradle.replace(/versionCode\s+\d+/,'versionCode 5')
+                         .replace(/versionName\s+["'][^"']+["']/,'versionName "01.05"');
           fs.writeFileSync(file,gradle);
-          if (!gradle.includes('versionCode 4') || !gradle.includes('versionName "01.04"'))
+          if (!gradle.includes('versionCode 5') || !gradle.includes('versionName "01.05"'))
             throw Error('La numeración Android no se aplicó');
           NODE
       - name: Compilar APK Android debug
@@ -95,16 +95,16 @@ jobs:
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep '^package:' | tee /tmp/gymlytics-package.txt
           grep -q "name='com.datapublicm.gymlytics'" /tmp/gymlytics-package.txt
-          grep -q "versionCode='4'" /tmp/gymlytics-package.txt
-          grep -q "versionName='01.04'" /tmp/gymlytics-package.txt
+          grep -q "versionCode='5'" /tmp/gymlytics-package.txt
+          grep -q "versionName='01.05'" /tmp/gymlytics-package.txt
           mkdir -p entregables
-          cp "$APK" entregables/Gymlytics_01.04_Pruebas.apk
-          (cd entregables && sha256sum Gymlytics_01.04_Pruebas.apk > SHA256.txt)
+          cp "$APK" entregables/Gymlytics_01.05_Pruebas.apk
+          (cd entregables && sha256sum Gymlytics_01.05_Pruebas.apk > SHA256.txt)
           ls -lh entregables/
       - name: Publicar APK para descarga
         uses: actions/upload-artifact@v4
         with:
-          name: Gymlytics_01.04_Pruebas_APK
+          name: Gymlytics_01.05_Pruebas_APK
           path: Android-Gymlytics/entregables/
           if-no-files-found: error
           retention-days: 30
