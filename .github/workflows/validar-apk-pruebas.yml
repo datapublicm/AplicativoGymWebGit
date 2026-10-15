@@ -25,6 +25,7 @@ jobs:
           node --check web/profile-policy.js
           node --check web/cloud-sync.js
           node --check web/sync-engine.js
+          node --check web/legacy-compat.js
           node --check web/catalogo.js
           node --check tools/validar-data-api.mjs
       - name: Ejecutar pruebas unitarias y de regresion
