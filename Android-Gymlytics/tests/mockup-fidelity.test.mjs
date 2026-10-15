@@ -33,7 +33,7 @@ test('La compilación web verifica que empaquete los archivos reales del mockup'
   assert.ok(vite.includes("'"+id+"'"),id);
  assert.match(vite,/source\.equals\(output\)/);
  assert.match(vite,/throw Error\('El APK empaquetaría una versión antigua/);
- assert.match(sw,/gymlytics-integridad-offline-20261015-v03/);
+ assert.match(sw,/gymlytics-integridad-offline-20261015-v04/);
 });
 test('Se mantienen Tablas y Dashboard independientes, sin cambiar su vista',()=>{
  assert.match(html,/id="page-tablas"/);
