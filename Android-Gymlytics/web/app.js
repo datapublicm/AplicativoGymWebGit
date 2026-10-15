@@ -225,6 +225,11 @@ function catalogOpenCard(kind,action='add'){
   toast('El número de serie y las subdivisiones se configuran en Registro.');
   showPage('registro');return;
  }
+ if(action==='edit'){
+  const selected=row.querySelector('.catalog-compact-picker select')?.value||'';
+  if(!selected){toast('Selecciona primero un elemento para modificar.');return;}
+  if(selected.startsWith('base:')){toast('Este valor procede del catálogo de referencia. Solo puedes modificar los elementos propios de tu cuenta.');return;}
+ }
  const detail=row.querySelector('.catalog-compact-detail'),btn=row.querySelector('.catalog-compact-toggle');
  if(!detail){toast('Este catálogo es de referencia y solo permite consultar.');return;}
  const open=action==='toggle'?detail.hidden:true;
@@ -451,6 +456,12 @@ function refreshRegistroSelectors(){
 }
 function installRegistroCompact(){
  const seriesSelect=$('registroNumeroSerie'),mode=$('registroModoSubdivision'),rows=$('seriesRows');
+ $('fecha')?.addEventListener('change',()=>{
+  const chosen=$('fecha').value;
+  if(!chosen)return;
+  for(const draft of draftTabs)draft.date=chosen;
+  updateRecordDate();
+ });
  seriesSelect?.addEventListener('change',()=>{
   const target=[...rows.querySelectorAll('tr')].find(r=>r.dataset.serie==='Serie '+seriesSelect.value);
   if(target){target.scrollIntoView({block:'center',behavior:'smooth'});target.querySelector('.weight')?.focus({preventScroll:true});}
