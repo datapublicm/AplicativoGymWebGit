@@ -36,9 +36,14 @@ export function planUpload(data){
   const last=related.at(-1);
   const found=(data.conflicts||[]).some(c=>c.sourceKey===key);
   if(found){blocked.push(...related);continue;}
-  const item={op_id:last.id,source_key:key,action:last.kind==='delete_series'?'delete':'upsert',
+  // Si la red cortó después del commit, repetir idéntico op_id y payload.
+  // Ningún cambio posterior puede alterar una petición ya enviada.
+  const submitted=related.find(x=>x.submittedRequest);
+  const item=submitted?structuredClone(submitted.submittedRequest):{
+   op_id:last.id,source_key:key,action:last.kind==='delete_series'?'delete':'upsert',
    expected_version:Math.max(0,Number(last.expectedVersion??row?.cloudVersion??0)),
-   ...(last.kind==='delete_series'?{}:{payload:payloadOf(row||{})})};
+   ...(last.kind==='delete_series'?{}:{payload:payloadOf(row||{})})
+  };
   if(item.action==='upsert'&&!row)throw Error('El registro pendiente '+key+' ya no existe');
   if(!uuidPattern.test(item.op_id)||!/^(local|legacy):[0-9a-f-]{36}$/i.test(key))
    throw Error('Identificador de sincronización inválido: '+key);
@@ -98,15 +103,25 @@ export function acknowledge(data,submitted,results){
   const related=(data.pending||[]).filter(x=>x.localId===op.source_key.slice(6)||
    x.remoteId&&op.source_key==='legacy:'+x.remoteId||
    x.syncKey===op.source_key);
+  let reached=false;
   for(const item of related){
    accepted.add(item.id);
-   if(item.id===op.op_id)break;
+   if(item.id===op.op_id){reached=true;break;}
+  }
+  if(!reached)throw Error('La respuesta confirmó una operación que ya no está en la cola');
+  // Las ediciones realizadas después del intento anterior deben usar la
+  // versión recién confirmada, pero conservan un op_id distinto.
+  let past=false;
+  for(const item of related){
+   if(past)item.expectedVersion=Number(result.version);
+   if(item.id===op.op_id)past=true;
   }
   done++;if(result.status==='duplicate')duplicate++;
   const record=data.records.find(r=>sourceKey(r)===op.source_key);
   if(record){
    record.cloudVersion=Number(result.version);
-   record.syncKey=op.source_key;record.lastServerPayload=payloadOf(record);
+   record.syncKey=op.source_key;
+   record.lastServerPayload=op.action==='upsert'?structuredClone(op.payload):payloadOf(record);
   }
   for(const t of data.tombstones||[]){
    if(t.syncKey===op.source_key||op.action==='delete'&&(t.localId===op.source_key.slice(6)||t.remoteId&&op.source_key==='legacy:'+t.remoteId))
