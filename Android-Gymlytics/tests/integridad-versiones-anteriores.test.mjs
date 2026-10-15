@@ -33,11 +33,12 @@ test('Eliminación desde cliente antiguo exige revisión, sin borrar automática
  assert.equal(local.conflicts[0].server.deleted,true);
  assert.equal(local.records.length,1);
 });
-test('No hay falsa alerta de eliminación si una serie ya está versionada en el espejo',()=>{
+test('Borrado del historial antiguo se detecta aun si existe su espejo',()=>{
  const local=state();
  const result=legacyAlerts(local,[],[mirror()]);
- assert.deepEqual(result,{changed:0,missing:0});
- assert.equal(local.conflicts.length,0);
+ assert.deepEqual(result,{changed:0,missing:1});
+ assert.equal(local.conflicts[0].kind,'legacy_unversioned');
+ assert.equal(local.records.length,1,'Conservar datos hasta una conciliación segura');
 });
 test('Si cliente antiguo actualiza tras cambio en espejo se bloquea la subida conflictiva',()=>{
  const local=state();local.records[0].weight=65;
