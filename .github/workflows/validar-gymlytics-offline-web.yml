@@ -49,3 +49,6 @@ jobs:
           grep -q 'src="./catalogo.js"' dist/index.html
           test ! -d android/app
           test ! -d android/app/build/outputs/apk
+
+      - name: Probar IndexedDB real y arranque sin Internet en Chromium
+        run: node tools/verificar-integridad-offline.mjs
