@@ -81,9 +81,9 @@ async function check(width,page){
    'const qty=document.querySelectorAll("#seriesRows tr").length;document.getElementById("addSeriesGroup").click();'+
    'const added=document.querySelectorAll("#seriesRows tr").length===qty+1;'+
    'const sel=document.getElementById("registroModoSubdivision");sel.value="lateral";sel.dispatchEvent(new Event("change",{bubbles:true}));'+
-   'const lateral=document.querySelectorAll("#seriesRows tr").length===6;'+
+   'const lateral=document.querySelectorAll("#seriesRows tr").length===(qty+1)*2;'+
    'sel.value="normal";sel.dispatchEvent(new Event("change",{bubbles:true}));'+
-   'const returnNormal=document.querySelectorAll("#seriesRows tr").length===3;'+
+   'const returnNormal=document.querySelectorAll("#seriesRows tr").length===qty+1;'+
    'const row=document.querySelector("#seriesRows tr");row.querySelector(".weight").value="60";row.querySelector(".reps").value="10";'+
    'row.querySelector(".registro-row-clear").click();const cleared=row.querySelector(".weight").value===""&&row.querySelector(".reps").value==="";'+
    'const output={dateShared,dateRestored,added,lateral,returnNormal,cleared,selected:sel.value};'+
