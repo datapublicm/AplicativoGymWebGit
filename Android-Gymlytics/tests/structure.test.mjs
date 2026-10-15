@@ -57,14 +57,16 @@ test('01.04: gimnasios, sedes, máquinas y ejercicios se crean independientement
  assert.ok(auth.includes("maquina_id"));
  assert.ok(app.includes("window.GymExerciseLibrary||[]"));
 });
-test('01.04: catálogo descargado tras login, nunca embebido en la APK',()=>{
- assert.doesNotMatch(html,/catalogo\.js/);
- assert.doesNotMatch(read('vite.config.js'),/['"]catalogo\.js['"]/);
- assert.doesNotMatch(read('web/sw.js'),/['"]\.\/catalogo\.js['"]/);
- assert.ok(app.includes('window.GymBaseCatalog||[]'));
- assert.ok(auth.includes('cloud.loadInitialCatalog()'));
- assert.ok(auth.includes('cloud.loadOwnCatalog()'));
+test('01.06: el catálogo de referencia funciona sin cuenta y se distribuye con la APK',()=>{
+ assert.match(html,/src="\.\/catalogo\.js"/);
+ assert.match(html,/src="\.\/offline-first\.js"/);
+ assert.match(read('web/catalogo.js'),/window\.GymBundledCatalog=CATALOG/);
+ assert.match(read('vite.config.js'),/offline-first\.js/);
+ assert.match(read('web/sw.js'),/offline-first\.js/);
+ for(const id of ['offlineProfiles','offlineNewName','offlineCreate','offlineCloudToggle','offlineCloudDownload'])
+  assert.ok(html.includes('id="'+id+'"'),id);
 });
+
 test('01.04: safe areas y CSS de pestañas',()=>{
  const css=read('web/styles.css');
  assert.ok(css.includes('safe-area-inset-top'));
