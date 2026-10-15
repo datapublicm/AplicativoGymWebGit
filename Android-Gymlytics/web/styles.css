@@ -993,3 +993,7 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
  .offline-new-profile button{width:100%}
  .offline-profile-panel .auth-status{font-size:13px}
 }
+
+.offline-backup-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.offline-backup-actions>.outline-btn{flex:1;min-width:155px;text-align:center;display:inline-flex;align-items:center;justify-content:center;border-color:#4388b9;color:#b2ebff;background:#133654;white-space:normal;min-height:45px;font-weight:650}
+.offline-backup-actions>label{cursor:pointer}
