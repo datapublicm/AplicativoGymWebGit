@@ -7,9 +7,9 @@ const next=read('../../.github/workflows/compilar-gymlytics-01.06-pruebas.yml');
 const settings=JSON.parse(read('../capacitor.config.json'));
 const pkg=JSON.parse(read('../package.json'));
 
-test('01.06 queda preparada solo para disparo manual y nunca por push',()=>{
+test('01.06 solo admite ejecución manual o cambio explícito de su propio workflow',()=>{
  assert.match(next,/on:\n  workflow_dispatch:/);
- assert.doesNotMatch(next,/\n  push:/);
+ assert.match(next,/\n  push:\n    branches:\n      - apk\/pruebas\n    paths:\n      - '\.github\/workflows\/compilar-gymlytics-01\.06-pruebas\.yml'/);
  assert.match(next,/refs\/heads\/apk\/pruebas/);
  assert.match(next,/test ! -d android\/app/);
 });
