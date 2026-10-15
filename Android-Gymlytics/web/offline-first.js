@@ -14,7 +14,7 @@ const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
 });
 const uuid=()=>crypto.randomUUID();
 const tidy=v=>String(v??'').trim();
-let db,profiles=[],activeId=null,profileEpoch=0,latest=null,queue=Promise.resolve(),remoteSession=null,syncController=null,transitioning=false;
+let db,profiles=[],activeId=null,profileEpoch=0,latest=null,queue=Promise.resolve(),remoteSession=null,cloudAccountKind=null,syncController=null,transitioning=false;
 const config={url:import.meta.env.VITE_SUPABASE_URL,key:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
  schema:import.meta.env.VITE_SUPABASE_SCHEMA||'sch_android_gymlytics'};
 const newClient=()=>config.url&&config.key?createClient(config.url,config.key,{
@@ -22,7 +22,7 @@ const newClient=()=>config.url&&config.key?createClient(config.url,config.key,{
   storageKey:'gymlytics-profile-memory-'+crypto.randomUUID()}
 }):null;
 let client=newClient(),remote=client?.schema(config.schema);
-function rotateCloudClient(){client=newClient();remote=client?.schema(config.schema);remoteSession=null;}
+function rotateCloudClient(){client=newClient();remote=client?.schema(config.schema);remoteSession=null;cloudAccountKind=null;}
 const remoteGateway={
  from:(...args)=>{if(!remote)throw Error('Supabase no está configurado');return remote.from(...args)},
  rpc:(...args)=>{if(!remote)throw Error('Supabase no está configurado');return remote.rpc(...args)}
@@ -357,12 +357,13 @@ const api={
 function refreshCloudControls(){
  const linked=!!remoteSession?.user&&!transitioning;
  $('offlineRemoteUser').textContent=linked?'Conectado: '+(remoteSession.user.email||remoteSession.user.id):'Sin sesión de nube';
- $('offlineLinkAccount').disabled=!linked||!!syncController?.isBusy()||!!latest?.data?.cloudUserId||!!latest?.data?.readOnly;
- $('offlineLinkAccount').textContent=latest?.data?.cloudUserId?'Perfil ya vinculado a esta cuenta':'Vincular este perfil con esta cuenta';
- $('offlineCloudDownload').disabled=!linked||!!syncController?.isBusy();
+ const demo=cloudAccountKind==='demo';
+ $('offlineLinkAccount').disabled=!linked||demo||!!syncController?.isBusy()||!!latest?.data?.cloudUserId||!!latest?.data?.readOnly;
+ $('offlineLinkAccount').textContent=demo?'🔒 La cuenta de prueba no puede vincularse':latest?.data?.cloudUserId?'Perfil ya vinculado a esta cuenta':'Vincular este perfil con esta cuenta';
+ $('offlineCloudDownload').disabled=!linked||demo||!!latest?.data?.readOnly||!!syncController?.isBusy();
  // No publicar modificaciones: todo el trabajo de esta versión se queda offline.
  $('offlineCloudUpload').hidden=true;$('offlineCloudUpload').disabled=true;
- $('offlineDemoDownload').disabled=!linked||!!syncController?.isBusy();
+ $('offlineDemoDownload').disabled=!linked||!demo||!!syncController?.isBusy();
  $('authLogout').hidden=!linked;
 }
 function requireCloudIdentity(uid,ownerStamp,ownerClient=client){
@@ -373,6 +374,7 @@ function requireCloudIdentity(uid,ownerStamp,ownerClient=client){
 async function linkAccount(){
  const user=remoteSession?.user;
  if(!user)throw Error('Inicia sesión en la nube primero.');
+ if(cloudAccountKind==='demo')throw Error('La cuenta de prueba no puede vincularse como una cuenta personal.');
  if(latest?.data?.readOnly)throw Error('Una cuenta de prueba no puede vincularse como personal.');
  requireCloudIdentity(user.id,stamp());
  if(latest?.data?.cloudUserId===user.id)return status('Perfil ya vinculado a esta cuenta.');
@@ -395,19 +397,25 @@ async function completeCloudLogin(session,ownerStamp,ownerClient,register=false)
  requireCloudIdentity(session?.user?.id,ownerStamp,ownerClient);
  try{
   if(register)await provisionGymlyticsAccount(ownerStamp);
-  else{
-   // Inicio de sesión existente, incluido el de prueba: no modifica Supabase.
-   const {data,error}=await remote.from('tbl_usuarios').select('id,activo').eq('id',session.user.id).maybeSingle();
-   if(error||!data?.activo)throw Error('La cuenta todavía no está habilitada en Gymlytics.');
-  }
+  // Consultar la identidad autorizada por el servidor: NUNCA inferir la cuenta
+  // de prueba del nombre de perfil ni del botón que pulsó el usuario.
+  const {data,error}=await remote.from('tbl_usuarios')
+   .select('id,usuario,activo').eq('id',session.user.id).maybeSingle();
+  if(error||!data?.activo)throw Error('La cuenta todavía no está habilitada en Gymlytics.');
+  const kind=String(data.usuario||'').trim().toLocaleLowerCase('es')==='prueba'?'demo':'personal';
   requireCloudIdentity(session.user.id,ownerStamp,ownerClient);
+  if(kind==='demo'&&latest?.data?.cloudUserId&&latest.data.cloudUserId!==session.user.id)
+   throw Error('Esta cuenta de prueba no puede abrirse sobre un perfil vinculado a otra cuenta.');
+  cloudAccountKind=kind;
  }catch(error){
   if(ownerStamp===stamp()&&ownerClient===client)rotateCloudClient();
   throw error;
  }
  remoteSession=session;
  refreshCloudControls();renderSyncStatus();
- status('Cuenta autenticada. El perfil local sigue intacto; puedes vincularlo o sincronizarlo voluntariamente.');
+ status(cloudAccountKind==='demo'?
+  'Cuenta de prueba verificada: solo descarga de consulta. Ningún dato se modificará.':
+  'Cuenta personal autenticada: puedes vincular o descargar datos, sin subir cambios locales.');
 }
 async function cloudLogin(email,password,register=false){
  if(transitioning)throw Error('Espera a que termine el cambio de perfil.');
@@ -464,9 +472,15 @@ function updateFromProfile(){
  renderSyncStatus();renderConflictButtons();refreshCloudControls();
 }
 async function remoteAction(action,options={}){
- if(!remoteSession?.user)throw Error('Inicia sesión o crea tu cuenta de nube primero');
+ if(!remoteSession?.user||!cloudAccountKind)throw Error('Inicia sesión o crea tu cuenta de nube primero');
  if(!syncController)throw Error('La sincronización no está disponible');
  if(action==='upload')throw Error('Los cambios de esta versión se conservan únicamente offline; subida deshabilitada.');
+ if(action==='download'){
+  if(cloudAccountKind==='demo'&&!options.readOnly)
+   throw Error('La cuenta de prueba únicamente puede descargarse en modo solo lectura.');
+  if(cloudAccountKind!=='demo'&&options.readOnly)
+   throw Error('La opción de prueba requiere iniciar sesión en la cuenta «prueba».');
+ }
  await syncController[action](remoteSession.user.id,stamp(),options);
 }
 
