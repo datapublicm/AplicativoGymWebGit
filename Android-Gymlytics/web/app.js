@@ -204,7 +204,7 @@ function catalogFillSelect(select,choices,placeholder){
  const before=select.value;
  select.replaceChildren(new Option(placeholder||'Selecciona un elemento…',''));
  choices.forEach(x=>select.add(new Option(x.name+(x.own?'':' · referencia'),x.id)));
- select.value=choices.some(x=>x.id===before)?before:'';
+ select.value=choices.some(x=>x.id===before)?before:(choices.find(x=>x.own)?.id||choices[0]?.id||'');
  select.disabled=false;
 }
 function catalogUpdateCounters(){
@@ -275,6 +275,8 @@ function setupMockupHeaders(){
  const menuBtn=$('catalogMenuToggle'),menuPanel=$('catalogMenuPanel');
  const actions=document.querySelector('#page-catalogos .catalog-main-actions');
  if(actions&&menuPanel)menuPanel.append(actions);
+ const muscles=document.querySelector('#page-catalogos .catalog-muscles');
+ if(muscles&&menuPanel)menuPanel.append(muscles);
  searchBtn?.addEventListener('click',()=>{
   searchPanel.hidden=!searchPanel.hidden;searchBtn.setAttribute('aria-expanded',String(!searchPanel.hidden));
   if(!searchPanel.hidden)searchInput?.focus();
@@ -313,8 +315,7 @@ function setupCatalogCompact(){
   {kind:'grip',label:'Agarre / Implemento',icon:'✋',select:null,count:null,parts:[]},
   {kind:'technique',label:'Tecnica_Actualizada',icon:'◈',select:null,count:null,parts:[]},
   {kind:'series',label:'Número Serie',icon:'#',select:null,count:null,parts:[],readOnly:true},
-  {kind:'subdivision',label:'Subdivisión',icon:'◫',select:null,count:null,parts:[],readOnly:true},
-  {kind:'muscle',label:'Músculos',icon:'◎',select:muscle,count:$('muscleCount'),parts:[],readOnly:true}
+  {kind:'subdivision',label:'Subdivisión',icon:'◫',select:null,count:null,parts:[],readOnly:true}
  ];
  holder.replaceChildren();
  for(const item of items){
