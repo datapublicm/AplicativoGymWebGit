@@ -1,6 +1,6 @@
 const PREFIX='gymlytics-mobile-';
-const CACHE=PREFIX+'gymlytics-integridad-offline-20261015-v03';
-const ASSETS=['./','./index.html','./styles.css','./app.js','./dashboard.js','./catalogo.js','./offline-first.js','./profile-policy.js','./cloud-sync.js','./sync-engine.js','./manifest.webmanifest','./assets/polea-alta.webp','./assets/jalon-pecho.webp','./icons/icon-192.png','./icons/icon-512.png'];
+const CACHE=PREFIX+'gymlytics-integridad-offline-20261015-v04';
+const ASSETS=['./','./index.html','./styles.css','./app.js','./dashboard.js','./catalogo.js','./offline-first.js','./profile-policy.js','./cloud-sync.js','./sync-engine.js','./legacy-compat.js','./manifest.webmanifest','./assets/polea-alta.webp','./assets/jalon-pecho.webp','./icons/icon-192.png','./icons/icon-512.png'];
 const STATIC_URLS=new Set(ASSETS.map(path=>new URL(path,self.location.href).href));
 
 self.addEventListener('install',event=>event.waitUntil(
