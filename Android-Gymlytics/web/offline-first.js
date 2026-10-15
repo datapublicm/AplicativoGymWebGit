@@ -2,14 +2,16 @@
  * La nube solo se consulta por acción expresa: nunca se reconcilia por estar online.
  */
 import { createClient } from '@supabase/supabase-js';
+import {sourceKey} from './sync-engine.js';
+import {createCloudSync} from './cloud-sync.js';
 const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
  records:[],photos:{},custom:[],library:[],entities:{gyms:[],sites:[],machines:[],options:[]},
- tombstones:[],pending:[],cloudUserId:null,lastPull:null
+ tombstones:[],pending:[],conflicts:[],cloudUserId:null,lastPull:null
 });
 const uuid=()=>crypto.randomUUID();
 const tidy=v=>String(v??'').trim();
-let db,profiles=[],activeId=null,profileEpoch=0,latest=null,queue=Promise.resolve(),remoteSession=null;
+let db,profiles=[],activeId=null,profileEpoch=0,latest=null,queue=Promise.resolve(),remoteSession=null,syncController=null;
 const config={url:import.meta.env.VITE_SUPABASE_URL,key:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
  schema:import.meta.env.VITE_SUPABASE_SCHEMA||'sch_android_gymlytics'};
 const client=config.url&&config.key?createClient(config.url,config.key,{
@@ -64,6 +66,7 @@ function renderSyncStatus(){
  const data=latest.data,counts=(data.pending||[]).length,deleted=(data.tombstones||[]).length;
  $('offlinePending').textContent=counts+' operaciones pendientes · '+deleted+' eliminaciones conservadas';
  $('offlineProfileInfo').textContent='Datos locales de '+latest.name+' · '+data.records.length+' series visibles';
+ $('offlineConflictSummary').textContent=(data.conflicts||[]).length+' conflictos por revisar';
  $('offlineSyncState').textContent=data.cloudUserId
   ?'Cuenta vinculada: '+data.cloudUserId.slice(0,8)+'… · Ningún cambio se sube ni descarga automáticamente.'
   :'Solo en este dispositivo. Puedes crear una cuenta más adelante sin perder tus registros.';
@@ -76,11 +79,12 @@ function catalogInit(){
  }));
 }
 async function activate(id,initial=false){
+ if(syncController?.isBusy())throw Error('Termina la sincronización antes de cambiar de perfil');
  const epoch=++profileEpoch;
  if(typeof invalidatePendingSave==='function')invalidatePendingSave();
  if(typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(null,null);
  if(typeof setHistoryReady==='function')setHistoryReady(false);
- remoteSession=null; // Desvincular la nube en pantalla; cambiar perfiles no depende de la red.
+ remoteSession=null; // En pantalla, el usuario debe autenticarse de nuevo para asociar otro perfil.
  const p=await get(id);
  if(epoch!==profileEpoch||!p) return;
  activeId=id;latest=p;profiles=await all();
@@ -106,6 +110,7 @@ async function activate(id,initial=false){
  status('Perfil local activo · '+p.name+' · funciona sin conexión');
  document.body.classList.remove('auth-locked');
  document.querySelectorAll('[data-page]').forEach(x=>{x.disabled=false;x.setAttribute('aria-disabled','false');});
+ renderConflictButtons();refreshCloudControls();
  if(initial)showPage('registro');
 }
 async function createProfile(){
@@ -162,16 +167,34 @@ const api={
  async deleteSeries(id){
   await flush(data=>{
    const index=data.records.findIndex(x=>String(x.id)===String(id));
-   if(index===-1)throw Error('La serie no pertenece al perfil activo');
-   const [row]=data.records.splice(index,1);
-   data.pending=data.pending.filter(x=>x.localId!==row.id||x.kind!=='create_series');
-   // La lápida protege contra reapariciones al descargar copias antiguas.
-   data.tombstones.push({localId:row.id,remoteId:row.remoteId||row.origin==='cloud'&&row.id||null,
-    at:new Date().toISOString()});
-   if(row.remoteId||row.origin==='cloud')data.pending.push({id:uuid(),kind:'delete_series',
-    localId:row.id,remoteId:row.remoteId||row.id});
-  });
-  return id;
+   if(index<0)throw Error('La serie no pertenece al perfil');
+   const [row]=data.records.splice(index,1),key=sourceKey(row),version=Number(row.cloudVersion||0);
+   data.pending=data.pending.filter(x=>x.localId!==row.id);
+   data.tombstones.push({localId:row.id,remoteId:row.remoteId||null,syncKey:key,
+    at:new Date().toISOString(),cloudVersion:version});
+   if(version||row.origin==='cloud')
+    data.pending.push({id:uuid(),kind:'delete_series',localId:row.id,remoteId:row.remoteId||null,
+     syncKey:key,expectedVersion:version});
+  });return id;
+ },
+ async updateSeries(id,patch){
+  await flush(data=>{
+   const row=data.records.find(x=>x.id===id);
+   if(!row)throw Error('Serie no encontrada');
+   for(const field of ['weight','reps','assistance','unit','notes']){
+    if(!(field in patch))continue;
+    const value=field==='unit'||field==='notes'?String(patch[field]):Number(patch[field]);
+    if(field==='unit'&&!['kg','lb'].includes(value))throw Error('Unidad incorrecta');
+    if(['weight','reps','assistance'].includes(field)&&(!Number.isFinite(value)||value<0||field==='reps'&&value<=0))
+     throw Error('Valor inválido');
+    row[field]=value;
+   }
+   if(!data.pending.some(x=>x.localId===id&&x.kind==='create_series')){
+    data.pending=data.pending.filter(x=>!(x.localId===id&&x.kind==='update_series'));
+    data.pending.push({id:uuid(),kind:'update_series',localId:id,syncKey:sourceKey(row),
+     expectedVersion:Number(row.cloudVersion||0)});
+   }
+  });return id;
  },
  async addIndependentItem(kind,values){
   const group=groups[kind];if(!group||kind==='exercise')throw Error('Tipo no válido');
@@ -253,7 +276,9 @@ const api={
 function refreshCloudControls(){
  const linked=!!remoteSession?.user;
  $('offlineRemoteUser').textContent=linked?'Conectado: '+(remoteSession.user.email||remoteSession.user.id):'Sin sesión de nube';
- $('offlineCloudDownload').disabled=!linked;
+ $('offlineCloudDownload').disabled=!linked||!!syncController?.isBusy();
+ $('offlineCloudUpload').disabled=!linked||!!syncController?.isBusy()||
+  !(latest?.data?.pending||[]).some(x=>['create_series','delete_series','update_series'].includes(x.kind));
  $('authLogout').hidden=!linked;
 }
 async function cloudLogin(email,password,register=false){
@@ -285,48 +310,32 @@ async function cloudLogin(email,password,register=false){
  refreshCloudControls();
  status('Cuenta autenticada. Para descargar datos debes confirmar la operación.');
 }
-async function cloudDownload(){
- if(!remoteSession?.user||!remote)throw Error('Inicia sesión en la nube primero');
- if(!navigator.onLine)throw Error('Necesitas conexión para descargar');
- const uid=remoteSession.user.id,epoch=profileEpoch;
- if(latest.data.cloudUserId&&latest.data.cloudUserId!==uid)
-  throw Error('Este perfil ya está asociado a otra cuenta. No se mezclarán cuentas distintas.');
- if(!confirm('¿Descargar y unir los datos de tu cuenta con ESTE perfil? No se borrarán los registros locales ni se reactivarán las series eliminadas. La subida sigue pendiente hasta disponer de sincronización segura.'))return;
- // La descarga se completa antes de modificar IndexedDB; un fallo no toca el perfil.
- const access=await remote.from('tbl_usuarios').select('id,activo').eq('id',uid).maybeSingle();
- if(access.error||!access.data?.activo)throw Error('La cuenta aún no tiene acceso habilitado a Gymlytics.');
- const pageSize=500,rows=[],ids=new Set();
- const countResponse=await remote.from('vw_historial_series').select('id',{head:true,count:'exact'}).eq('user_id',uid);
- if(countResponse.error)throw countResponse.error;
- const total=countResponse.count;
- if(!Number.isSafeInteger(total)||total<0)throw Error('No se pudo comprobar el total remoto');
- for(let offset=0;offset<total;offset+=pageSize){
-  const response=await remote.from('vw_historial_series').select('*').eq('user_id',uid)
-   .order('date',{ascending:false}).order('id',{ascending:true}).range(offset,offset+pageSize-1);
-  if(response.error)throw response.error;
-  if(response.data.length!==Math.min(pageSize,total-offset))throw Error('Descarga incompleta. No se guardó ningún cambio.');
-  for(const x of response.data){
-   if(!x.id||x.user_id!==uid||ids.has(String(x.id)))throw Error('La descarga contiene filas repetidas o ajenas.');
-   ids.add(String(x.id));rows.push(x);
-  }
+function renderConflictButtons(){
+ const holder=$('offlineConflicts');if(!holder)return;
+ holder.replaceChildren();
+ for(const c of latest?.data?.conflicts||[]){
+  const box=document.createElement('div');box.className='offline-conflict';
+  const title=document.createElement('p');title.textContent='Conflicto · '+c.sourceKey;
+  const local=document.createElement('button');local.type='button';local.textContent='Conservar este dispositivo';
+  const cloud=document.createElement('button');cloud.type='button';cloud.textContent='Usar datos de la nube';
+  const action=async choice=>{
+   try{await syncController.resolve(remoteSession?.user?.id,stamp(),c.sourceKey,choice);}
+   catch(e){status('Error de conflicto: '+e.message)}
+  };
+  local.addEventListener('click',()=>action('local'));
+  cloud.addEventListener('click',()=>action('cloud'));
+  box.append(title,local,cloud);holder.append(box);
  }
- if(epoch!==profileEpoch||!remoteSession||remoteSession.user.id!==uid)throw Error('El perfil o la cuenta cambió');
- let added=0;
- await flush(data=>{
-  if(data.cloudUserId&&data.cloudUserId!==uid)throw Error('La cuenta ya no coincide');
-  const locallyKnown=new Set(data.records.map(x=>String(x.remoteId||x.origin==='cloud'&&x.id||'')));
-  const removed=new Set(data.tombstones.map(x=>String(x.remoteId||'')));
-  for(const r of rows){
-   const id=String(r.id);
-   if(locallyKnown.has(id)||removed.has(id))continue;
-   data.records.push({...r,id:'cloud:'+id,remoteId:id,origin:'cloud',
-    weight:Number(r.weight||0),reps:Number(r.reps||0),assistance:Number(r.assistance||0)});
-   added++;
-  }
-  data.cloudUserId=uid;data.lastPull=new Date().toISOString();
- });
- model.records=structuredClone(latest.data.records);drawRecent();drawHistory(true);drawReports();renderSyncStatus();
- status('Descarga completa: '+added+' series nuevas, sin sobrescribir registros ni eliminaciones locales.');
+}
+function updateFromProfile(){
+ model.records=structuredClone(latest.data.records||[]);
+ drawRecent();drawHistory(true);drawReports();
+ renderSyncStatus();renderConflictButtons();refreshCloudControls();
+}
+async function remoteAction(action){
+ if(!remoteSession?.user)throw Error('Inicia sesión o crea tu cuenta de nube primero');
+ if(!syncController)throw Error('La sincronización no está disponible');
+ await syncController[action](remoteSession.user.id,stamp());
 }
 
 function downloadLocal(name,data){
@@ -365,6 +374,12 @@ async function importProfileBackup(event){
 
 async function init(){
  db=await openDB();profiles=await all();
+ syncController=createCloudSync({
+  remote,getState:()=>({data:latest?.data||EMPTY(),profileName:latest?.name||'Perfil'}),
+  mutate:update=>flush(update),refresh:updateFromProfile,
+  isCurrent:(uid,token)=>stamp()===token&&remoteSession?.user?.id===uid,
+  confirmAction:message=>confirm(message),notify:status
+ });
  if(!profiles.length){
   const profile={id:uuid(),name:'Mi perfil',modifiedAt:new Date().toISOString(),data:EMPTY()};
   await put(profile);profiles=[profile];
@@ -394,9 +409,14 @@ async function init(){
   catch(error){status('No se pudo registrar: '+error.message)}
   finally{$('authPassword').value=''}
  });
+ $('offlineCloudUpload').addEventListener('click',async()=>{
+  const button=$('offlineCloudUpload');button.disabled=true;
+  try{await remoteAction('upload')}catch(e){status('Subida no completada: '+e.message+'. Los registros siguen locales.')}
+  finally{refreshCloudControls()}
+ });
  $('offlineCloudDownload').addEventListener('click',async()=>{
   const button=$('offlineCloudDownload');button.disabled=true;
-  try{await cloudDownload()}catch(error){status('Descarga cancelada: '+error.message)}
+  try{await remoteAction('download')}catch(error){status('Descarga cancelada: '+error.message)}
   finally{button.disabled=false;refreshCloudControls()}
  });
  $('authLogout').addEventListener('click',async()=>{
