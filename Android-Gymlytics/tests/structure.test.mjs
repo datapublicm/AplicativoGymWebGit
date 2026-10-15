@@ -57,13 +57,15 @@ test('01.04: gimnasios, sedes, máquinas y ejercicios se crean independientement
  assert.ok(auth.includes("maquina_id"));
  assert.ok(app.includes("window.GymExerciseLibrary||[]"));
 });
-test('01.06: el catálogo de referencia funciona sin cuenta y se distribuye con la APK',()=>{
- assert.match(html,/src="\.\/catalogo\.js"/);
+test('01.06: cada perfil inicia sin catálogo embebido, y ofrece descarga completa explícita',()=>{
+ assert.doesNotMatch(html,/src="\.\/catalogo\.js"/);
  assert.match(html,/src="\.\/offline-first\.js"/);
- assert.match(read('web/catalogo.js'),/window\.GymBundledCatalog=CATALOG/);
- assert.match(read('vite.config.js'),/offline-first\.js/);
- assert.match(read('web/sw.js'),/offline-first\.js/);
- for(const id of ['offlineProfiles','offlineNewName','offlineCreate','offlineCloudToggle','offlineCloudDownload'])
+ const offline=read('web/offline-first.js');
+ assert.match(offline,/baseCatalog:\[\]/);
+ assert.match(offline,/catalogFetch:downloadAllCatalogs/);
+ assert.match(read('vite.config.js'),/offline-catalog-download\.js/);
+ assert.match(read('web/sw.js'),/offline-catalog-download\.js/);
+ for(const id of ['offlineProfiles','offlineNewName','offlineCreate','offlineCloudToggle','offlineCloudDownload','offlineDemoDownload'])
   assert.ok(html.includes('id="'+id+'"'),id);
 });
 
