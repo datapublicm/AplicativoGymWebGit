@@ -44,7 +44,7 @@ export function planUpload(data){
    expected_version:Math.max(0,Number(last.expectedVersion??row?.cloudVersion??0)),
    ...(last.kind==='delete_series'?{}:{payload:payloadOf(row||{})})
   };
-  if(item.action==='upsert'&&!row)throw Error('El registro pendiente '+key+' ya no existe');
+  if(item.action==='upsert'&&!row&&!submitted)throw Error('El registro pendiente '+key+' ya no existe');
   if(!uuidPattern.test(item.op_id)||!/^(local|legacy):[0-9a-f-]{36}$/i.test(key))
    throw Error('Identificador de sincronización inválido: '+key);
   ops.push(item);
