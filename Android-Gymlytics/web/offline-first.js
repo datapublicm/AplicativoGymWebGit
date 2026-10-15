@@ -284,6 +284,13 @@ function refreshCloudControls(){
   !(latest?.data?.pending||[]).some(x=>['create_series','delete_series','update_series'].includes(x.kind));
  $('authLogout').hidden=!linked;
 }
+async function provisionGymlyticsAccount(ownerStamp){
+ if(!remote)throw Error('No está configurada la base de datos');
+ const {data,error}=await remote.rpc('asegurar_perfil_gymlytics');
+ if(ownerStamp!==stamp())throw Error('El perfil cambió durante el registro de la cuenta');
+ if(error)throw Error('No se pudo habilitar la cuenta: '+error.message);
+ if(!data?.activo)throw Error('La cuenta Gymlytics está desactivada; no se reactivó automáticamente.');
+}
 async function cloudLogin(email,password,register=false){
  const ownerStamp=stamp();
  if(!client)throw Error('No hay conexión de Supabase configurada');
@@ -296,6 +303,7 @@ async function cloudLogin(email,password,register=false){
   if(set.error)throw set.error;
   if(ownerStamp!==stamp())throw Error('Cambiaste de perfil durante la autenticación.');
   remoteSession=set.data.session;
+  await provisionGymlyticsAccount(ownerStamp);
   refreshCloudControls();
   status('Cuenta autenticada. Para descargar debes confirmar la operación.');
   return;
@@ -310,6 +318,7 @@ async function cloudLogin(email,password,register=false){
  if(ownerStamp!==stamp())throw Error('Cambiaste de perfil durante la autenticación.');
  remoteSession=result.data.session;
  if(!remoteSession?.user)throw Error('No se obtuvo la sesión de la nube');
+ await provisionGymlyticsAccount(ownerStamp);
  refreshCloudControls();
  status('Cuenta autenticada. Para descargar datos debes confirmar la operación.');
 }
