@@ -14,10 +14,11 @@ self.addEventListener('activate',event=>event.waitUntil(
 self.addEventListener('fetch',event=>{
  const req=event.request;
  const url=new URL(req.url);
- const generatedAsset=url.origin===self.location.origin&&
-  (/\\/assets\\/[^/]+\\.(js|css|woff2?|png|webp|svg)$/.test(url.pathname)||
-   (req.destination==='script'||req.destination==='style'||req.destination==='font')&&
-   /\\.(js|css|woff2?)$/.test(url.pathname));
+ const extension=url.pathname.split('.').pop()?.toLowerCase();
+ const generatedAsset=url.origin===self.location.origin&&(
+  url.pathname.includes('/assets/')&&['js','css','woff','woff2','png','webp','svg'].includes(extension)||
+  ['script','style','font'].includes(req.destination)&&['js','css','woff','woff2'].includes(extension)
+ );
  // Vite genera chunks con nombres hash distintos del manifiesto de origen.
  // Sin almacenarlos tras una visita online, el reinicio 100% offline falla.
  if(req.method!=='GET'||!STATIC_URLS.has(req.url)&&!generatedAsset)return;
