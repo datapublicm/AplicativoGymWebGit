@@ -237,11 +237,13 @@ const api={
   return {id:null,primary:[],secondary:[],images:{},zones3d:[],photos};
  },
  async uploadUserPhoto({exercise,type,side,blob}){
+  const ownerStamp=stamp();
   if(!blob||blob.size>3*1024*1024)throw Error('Fotografía demasiado grande (máximo 3 MB)');
   const key=type==='maquina'?`${exercise.g}|${exercise.s}|${exercise.i}`:`${exercise.g}|${exercise.s}|${exercise.i}|${exercise.e}`;
   const base64=await new Promise((resolve,reject)=>{
    const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob);
   });
+  if(ownerStamp!==stamp())throw Error('Cambiaste de perfil antes de guardar la fotografía.');
   await flush(data=>{data.photos[(type==='maquina'?'equipo':type==='ejercicio'?'ejercicio':'anatomia')+':'+key]=base64;
    data.pending.push({id:uuid(),kind:'photo',key,at:new Date().toISOString()});
   });
