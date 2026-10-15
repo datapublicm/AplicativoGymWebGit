@@ -3,7 +3,7 @@ import {legacyAlerts,normalizeLegacySnapshot} from './legacy-compat.js';
 
 // Adaptador de red sin sincronización automática. Las mutaciones se confirman
 // primero en IndexedDB y los conflictos requieren decisión humana.
-export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLinkedElsewhere,confirmAction,notify}){
+export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLinkedElsewhere,confirmAction,notify,catalogFetch}){
  let busy=false;
  const isBusy=()=>busy;
  function validate(uid,stamp){
@@ -80,18 +80,42 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
    return {done,duplicates,conflicts};
   }finally{busy=false;refresh();}
  }
- async function download(uid,stamp){
+ async function download(uid,stamp,{readOnly=false}={}){
   if(busy)throw Error('Hay otra sincronización activa');
   await authorized(uid,stamp);
-  const {profileName}=getState();
-  if(!confirmAction('¿Descargar al perfil '+profileName+'? Se unirán los datos sin sobrescribir ediciones o eliminaciones locales; los conflictos se revisarán aparte.'))return null;
+  const {profileName,data}=getState();
+  if((data.pending||[]).some(x=>['add_catalog','update_catalog','delete_catalog'].includes(x.kind)))
+   throw Error('Este perfil tiene cambios locales de catálogos. Para descargar sin sobrescribirlos, crea otro perfil vacío o conserva una copia de seguridad.');
+  if(readOnly&&(data.records?.length||data.entities?.gyms?.length||data.entities?.sites?.length||
+      data.entities?.machines?.length||data.entities?.options?.length||data.custom?.length||
+      data.library?.length||data.baseCatalog?.length))
+   throw Error('La cuenta de prueba solo se descarga en un perfil vacío; crea primero un perfil local nuevo.');
+  if(data.readOnly&&!readOnly)throw Error('El perfil de prueba solo admite descargas en modo de consulta.');
+  const mode=readOnly?'CUENTA DE PRUEBA: únicamente consulta, sin cambios':'CUENTA PERSONAL: cambios solamente offline';
+  if(!confirmAction('¿Descargar el historial completo, gimnasios, sedes, instrumentos, ejercicios y técnicas a «'+profileName+'»? '+mode+'. Los cambios locales de series nunca se sobrescribirán sin resolver conflictos.'))return null;
   busy=true;refresh();
   try{
-   const [legacy,mirror]=await Promise.all([pages('vw_historial_series',uid),pages('tbl_sync_series',uid)]);
+   // Cargar ambos orígenes por completo ANTES de modificar IndexedDB.
+   const [legacy,mirror,catalog]=await Promise.all([
+    pages('vw_historial_series',uid),pages('tbl_sync_series',uid),catalogFetch(uid,stamp)
+   ]);
    validate(uid,stamp);
+   if(!catalog||!Array.isArray(catalog.baseCatalog)||!catalog.entities||!Array.isArray(catalog.library)||!Array.isArray(catalog.custom))
+    throw Error('Descarga de catálogo incompleta; se conservó el perfil local');
    let summary;
    await mutate(local=>{
     validate(uid,stamp);
+    if((local.pending||[]).some(x=>['add_catalog','update_catalog','delete_catalog'].includes(x.kind)))
+     throw Error('Se detectaron ediciones de catálogos durante la descarga. No se aplicó.');
+    if(readOnly&&(local.records?.length||local.baseCatalog?.length||local.library?.length||local.custom?.length||
+      Object.values(local.entities||{}).some(a=>Array.isArray(a)&&a.length)))
+     throw Error('El perfil de prueba dejó de estar vacío. No se aplicó la descarga.');
+    local.baseCatalog=structuredClone(catalog.baseCatalog);
+    local.entities=structuredClone(catalog.entities);
+    local.library=structuredClone(catalog.library);
+    local.custom=structuredClone(catalog.custom);
+    local.readOnly=!!(readOnly||local.readOnly);
+    local.demo=local.readOnly;
     const alert=legacyAlerts(local,legacy,mirror);
     const known=new Set(local.records.map(sourceKey));
     const removed=new Set(local.tombstones.map(t=>t.syncKey||t.remoteId&&'legacy:'+t.remoteId||t.localId&&'local:'+t.localId));
@@ -120,7 +144,12 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
     local.cloudUserId=uid;local.lastPull=new Date().toISOString();
    });
    refresh();
-   notify('Descarga completada: '+summary.added+' nuevas, '+summary.updated+' actualizadas, '+summary.conflicts+' conflictos; '+summary.legacyAlerts+' alertas de clientes antiguos. No se perdieron cambios locales.');
+   notify('Descarga COMPLETA ('+(readOnly?'prueba: solo lectura':'cuenta personal: edición offline')+'): '+
+    catalog.baseCatalog.length+' entradas de catálogo base, '+
+    catalog.library.length+' ejercicios propios sin sede, '+
+    catalog.custom.length+' ejercicios propios con sede y '+
+    (summary.added+summary.updated)+' series nuevas/actualizadas. '+
+    summary.conflicts+' conflictos; '+summary.legacyAlerts+' alertas de clientes antiguos.');
    return summary;
   }finally{busy=false;refresh();}
  }
