@@ -390,6 +390,7 @@ async function init(){
   remote,getState:()=>({data:latest?.data||EMPTY(),profileName:latest?.name||'Perfil'}),
   mutate:update=>flush(update),refresh:updateFromProfile,
   isCurrent:(uid,token)=>stamp()===token&&remoteSession?.user?.id===uid,
+  isLinkedElsewhere:uid=>profiles.some(p=>p.id!==activeId&&p.data?.cloudUserId===uid),
   confirmAction:message=>confirm(message),notify:status
  });
  if(!profiles.length){
