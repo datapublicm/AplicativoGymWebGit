@@ -8,7 +8,7 @@ import {profileMeta,validateProfileName,validateProfileBinding,verifyRestoreBack
 import {prepareDownloadedCatalog} from './offline-catalog-download.js';
 const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
- records:[],photos:{},baseCatalog:[],custom:[],library:[],readOnly:false,demo:false,
+ records:[],photos:{},baseCatalog:[],muscles:[],custom:[],library:[],readOnly:false,demo:false,
  entities:{gyms:[],sites:[],machines:[],options:[]},
  tombstones:[],pending:[],conflicts:[],cloudUserId:null,lastPull:null
 });
@@ -124,6 +124,7 @@ async function activate(id,initial=false){
   if(typeof resetExerciseTabs==='function')resetExerciseTabs();
   if(typeof renderOwnCatalog==='function')renderOwnCatalog();
   if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
+  catalogUpdate();
   if(typeof cascade==='function')cascade(0);
   drawRecent();drawHistory();drawReports();
   if(typeof setHistoryReady==='function')setHistoryReady(true);
@@ -186,6 +187,10 @@ function catalogUpdate(){
  if(typeof renderOwnCatalog==='function')renderOwnCatalog();
  if(typeof cascade==='function')cascade(0);
  if(typeof catalogUpdateCounters==='function')catalogUpdateCounters();
+ const muscle=$('muscleExistingSelect'),count=$('muscleCount');
+ if(muscle){muscle.replaceChildren(new Option('Selecciona un músculo…',''));
+  for(const row of latest.data.muscles||[])muscle.add(new Option(row.nombre,row.id));}
+ if(count)count.textContent=String((latest.data.muscles||[]).length);
 }
 const groups={gym:'gyms',site:'sites',machine:'machines',option:'options',exercise:'library'};
 function presentCatalog(kind){
@@ -522,13 +527,13 @@ async function downloadAllCatalogs(uid,ownerStamp){
   }
   return result;
  };
- const [base,exercises,gyms,sites,machines,options]=await Promise.all([
+ const [base,exercises,gyms,sites,machines,options,muscles]=await Promise.all([
   fetchTable('tbl_catalogo_predeterminado',{shared:true}),fetchTable('tbl_ejercicios'),
   fetchTable('tbl_gimnasios'),fetchTable('tbl_sedes'),fetchTable('tbl_maquinas'),
-  fetchTable('tbl_opciones_personales')
+  fetchTable('tbl_opciones_personales'),fetchTable('tbl_musculos',{shared:true})
  ]);
  if(ownerStamp!==stamp()||remoteSession?.user?.id!==uid)throw Error('Se cambió de cuenta durante la descarga.');
- return prepareDownloadedCatalog({base,exercises,gyms,sites,machines,options:options.filter(x=>x.activo!==false)});
+ return prepareDownloadedCatalog({base,exercises,gyms,sites,machines,muscles,options:options.filter(x=>x.activo!==false)});
 }
 
 async function init(){
