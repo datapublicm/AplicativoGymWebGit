@@ -227,7 +227,7 @@ function catalogOpenCard(kind,action='add'){
  }
  const detail=row.querySelector('.catalog-compact-detail'),btn=row.querySelector('.catalog-compact-toggle');
  if(!detail){toast('Este catálogo es de referencia y solo permite consultar.');return;}
- const open=action==='toggle'?!detail.hidden:true;
+ const open=action==='toggle'?detail.hidden:true;
  if(open)document.querySelectorAll('#catalogCompactRows .catalog-compact-detail').forEach(other=>{
   if(other===detail)return;
   other.hidden=true;
