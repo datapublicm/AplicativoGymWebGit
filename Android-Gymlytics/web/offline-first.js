@@ -355,7 +355,22 @@ async function provisionGymlyticsAccount(ownerStamp){
  if(error)throw Error('No se pudo habilitar la cuenta: '+error.message);
  if(!data?.activo)throw Error('La cuenta Gymlytics está desactivada; no se reactivó automáticamente.');
 }
+async function completeCloudLogin(session,ownerStamp,ownerClient){
+ requireCloudIdentity(session?.user?.id,ownerStamp,ownerClient);
+ try{
+  await provisionGymlyticsAccount(ownerStamp);
+  requireCloudIdentity(session.user.id,ownerStamp,ownerClient);
+ }catch(error){
+  if(ownerStamp===stamp()&&ownerClient===client)rotateCloudClient();
+  throw error;
+ }
+ remoteSession=session;
+ refreshCloudControls();renderSyncStatus();
+ status('Cuenta autenticada. El perfil local sigue intacto; puedes vincularlo o sincronizarlo voluntariamente.');
+}
 async function cloudLogin(email,password,register=false){
+ if(transitioning)throw Error('Espera a que termine el cambio de perfil.');
+ rotateCloudClient();
  const ownerStamp=stamp(),ownerClient=client;
  if(!client)throw Error('No hay conexión de Supabase configurada');
  if(!navigator.onLine)throw Error('Sin conexión a Internet. Tus registros locales siguen disponibles');
@@ -365,11 +380,7 @@ async function cloudLogin(email,password,register=false){
   if(!data?.access_token||!data?.refresh_token)throw Error(data?.error||'Nombre de usuario o contraseña inválidos');
   const set=await ownerClient.auth.setSession({access_token:data.access_token,refresh_token:data.refresh_token});
   if(set.error)throw set.error;
-  requireCloudIdentity(set.data.session?.user?.id,ownerStamp,ownerClient);
-  remoteSession=set.data.session;
-  await provisionGymlyticsAccount(ownerStamp);
-  refreshCloudControls();
-  status('Cuenta autenticada. Para descargar debes confirmar la operación.');
+  await completeCloudLogin(set.data.session,ownerStamp,ownerClient);
   return;
  }
  if(register&&(!email.includes('@')||password.length<6))throw Error('Para registrarte, introduce un correo válido y contraseña de al menos 6 caracteres.');
@@ -379,12 +390,7 @@ async function cloudLogin(email,password,register=false){
   status('Revisa tu correo para confirmar la cuenta. Tu perfil local no se modificó.');
   return;
  }
- requireCloudIdentity(result.data.session?.user?.id,ownerStamp,ownerClient);
- remoteSession=result.data.session;
- if(!remoteSession?.user)throw Error('No se obtuvo la sesión de la nube');
- await provisionGymlyticsAccount(ownerStamp);
- refreshCloudControls();
- status('Cuenta autenticada. Para descargar datos debes confirmar la operación.');
+ await completeCloudLogin(result.data.session,ownerStamp,ownerClient);
 }
 function renderConflictButtons(){
  const holder=$('offlineConflicts');if(!holder)return;
@@ -420,7 +426,9 @@ function downloadLocal(name,data){
  link.href=url;link.download=name;document.body.append(link);link.click();link.remove();
  setTimeout(()=>URL.revokeObjectURL(url),3000);
 }
-function saveProfileBackup(){
+async function saveProfileBackup(){
+ if(transitioning||syncController?.isBusy())throw Error('Espera a que termine la operación actual.');
+ await queue;
  if(!latest)return;
  downloadLocal('Gymlytics_perfil_'+latest.name.replace(/[^a-z0-9-_]/gi,'_')+'_'+new Date().toISOString().slice(0,10)+'.json',
   {format:'gymlytics-profile-backup',version:1,name:latest.name,data:latest.data,
@@ -429,6 +437,7 @@ function saveProfileBackup(){
 }
 async function importProfileBackup(event){
  const file=event.target.files?.[0];event.target.value='';
+ if(transitioning||syncController?.isBusy())return status('Espera a que termine la operación actual.');
  if(!file)return;
  if(file.size>50*1024*1024)return status('Respaldo excesivamente grande.');
  try{
@@ -471,7 +480,7 @@ async function init(){
   try{await renameProfile()}catch(error){status('No se pudo renombrar: '+error.message)}
  });
  $('offlineCreate').addEventListener('click',async()=>{try{await createProfile()}catch(e){status(e.message)}});
- $('offlineBackup').addEventListener('click',saveProfileBackup);
+ $('offlineBackup').addEventListener('click',()=>saveProfileBackup().catch(error=>status('Respaldo no realizado: '+error.message)));
  $('offlineImport').addEventListener('change',importProfileBackup);
  $('offlineCloudToggle').addEventListener('click',()=>{
   $('offlineCloudPanel').hidden=!$('offlineCloudPanel').hidden;
