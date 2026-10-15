@@ -24,7 +24,7 @@ async function check(width,page){
  const names={
   sesion:['#page-sesion .auth-panel'],
   catalogos:['#page-catalogos .catalog-compact-card','#page-catalogos .catalog-main-actions','#catalogRefresh','#gymExistingSelect','#exerciseExistingSelect'],
-  registro:['#page-registro .exercise-tabs-wrap','#page-registro .context-panel','#continueToSeries'],
+  registro:['#page-registro .exercise-tabs-wrap','#page-registro .registro-compact-panel','#registroModoSubdivision','#registroNumeroSerie'],
   'registro-series':['#page-registro .series-panel','#page-registro .table-scroll','#saveRecords'],
   tablas:['#page-tablas .history-tools','#historyGym','#historyRefresh','#exportCsv','#historyView'],
   dashboard:['#page-dashboard .progress-panel','#page-dashboard .progress-filters','#progressExercise','#progressMetric','#progressChart']
@@ -92,6 +92,15 @@ async function check(width,page){
   const openShot=await request('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
   writeFileSync(join(folder,'gymlytics-catalogos-editor-390.png'),Buffer.from(openShot.data,'base64'));
   await request('Runtime.evaluate',{expression:'document.querySelector("[data-catalog-kind=grip] .catalog-compact-toggle").click();window.scrollTo({top:0,behavior:"instant"});document.scrollingElement.scrollTop=0;',returnByValue:true});
+ }
+ if(width===390&&page==='registro-series'){
+  const folder=resolve(root,'../mobile-check');mkdirSync(folder,{recursive:true});
+  const r=await request('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
+  writeFileSync(join(folder,'gymlytics-registro-completo-390.png'),Buffer.from(r.data,'base64'));
+  await request('Runtime.evaluate',{expression:'window.scrollTo(0,440);',returnByValue:true});
+  const r2=await request('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+  writeFileSync(join(folder,'gymlytics-registro-parte-inferior-390.png'),Buffer.from(r2.data,'base64'));
+  await request('Runtime.evaluate',{expression:'window.scrollTo(0,0);',returnByValue:true});
  }
  if((width===320&&page==='dashboard')||(width===390&&['registro-series','catalogos','tablas'].includes(page))){
   const path=resolve(root,'../mobile-check');mkdirSync(path,{recursive:true});
