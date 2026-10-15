@@ -90,6 +90,12 @@ try{
  await until('navigator.serviceWorker?.ready.then(()=>true).catch(()=>false)','registro Service Worker');
  // Online=false no puede disparar subidas, pero permite entradas offline en IndexedDB.
  await cd('Network.emulateNetworkConditions',{offline:true,latency:0,downloadThroughput:0,uploadThroughput:0});
+ // El primer reinicio después de instalar debe funcionar incluso sin una segunda
+ // visita online: es aquí donde los chunks hash de Vite deben estar precargados.
+ await navigate(url);
+ await until('!!window.GymCloud?.canWrite?.()','primera reapertura inmediata sin Internet');
+ assert.equal(await evaluate('document.querySelector("#offlineProfiles").options.length'),1);
+ console.log('PASS 1b: primer arranque después de instalar con caché inicial sin Internet');
  for(const [date,weight] of [['2026-07-15',30],['2026-08-15',32],['2026-09-15',35],['2026-10-15',40]]){
   const r=await evaluate('window.GymCloud.saveWorkout('+JSON.stringify(workout(date,weight))+')');
   assert.equal(r,1);
