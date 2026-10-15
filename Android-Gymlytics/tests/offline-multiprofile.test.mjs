@@ -66,7 +66,7 @@ test('El cambio de A a B espera guardados activos y destruye sesión previa',asy
 let activeId='A',profileEpoch=4,transitioning=false,remoteSession={user:{id:'cloud-A'}};
 let queueDone,rotations=0,reads=0,savedId=null,draws=0;
 const queue=new Promise(ok=>queueDone=ok);
-const profiles=[{id:'A',name:'Usuario A',cloudUserId:'cloud-A'},{id:'B',name:'Usuario B',cloudUserId:null}];
+let profiles=[{id:'A',name:'Usuario A',cloudUserId:'cloud-A'},{id:'B',name:'Usuario B',cloudUserId:null}];
 let latest={id:'A',name:'Usuario A',data:{records:[{id:'serie-A'}]}};
 const syncController={isBusy:()=>false};
 const model={records:[{id:'serie-A'}],photos:{secret:'A'}};
