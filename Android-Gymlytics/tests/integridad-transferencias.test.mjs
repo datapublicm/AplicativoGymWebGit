@@ -63,6 +63,7 @@ function setup(initial=base()){
   isLinkedElsewhere:()=>false,confirmAction:()=>allow,notify:text=>notices.push(text)
  });
  return {sync,uid,view,rows,notices,read:()=>structuredClone(state),
+  editLocal:fn=>fn(state),
   enableConfirm:v=>allow=v,cutAfterCommit:()=>failAfterCommit=true,
   cutSecondPage:()=>denyPage=true,changeProfile:()=>current=false,
   rpcCalls:()=>rpcCalls,mutations:()=>mutations};
@@ -117,5 +118,50 @@ test('Cambio de perfil mientras responde Supabase nunca confirma datos al perfil
   await assert.rejects(upload,/Cambió la cuenta o el perfil/);
   assert.equal(h.read().pending.length,1);
   assert.equal(h.read().cloudUserId,null);
+ }finally{Object.defineProperty(globalThis,'navigator',{value:original,configurable:true})}
+});
+
+test('Modificar una serie después de perder su ACK conserva el alta original y actualiza luego',async()=>{
+ const state=base(),item=seed(state),h=setup(state);
+ const original=globalThis.navigator;Object.defineProperty(globalThis,'navigator',{value:{onLine:true},configurable:true});
+ try{
+  h.cutAfterCommit();
+  await assert.rejects(h.sync.upload(uid,'perfil-A'),e=>e?.message?.includes('Timeout'));
+  const pending=h.read().pending[0];assert.equal(pending.submittedRequest.payload.weight,50);
+  h.editLocal(data=>{
+   data.records[0].weight=75;
+   data.pending.push({id:randomUUID(),kind:'update_series',localId:item.id,
+    syncKey:'local:'+item.id,expectedVersion:0});
+  });
+  assert.equal(h.read().pending[0].submittedRequest.payload.weight,50);
+  const retry=await h.sync.upload(uid,'perfil-A');
+  assert.equal(retry.duplicates,1);assert.equal(h.read().pending.length,1);
+  assert.equal(h.read().pending[0].expectedVersion,1);
+  await h.sync.upload(uid,'perfil-A');
+  assert.equal(h.rows.get('local:'+item.id).version,2);
+  assert.equal(h.rows.get('local:'+item.id).payload.weight,75);
+  assert.equal(h.read().pending.length,0);
+ }finally{Object.defineProperty(globalThis,'navigator',{value:original,configurable:true})}
+});
+test('Borrar una serie después de perder ACK evita resurrecciones al reconectar',async()=>{
+ const state=base(),item=seed(state),h=setup(state);
+ const original=globalThis.navigator;Object.defineProperty(globalThis,'navigator',{value:{onLine:true},configurable:true});
+ try{
+  h.cutAfterCommit();
+  await assert.rejects(h.sync.upload(uid,'perfil-A'),e=>e?.message?.includes('Timeout'));
+  h.editLocal(data=>{
+   data.records.splice(0,1);
+   data.tombstones.push({localId:item.id,syncKey:'local:'+item.id});
+   data.pending.push({id:randomUUID(),kind:'delete_series',localId:item.id,
+    syncKey:'local:'+item.id,expectedVersion:0});
+  });
+  await h.sync.upload(uid,'perfil-A');
+  assert.equal(h.read().records.length,0);
+  assert.equal(h.read().pending[0].expectedVersion,1);
+  await h.sync.upload(uid,'perfil-A');
+  assert.equal(h.rows.get('local:'+item.id).deleted,true);
+  assert.equal(h.rows.get('local:'+item.id).version,2);
+  assert.equal(h.read().tombstones.length,1);
+  assert.equal(h.read().pending.length,0);
  }finally{Object.defineProperty(globalThis,'navigator',{value:original,configurable:true})}
 });
