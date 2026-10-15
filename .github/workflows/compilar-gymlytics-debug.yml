@@ -63,6 +63,12 @@ jobs:
           node -e 'if(!process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.startsWith("sb_publishable_"))process.exit(1)'
           npm run build:web
           test -s dist/index.html
+          test -s dist/app.js
+          test -s dist/dashboard.js
+          test -s dist/styles.css
+          grep -q 'dashboard.js' dist/index.html
+          grep -q 'id="registroModoSubdivision"' dist/index.html
+          grep -q 'id="catalogCompactRows"' dist/index.html
       - name: Crear plataforma Android temporal
         run: |
           test -f android/README.md
@@ -71,6 +77,10 @@ jobs:
           rmdir android
           npx cap add android
           npx cap sync android
+          test -s android/app/src/main/assets/public/dashboard.js
+          test -s android/app/src/main/assets/public/app.js
+          grep -q 'dashboard.js' android/app/src/main/assets/public/index.html
+          grep -q 'id="registroModoSubdivision"' android/app/src/main/assets/public/index.html
       - name: Establecer version interna 01.05 y codigo 5
         run: |
           node <<'NODE'
@@ -94,6 +104,9 @@ jobs:
         run: |
           APK=android/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
+          unzip -Z1 "$APK" | grep -Fxq 'assets/public/dashboard.js'
+          unzip -Z1 "$APK" | grep -Fxq 'assets/public/app.js'
+          unzip -Z1 "$APK" | grep -Fxq 'assets/public/index.html'
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep '^package:' | tee /tmp/gymlytics-package.txt
           grep -q "name='com.datapublicm.gymlytics'" /tmp/gymlytics-package.txt
