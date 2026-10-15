@@ -101,7 +101,7 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
     pages('vw_historial_series',uid),pages('tbl_sync_series',uid),catalogFetch(uid,stamp)
    ]);
    validate(uid,stamp);
-   if(!catalog||!Array.isArray(catalog.baseCatalog)||!catalog.entities||!Array.isArray(catalog.library)||!Array.isArray(catalog.custom))
+   if(!catalog||!Array.isArray(catalog.baseCatalog)||!Array.isArray(catalog.muscles)||!catalog.entities||!Array.isArray(catalog.library)||!Array.isArray(catalog.custom))
     throw Error('Descarga de catálogo incompleta; se conservó el perfil local');
    let summary;
    await mutate(local=>{
@@ -111,6 +111,7 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
      throw Error('El perfil de prueba dejó de estar vacío. No se aplicó la descarga.');
     const snap=readOnly?structuredClone(catalog):mergeDownloadedCatalog(local,catalog);
     local.baseCatalog=snap.baseCatalog;
+    local.muscles=snap.muscles;
     local.entities=snap.entities;
     local.library=snap.library;
     local.custom=snap.custom;
@@ -145,7 +146,7 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
    });
    refresh();
    notify('Descarga COMPLETA ('+(readOnly?'prueba: solo lectura':'cuenta personal: edición offline')+'): '+
-    catalog.baseCatalog.length+' entradas de catálogo base, '+
+    catalog.baseCatalog.length+' entradas de catálogo base, '+catalog.muscles.length+' músculos, '+
     catalog.library.length+' ejercicios propios sin sede, '+
     catalog.custom.length+' ejercicios propios con sede y '+
     (summary.added+summary.updated)+' series nuevas/actualizadas. '+
