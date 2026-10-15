@@ -81,6 +81,7 @@ async function activate(id,initial=false){
  if(typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(null,null);
  if(typeof setHistoryReady==='function')setHistoryReady(false);
  remoteSession=null;
+ if(client)await client.auth.signOut().catch(()=>{});
  const p=await get(id);
  if(epoch!==profileEpoch||!p) return;
  activeId=id;latest=p;profiles=await all();
@@ -257,6 +258,18 @@ function refreshCloudControls(){
 async function cloudLogin(email,password,register=false){
  if(!client)throw Error('No hay conexión de Supabase configurada');
  if(!navigator.onLine)throw Error('Sin conexión a Internet. Tus registros locales siguen disponibles');
+ if(!register&&!email.includes('@')){
+  const {data,error}=await client.functions.invoke('gymlytics-login-usuario',{body:{username:email,password}});
+  if(error)throw error;
+  if(!data?.access_token||!data?.refresh_token)throw Error(data?.error||'Nombre de usuario o contraseña inválidos');
+  const set=await client.auth.setSession({access_token:data.access_token,refresh_token:data.refresh_token});
+  if(set.error)throw set.error;
+  remoteSession=set.data.session;
+  refreshCloudControls();
+  status('Cuenta autenticada. Para descargar debes confirmar la operación.');
+  return;
+ }
+ if(register&&(!email.includes('@')||password.length<6))throw Error('Para registrarte, introduce un correo válido y contraseña de al menos 6 caracteres.');
  const result=register?await client.auth.signUp({email,password}):await client.auth.signInWithPassword({email,password});
  if(result.error)throw result.error;
  if(register&&!result.data.session){
@@ -276,6 +289,8 @@ async function cloudDownload(){
   throw Error('Este perfil ya está asociado a otra cuenta. No se mezclarán cuentas distintas.');
  if(!confirm('¿Descargar y unir los datos de tu cuenta con ESTE perfil? No se borrarán los registros locales ni se reactivarán las series eliminadas. La subida sigue pendiente hasta disponer de sincronización segura.'))return;
  // La descarga se completa antes de modificar IndexedDB; un fallo no toca el perfil.
+ const access=await remote.from('tbl_usuarios').select('id,activo').eq('id',uid).maybeSingle();
+ if(access.error||!access.data?.activo)throw Error('La cuenta aún no tiene acceso habilitado a Gymlytics.');
  const pageSize=500,rows=[],ids=new Set();
  const countResponse=await remote.from('vw_historial_series').select('id',{head:true,count:'exact'}).eq('user_id',uid);
  if(countResponse.error)throw countResponse.error;
@@ -309,6 +324,41 @@ async function cloudDownload(){
  model.records=structuredClone(latest.data.records);drawRecent();drawHistory(true);drawReports();renderSyncStatus();
  status('Descarga completa: '+added+' series nuevas, sin sobrescribir registros ni eliminaciones locales.');
 }
+
+function downloadLocal(name,data){
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob),link=document.createElement('a');
+ link.href=url;link.download=name;document.body.append(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+function saveProfileBackup(){
+ if(!latest)return;
+ downloadLocal('Gymlytics_perfil_'+latest.name.replace(/[^a-z0-9-_]/gi,'_')+'_'+new Date().toISOString().slice(0,10)+'.json',
+  {format:'gymlytics-profile-backup',version:1,name:latest.name,data:latest.data,
+   exportedAt:new Date().toISOString()});
+ status('Respaldo completo del perfil descargado, incluyendo eliminaciones y cambios pendientes.');
+}
+async function importProfileBackup(event){
+ const file=event.target.files?.[0];event.target.value='';
+ if(!file)return;
+ if(file.size>50*1024*1024)return status('Respaldo excesivamente grande.');
+ try{
+  const backup=JSON.parse(await file.text());
+  if(backup.format!=='gymlytics-profile-backup'||backup.version!==1||
+     !backup.data||!Array.isArray(backup.data.records)||!Array.isArray(backup.data.tombstones)||
+     !Array.isArray(backup.data.pending)||!backup.data.entities||
+     !Array.isArray(backup.data.library)||!Array.isArray(backup.data.custom))
+    throw Error('No es una copia compatible y completa');
+  if(!confirm('Se restaurará como un perfil NUEVO, sin reemplazar ningún perfil existente. ¿Continuar?'))return;
+  const name='Restaurado - '+String(backup.name||'Gymlytics').slice(0,42);
+  const profile={id:uuid(),name,modifiedAt:new Date().toISOString(),data:backup.data};
+  await put(profile);
+  await activate(profile.id);
+  localStorage.setItem('gymlytics-active-profile',profile.id);
+  status('Copia restaurada en un perfil independiente; no se reemplazó ningún registro.');
+ }catch(error){status('No se pudo restaurar: '+error.message)}
+}
+
 async function init(){
  db=await openDB();profiles=await all();
  if(!profiles.length){
@@ -324,6 +374,8 @@ async function init(){
   await activate(event.target.value);
  });
  $('offlineCreate').addEventListener('click',async()=>{try{await createProfile();localStorage.setItem('gymlytics-active-profile',activeId)}catch(e){status(e.message)}});
+ $('offlineBackup').addEventListener('click',saveProfileBackup);
+ $('offlineImport').addEventListener('change',importProfileBackup);
  $('offlineCloudToggle').addEventListener('click',()=>{
   $('offlineCloudPanel').hidden=!$('offlineCloudPanel').hidden;
  });
