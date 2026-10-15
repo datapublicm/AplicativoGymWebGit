@@ -7,7 +7,9 @@ const html=read('../web/index.html'),app=read('../web/app.js'),cloud=read('../we
 
 test('Catálogos concentra la administración; se retira el panel inicial duplicado',()=>{
  assert.doesNotMatch(html,/<h2>Catálogo de entrenamiento<\/h2>/);
- assert.match(html,/<h2>Administrar mis catálogos<\/h2>/);
+ assert.match(html,/class="gym-mock-header gym-catalog-header"/);
+ assert.match(html,/<h1>Catálogos<\/h1>/);
+ assert.match(html,/id="catalogCompactRows"/);
  for(const id of ['catalogRefresh','gymCount','siteCount','machineCount','optionCount','exerciseCount','muscleCount'])
   assert.ok(html.includes('id="'+id+'"'),id);
 });
