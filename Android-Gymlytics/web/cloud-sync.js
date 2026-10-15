@@ -107,6 +107,14 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
      known.add(key);oldAdded++;
     }
     summary=mergeDownload(local,mirror);
+    // Una serie heredada recibida por primera vez desde el espejo conserva
+    // también el estado original de la vista vieja como punto de referencia.
+    const legacyMap=new Map(legacy.map(item=>['legacy:'+item.id,item]));
+    for(const item of local.records){
+     const key=sourceKey(item);
+     if(!known.has(key)&&key.startsWith('legacy:')&&!item.lastLegacyPayload&&legacyMap.has(key))
+      item.lastLegacyPayload=normalizeLegacySnapshot(legacyMap.get(key));
+    }
     summary.added+=oldAdded;
     summary.legacyAlerts=alert.changed+alert.missing;
     local.cloudUserId=uid;local.lastPull=new Date().toISOString();
