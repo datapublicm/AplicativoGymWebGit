@@ -86,7 +86,63 @@ Supabase Pruebas</div></aside>
 <div id="historyRecords" aria-live="polite"></div>
 <div class="history-pagination" id="historyPagination" hidden><span id="historyPageInfo"></span><button class="outline-btn" id="historyLoadMore" type="button">Mostrar más series</button></div>
 </div><div class="panel backup"><h2>Respaldo de datos</h2><p>Los datos se encuentran sincronizados con Supabase. La exportación incluye el historial completo y no depende de los filtros visibles.</p><div class="backup-actions"><button class="outline-btn" id="exportJson" type="button" disabled>Exportar JSON</button></div></div></section>
-<section class="page" id="page-dashboard"><div class="page-title"><div><div class="eyebrow">ESTADÍSTICAS</div><h1>Reportes</h1><p>Evolución de tus series sincronizadas con Supabase.</p></div></div><div class="stats-grid" id="reportStats"></div><div class="panel progress-panel"><div class="progress-heading"><div><h2>Progreso por fecha</h2><p>Selecciona un ejercicio y compara peso, repeticiones o series.</p></div><div class="progress-filters"><label for="progressExercise">Ejercicio<select id="progressExercise" aria-label="Ejercicio para visualizar"></select></label><label for="progressMetric">Indicador<select id="progressMetric" aria-label="Indicador de progreso"><option value="weight">Peso máximo (kg)</option><option value="reps">Repeticiones totales</option><option value="series">Series realizadas</option><option value="volume">Volumen total (kg × rep.)</option></select></label><label for="progressRange">Período<select id="progressRange" aria-label="Rango de fechas"><option value="all">Todo el historial</option><option value="7">Últimos 7 días</option><option value="30">Últimos 30 días</option><option value="90">Últimos 90 días</option></select></label></div></div><p class="progress-summary" id="progressSummary" aria-live="polite"></p><div id="progressChart" class="progress-chart" aria-label="Gráfico de progreso de entrenamiento"></div><p class="progress-footnote">Se muestran hasta 10 fechas por período, contado desde la sesión más reciente del ejercicio. Desliza el gráfico horizontalmente para explorar las fechas. El peso y el volumen se convierten a kg cuando corresponda.</p></div><div class="panel"><h2>Ejercicios más frecuentes</h2><div id="frequentExercises"></div></div></section>
+<section class="page" id="page-dashboard">
+<div class="page-title"><div><div class="eyebrow">TU PROGRESO EN DATOS</div><h1>Dashboard</h1><p>Frecuencia, evolución y comparaciones reales de tus entrenamientos.</p></div></div>
+<div class="dash-filters panel">
+ <label>Gimnasio<select id="dashGym"><option value="">Todos los gimnasios</option></select></label>
+ <label>Sede<select id="dashSede"><option value="">Todas las sedes</option></select></label>
+ <label>Período<select id="dashRange"><option value="30">Últimos 30 días</option><option value="90" selected>Últimos 90 días</option><option value="180">Últimos 180 días</option><option value="all">Todo el historial</option><option value="custom">Personalizado</option></select></label>
+ <div class="dash-date-custom" id="dashCustomDates" hidden><label>Desde<input id="dashFrom" type="date"/></label><label>Hasta<input id="dashTo" type="date"/></label></div>
+ <label class="dash-tech-toggle"><input id="dashTechnique" type="checkbox" checked/><span>Considerar técnica</span></label>
+ <p class="dash-hint">Con técnica: la comparación requiere ejecución equivalente. Sin técnica: ves todas las series, pero las ejecuciones diferentes no se califican como mejora o retroceso.</p>
+</div>
+<div class="dash-tabs" role="tablist" aria-label="Vistas del Dashboard">
+ <button type="button" class="selected" data-dash-tab="resumen" role="tab" aria-selected="true" aria-controls="dash-resumen">▥ Resumen</button>
+ <button type="button" data-dash-tab="progreso" role="tab" aria-selected="false" aria-controls="dash-progreso">↗ Progreso</button>
+ <button type="button" data-dash-tab="analisis" role="tab" aria-selected="false" aria-controls="dash-analisis">◉ Análisis</button>
+</div>
+<p id="dashStatus" class="dash-status" role="status" aria-live="polite"></p>
+<div id="dash-resumen" class="dash-pane" role="tabpanel">
+ <div id="dashCards" class="dash-cards"></div>
+ <div class="dash-two">
+  <section class="dash-card"><h2>Frecuencia semanal</h2><p>Días distintos con entrenamiento, no cantidad de series.</p><div id="dashWeekly" class="dash-visual"></div></section>
+  <section class="dash-card"><h2>Actividad reciente</h2><p>Calendario de días con registros.</p><div id="dashCalendar" class="dash-visual"></div></section>
+ </div>
+ <div class="dash-two">
+  <section class="dash-card"><h2>Ejercicios que destacan</h2><div id="dashTop"></div></section>
+  <section class="dash-card"><h2>Ejercicios por revisar</h2><div id="dashReview"></div></section>
+ </div>
+ <section class="dash-card"><h2>Periodicidad por zona de entrenamiento</h2><p>Basada en AnotaciónV2, no es una estimación de trabajo muscular.</p><div id="dashZones"></div></section>
+</div>
+<div id="dash-progreso" class="dash-pane" role="tabpanel" hidden>
+ <div class="dash-detail-filters">
+  <label>Ejercicio<select id="dashExercise"><option value="">Selecciona ejercicio</option></select></label>
+  <label>Instrumento<select id="dashEquipment"><option value="">Todos</option></select></label>
+  <label>Agarre / implemento<select id="dashAccessory"><option value="">Todos</option></select></label>
+  <label>Subdivisión<select id="dashSubdivision"><option value="">Todas</option></select></label>
+  <label>Número de serie<select id="dashSeries"><option value="">Mejor peso por sesión</option></select></label>
+  <label>Indicador<select id="dashMetric"><option value="weight">Peso (kg)</option><option value="reps">Repeticiones</option></select></label>
+ </div>
+ <div class="dash-cards" id="dashProgressCards"></div>
+ <section class="dash-card"><h2>Evolución por sesión</h2><p id="dashTrendNote">Elige un ejercicio para consultar su historial.</p><div id="dashTrend" class="dash-visual"></div></section>
+ <section class="dash-card"><h2>Serie 1 vs. Serie 1, Serie 2 vs. Serie 2</h2><p>Dos fechas recientes del mismo ejercicio. Se mantiene cada subdivisión por separado.</p><div id="dashSeriesChart" class="dash-visual"></div><div id="dashSeriesTable" class="dash-table-wrap"></div></section>
+ <section class="dash-card"><h2>Técnicas registradas</h2><div id="dashTechniques"></div></section>
+</div>
+<div id="dash-analisis" class="dash-pane" role="tabpanel" hidden>
+ <div id="dashAnalysisCards" class="dash-cards"></div>
+ <div class="dash-two">
+  <section class="dash-card"><h2>Estado de los ejercicios</h2><p>Según las dos últimas sesiones comparables y sus series equivalentes.</p><div id="dashStates" class="dash-visual"></div></section>
+  <section class="dash-card"><h2>Frecuencia habitual frente a reciente</h2><p>Días por semana: 28 días anteriores versus últimos 28 días.</p><div id="dashPeriodicity" class="dash-visual"></div></section>
+ </div>
+ <div class="dash-two">
+  <section class="dash-card"><h2>Ejercicios sin progreso confirmado</h2><div id="dashStalled"></div></section>
+  <section class="dash-card"><h2>Derecha / izquierda</h2><p>Solo cuando existe un ejercicio con registros unilaterales.</p><div id="dashSides"></div></section>
+ </div>
+ <section class="dash-card"><h2>Cambios de técnica</h2><div id="dashTechniqueChanges"></div></section>
+ <p class="dash-hint">Sin RPE, calorías, puntuaciones de técnica ni recomendaciones de carga inventadas. «Sin comparación» no significa retroceso.</p>
+</div>
+<div class="dashboard-legacy" hidden aria-hidden="true"><div class="page-title"><div><div class="eyebrow">ESTADÍSTICAS</div><h1>Reportes</h1><p>Evolución de tus series sincronizadas con Supabase.</p></div></div><div class="stats-grid" id="reportStats"></div><div class="panel progress-panel"><div class="progress-heading"><div><h2>Progreso por fecha</h2><p>Selecciona un ejercicio y compara peso, repeticiones o series.</p></div><div class="progress-filters"><label for="progressExercise">Ejercicio<select id="progressExercise" aria-label="Ejercicio para visualizar"></select></label><label for="progressMetric">Indicador<select id="progressMetric" aria-label="Indicador de progreso"><option value="weight">Peso máximo (kg)</option><option value="reps">Repeticiones totales</option><option value="series">Series realizadas</option><option value="volume">Volumen total (kg × rep.)</option></select></label><label for="progressRange">Período<select id="progressRange" aria-label="Rango de fechas"><option value="all">Todo el historial</option><option value="7">Últimos 7 días</option><option value="30">Últimos 30 días</option><option value="90">Últimos 90 días</option></select></label></div></div><p class="progress-summary" id="progressSummary" aria-live="polite"></p><div id="progressChart" class="progress-chart" aria-label="Gráfico de progreso de entrenamiento"></div><p class="progress-footnote">Se muestran hasta 10 fechas por período, contado desde la sesión más reciente del ejercicio. Desliza el gráfico horizontalmente para explorar las fechas. El peso y el volumen se convierten a kg cuando corresponda.</p></div><div class="panel"><h2>Ejercicios más frecuentes</h2><div id="frequentExercises"></div></div></div>
+</section>
 </main>
 </div>
 <nav aria-label="Navegación móvil" class="bottom-nav"><button class="bottom-item active" data-page="sesion" type="button"><span>♙</span><small>Sesión</small></button><button class="bottom-item" data-page="catalogos" type="button"><span>▦</span><small>Catálogos</small></button><button class="bottom-item" data-page="registro" type="button"><span>✚</span><small>Registro</small></button><button class="bottom-item" data-page="tablas" type="button"><span>▥</span><small>Tablas</small></button><button class="bottom-item" data-page="dashboard" type="button"><span>◈</span><small>Dashboard</small></button></nav>
@@ -106,4 +162,4 @@ Supabase Pruebas</div></aside>
 <p class="anatomy-note">Los nombres provienen del historial disponible. La asignación a IDs anatómicos y el giro automático se activarán cuando se vincule el catálogo muscular y el modelo 3D real.</p>
 </section><div class="detail-section"><h3>Descripción</h3><p id="detailDesc"></p></div><div class="muscle-grid"><div class="muscle-card"><small>MÚSCULOS PRINCIPALES</small><strong id="detailMainMuscle">—</strong></div><div class="muscle-card"><small>MÚSCULOS SECUNDARIOS</small><strong id="detailOtherMuscle">—</strong></div></div><div class="detail-section"><h3>Técnica seleccionada</h3><p id="detailTechnique">—</p></div><div class="detail-meta"><span id="detailHistory"></span><small>Información muscular y técnica procedente del Excel. Las fotografías se cargarán en el almacenamiento privado de Gymlytics cuando se configure la conexión.</small></div></div><div class="dialog-footer"><button class="primary-btn" id="closeDetailBottom" type="button">Cerrar detalle</button></div></dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
-<script src="./app.js"></script><script src="./auth-cloud.js" type="module"></script></body></html>
+<script src="./app.js"></script><script src="./dashboard.js"></script><script src="./auth-cloud.js" type="module"></script></body></html>
