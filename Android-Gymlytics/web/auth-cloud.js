@@ -441,6 +441,43 @@ const cloud={
   await this.loadCatalogStats();assertCurrentSession(user_id,epoch);
   return id;
  },
+ async deleteCatalogItem(kind,itemId){
+  if(!owns())throw Error('Inicia sesión para eliminar un elemento personal');
+  const user_id=signedIn.id,epoch=authEpoch,id=String(itemId||'');
+  const groups={
+   gym:{table:'tbl_gimnasios',items:window.GymEntities?.gyms||[]},
+   site:{table:'tbl_sedes',items:window.GymEntities?.sites||[]},
+   machine:{table:'tbl_maquinas',items:window.GymEntities?.machines||[]},
+   option:{table:'tbl_opciones_personales',items:window.GymEntities?.options||[]},
+   exercise:{table:'tbl_ejercicios',items:[
+    ...(window.GymExerciseLibrary||[]),
+    ...(window.GymCustomCatalog||[]).filter(x=>x.cloud_id).map(x=>({id:x.cloud_id,nombre:x.e}))
+   ]}
+  };
+  const group=groups[kind],item=group?.items.find(x=>String(x.id)===id);
+  if(!group||!item)throw Error('Solo se pueden eliminar valores de tu propio catálogo.');
+  if(kind==='gym'&&(window.GymEntities?.sites||[]).some(x=>x.gimnasio_id===id))
+   throw Error('Este gimnasio contiene sedes. Elimina o reasigna sus sedes antes de continuar.');
+  const q=kind==='option'?db.from(group.table).update({activo:false}):db.from(group.table).delete();
+  const {data,error}=await q.eq('id',id).eq('user_id',user_id).select('id');
+  must(data,error);assertCurrentSession(user_id,epoch);
+  if(data?.length!==1)throw Error('No se confirmó la eliminación. Actualiza el catálogo.');
+  if(kind==='exercise'){
+   const custom=await this.loadOwnCatalog();assertCurrentSession(user_id,epoch);
+   window.GymCustomCatalog=custom;
+   if(typeof renderOwnCatalog==='function')renderOwnCatalog();
+  }else{
+   await this.loadIndependentCatalog();assertCurrentSession(user_id,epoch);
+   if(kind==='gym'||kind==='site'||kind==='machine'){
+    const custom=await this.loadOwnCatalog();assertCurrentSession(user_id,epoch);
+    window.GymCustomCatalog=custom;
+    if(typeof renderOwnCatalog==='function')renderOwnCatalog();
+   }
+  }
+  if(typeof cascade==='function')cascade(0);
+  await this.loadCatalogStats();assertCurrentSession(user_id,epoch);
+  return id;
+ },
  async saveCustomExercise(values){
   if(!owns())throw Error('Inicia sesión para editar tu catálogo');
   const user_id=signedIn.id,epoch=authEpoch,nombre=String(values.e||'').trim();
@@ -470,6 +507,7 @@ const cloud={
    assertCurrentSession(uid,epoch);
    $(id).textContent=error?'Sin conexión':String(count??0);
   }
+  if(typeof catalogUpdateCounters==='function')catalogUpdateCounters();
   const selector=$('muscleExistingSelect');
   if(selector){
    const {data,error}=await db.from('tbl_musculos').select('id,nombre').order('nombre');
