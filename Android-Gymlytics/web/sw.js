@@ -1,5 +1,5 @@
 const PREFIX='gymlytics-mobile-';
-const CACHE=PREFIX+'catalogos-registro-pruebas-20261015';
+const CACHE=PREFIX+'catalogos-registro-funcional-20261015-v02';
 const ASSETS=['./','./index.html','./styles.css','./app.js','./dashboard.js','./manifest.webmanifest','./assets/polea-alta.webp','./assets/jalon-pecho.webp','./icons/icon-192.png','./icons/icon-512.png'];
 const STATIC_URLS=new Set(ASSETS.map(path=>new URL(path,self.location.href).href));
 
