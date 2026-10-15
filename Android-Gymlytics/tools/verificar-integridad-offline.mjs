@@ -69,7 +69,7 @@ try{
   '--user-data-dir='+work,'about:blank'],{stdio:['ignore','ignore','pipe']});
  browser.stderr?.on('data',chunk=>stderr+=String(chunk).slice(-3000));
  let port=0;
- for(let i=0;i<250;i++){try{port=Number(readFileSync(join(work,'DevToolsActivePort'),'utf8').split('\n')[0]);break}catch{await delay(100)}}
+ for(let i=0;i<550;i++){try{port=Number(readFileSync(join(work,'DevToolsActivePort'),'utf8').split('\n')[0]);break}catch{await delay(100)}}
  assert.ok(port,'Chrome no inició: '+stderr.slice(-900));
  const tabs=await(await fetch('http://127.0.0.1:'+port+'/json/list')).json();
  ws=new WebSocket(tabs.find(x=>x.type==='page').webSocketDebuggerUrl);
