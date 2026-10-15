@@ -22,7 +22,7 @@ function request(method,params={}){
 }
 async function check(width,page){
  const names={
-  sesion:['#page-sesion .auth-panel'],
+  sesion:['#page-sesion .offline-profile-panel','#offlineProfiles','#offlineCreate','#offlineCloudToggle'],
   catalogos:['#page-catalogos .catalog-compact-card','#page-catalogos .catalog-main-actions','#catalogRefresh','#gymExistingSelect','#exerciseExistingSelect'],
   registro:['#page-registro .exercise-tabs-wrap','#page-registro .registro-compact-panel','#registroModoSubdivision','#registroNumeroSerie'],
   'registro-series':['#page-registro .series-panel','#page-registro .table-scroll','#saveRecords'],
