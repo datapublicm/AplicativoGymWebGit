@@ -123,7 +123,7 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,confir
    }else if(choice==='local'){
     const row=index>=0?local.records[index]:null;
     if(row){row.cloudVersion=Number(remoteRecord?.version||0);row.syncKey=key;}
-    const localId=row?.id||key.startsWith('legacy:')?'cloud:'+key.slice(7):key.slice(6);
+    const localId=row?.id||(key.startsWith('legacy:')?'cloud:'+key.slice(7):key.slice(6));
     local.pending.push({id:crypto.randomUUID(),kind:row?'update_series':'delete_series',
      localId:row?.id||localId,syncKey:key,expectedVersion:Number(remoteRecord?.version||0)});
     if(!row)local.tombstones.push({syncKey:key,localId,at:new Date().toISOString(),
