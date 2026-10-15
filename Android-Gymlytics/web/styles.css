@@ -1005,3 +1005,12 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 .offline-conflict p{font-size:12px;margin:0 0 8px;overflow-wrap:anywhere}
 .offline-conflict button{background:#19344c;border:1px solid #6986a6;border-radius:8px;color:#eafaff;min-height:41px;padding:8px;margin-right:7px;margin-bottom:5px}
 @media(max-width:480px){.offline-sync-actions{grid-template-columns:1fr}}
+
+/* Bloque 2 · gestión avanzada de perfiles */
+.offline-rename-profile{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin:12px 0 14px}
+.offline-rename-profile .field{flex:1;min-width:165px}
+.offline-rename-profile input{min-height:46px;background:#112f4b;border:1px solid #4a7199;border-radius:12px;color:#effaff;font-size:16px}
+.offline-rename-profile button{min-height:46px;white-space:normal}
+#offlineLinkAccount{width:100%;min-height:45px;padding:9px;margin:10px 0 3px;border-color:#5c91b1;color:#c6f5ff}
+#offlineProfileCount{font-size:12px;color:#88ddf1;font-weight:700}
+@media(max-width:480px){.offline-rename-profile button{width:100%}}
