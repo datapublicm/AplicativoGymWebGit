@@ -523,7 +523,7 @@ async function saveSeries(){
  if(entries.some(x=>!validSeriesEntry(x))){
   toast('Revisa peso, repeticiones y asistencias.');return;
  }
- if(!window.GymCloud?.canWrite()){toast('Inicia sesión para guardar en Supabase.');return}
+ if(!window.GymCloud?.canWrite()){toast('Selecciona un perfil local para guardar.');return}
  const savedDraftId=activeDraftId;
  const requestId=(window.GymSaveAttempt||0)+1;
  window.GymSaveAttempt=requestId;
@@ -534,7 +534,7 @@ async function saveSeries(){
  const rowSignature=()=>JSON.stringify({date:$('fecha').value,tech:getValue('t'),exercise:chosenRow()?.e,
    notes:$('observaciones').value.trim(),entries:getEntries().map(({el,...entry})=>entry)});
  const submittedSignature=rowSignature();
- const btn=$('saveRecords'),feedback=$('saveFeedback');feedback.hidden=true;feedback.textContent='';btn.disabled=true;btn.textContent='Guardando en Supabase…';
+ const btn=$('saveRecords'),feedback=$('saveFeedback');feedback.hidden=true;feedback.textContent='';btn.disabled=true;btn.textContent='Guardando en este dispositivo…';
  try{
   await window.GymCloud.saveWorkout(payload);
  }catch(err){
@@ -560,11 +560,11 @@ async function saveSeries(){
   if(!current())return;
   model.records=latest;drawRecent();drawHistory(true);drawReports();
   setHistoryReady(true);
-  toast('Series guardadas en Supabase ✓');
+  toast('Series guardadas en el perfil local ✓');
  }catch(err){
   if(!current())return;
-  feedback.textContent='✅ Series guardadas en Supabase. No se pudo actualizar el historial: no vuelvas a guardar estas mismas series.';feedback.hidden=false;
-  toast('Series GUARDADAS; no se pudo actualizar el historial. No las guardes otra vez.');
+  feedback.textContent='✅ Series guardadas localmente. No se pudo releer el historial; no las guardes otra vez.';feedback.hidden=false;
+  toast('Series guardadas localmente; comprueba el historial antes de repetir.');
  }
  finally{if(current()){btn.disabled=false;btn.textContent='Guardar series'}}
 }
@@ -665,7 +665,7 @@ async function deleteRecord(id){
   if(!current())return;
   model.records=latest;drawRecent();drawHistory();drawReports();
   setHistoryReady(true);
-  toast('Serie eliminada de Supabase');
+  toast('Serie eliminada localmente (eliminación preservada)');
  }catch(err){if(current())toast('Serie ELIMINADA; no se pudo actualizar el historial.');}
 }
 function drawReports(){const rows=model.records,days=new Set(rows.map(r=>r.date)).size,vol=rows.reduce((v,r)=>v+r.weight*(r.unit==='lb'?0.45359237:1)*r.reps,0);$('reportStats').innerHTML=`<div class="stat"><strong>${rows.length}</strong><small>Series guardadas</small></div><div class="stat"><strong>${days}</strong><small>Días con registros</small></div><div class="stat"><strong>${Math.round(vol).toLocaleString('es-PE')}</strong><small>Volumen en kg</small></div>`;const counts={};rows.forEach(r=>counts[r.exercise]=(counts[r.exercise]||0)+1);$('frequentExercises').innerHTML=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([name,n])=>`<div class="freq"><span>${esc(name)}</span><strong>${n}</strong></div>`).join('')||'<div class="empty">Sin ejercicios todavía.</div>';drawProgressChart(rows);window.GymDashboard?.render(rows);}
@@ -731,11 +731,11 @@ function setHistoryReady(ready){
 }
 function canExportHistory(){
  if(historyReady&&!!window.GymCloud?.canWrite())return true;
- toast('Primero sincroniza el historial completo de tu cuenta para exportarlo.');
+ toast('Espera a que termine de cargar el perfil para exportarlo.');
  return false;
 }
 async function refreshHistory(){
- if(!window.GymCloud?.canWrite()){toast('Inicia sesión para actualizar el historial.');return;}
+ if(!window.GymCloud?.canWrite()){toast('Selecciona un perfil para consultar el historial.');return;}
  const stamp=window.GymCloud.getSessionStamp?.();
  const current=()=>stamp===window.GymCloud?.getSessionStamp?.()&&!!window.GymCloud?.canWrite();
  const button=$('historyRefresh');button.disabled=true;
@@ -748,7 +748,7 @@ async function refreshHistory(){
   if(!current())return;
   model.records=latest;drawRecent();drawHistory(true);drawReports();
   setHistoryReady(true);
-  toast('Historial actualizado desde Supabase ✓');
+  toast('Historial local actualizado ✓');
  }catch(error){
   if(current())toast('No se pudo actualizar el historial: '+String(error.message||error).slice(0,120));
  }finally{if(current()){button.disabled=false;if(typeof showHistoryLoadProgress==='function')showHistoryLoadProgress(null,null);}}
@@ -775,7 +775,7 @@ async function uploadPhoto(event){
   if(!current())return;
   model.photos[type+':'+key]=url;
   detailOpenAfterUpload(type);
-  toast('Fotografía guardada en Supabase ✓');
+  toast('Fotografía guardada en el perfil local ✓');
  }catch(error){if(current())toast('Error de fotografía: '+error.message.slice(0,110));}
  finally{event.target.value='';}
 }
@@ -806,10 +806,10 @@ document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEve
  const select=$({gym:'gymExistingSelect',site:'siteExistingSelect',machine:'machineExistingSelect',option:'optionExistingSelect',exercise:'exerciseExistingSelect'}[kind]);
  const name=$(kind+'EditName')?.value.trim()||'',feedback=$(kind==='exercise'?'exerciseEditFeedback':{gym:'gymFeedback',site:'siteFeedback',machine:'machineFeedback',option:'optionFeedback'}[kind]);
  if(!select.value||!name){feedback.textContent='Selecciona un elemento y escribe su nuevo nombre.';return;}
- if(!window.GymCloud?.canWrite()){feedback.textContent='Inicia sesión para modificar.';return;}
+ if(!window.GymCloud?.canWrite()){feedback.textContent='Selecciona un perfil para modificar.';return;}
  const stamp=window.GymCloud.getSessionStamp?.(),current=()=>stamp===window.GymCloud.getSessionStamp?.()&&window.GymCloud.canWrite();
  button.disabled=true;
- try{await window.GymCloud.updateCatalogItem(kind,select.value,name);if(current())feedback.textContent='Nombre actualizado correctamente en Supabase.';}
+ try{await window.GymCloud.updateCatalogItem(kind,select.value,name);if(current())feedback.textContent='Nombre actualizado en este perfil.';}
  catch(error){if(current())feedback.textContent='No se pudo modificar: '+error.message;}
  finally{button.disabled=false;}
 }));
