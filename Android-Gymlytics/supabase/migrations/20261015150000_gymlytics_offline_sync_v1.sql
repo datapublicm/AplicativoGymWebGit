@@ -63,12 +63,12 @@ BEGIN
   IF v_action='upsert' THEN
    IF jsonb_typeof(v_payload)<>'object' OR length(v_payload::text)>12000
      OR nullif(btrim(v_payload->>'exercise'),'') IS NULL
-     OR (v_payload->>'date') !~ '^\\d{4}-\\d{2}-\\d{2}$'
+     OR (v_payload->>'date') IS NULL OR (v_payload->>'date') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
      OR nullif(btrim(v_payload->>'gym'),'') IS NULL
      OR nullif(btrim(v_payload->>'sede'),'') IS NULL
-     OR (v_payload->>'unit') NOT IN ('kg','lb')
-     OR (v_payload->>'weight') !~ '^\\d+(\\.\\d+)?$'
-     OR (v_payload->>'reps') !~ '^\\d+(\\.\\d+)?$'
+     OR (v_payload->>'unit') IS NULL OR (v_payload->>'unit') NOT IN ('kg','lb')
+     OR (v_payload->>'weight') IS NULL OR (v_payload->>'weight') !~ '^[0-9]+(\\.[0-9]+)?$'
+     OR (v_payload->>'reps') IS NULL OR (v_payload->>'reps') !~ '^[0-9]+(\\.[0-9]+)?$'
      OR (v_payload->>'reps')::numeric<=0 THEN
     RAISE EXCEPTION 'Contenido de serie inválido';
    END IF;
@@ -79,7 +79,7 @@ BEGIN
    WHERE user_id=v_uid AND op_id=v_id;
   IF FOUND THEN
    IF v_log.request<>v_item THEN RAISE EXCEPTION 'El identificador de operación fue reutilizado'; END IF;
-   v_answer:=v_answer||jsonb_build_array(v_log.response||jsonb_build_object('status','duplicate'));
+   v_answer:=v_answer||jsonb_build_array(CASE WHEN v_log.response->>'status'='applied' THEN v_log.response||jsonb_build_object('status','duplicate') ELSE v_log.response END);
    CONTINUE;
   END IF;
   SELECT * INTO v_old FROM sch_android_gymlytics.tbl_sync_series
