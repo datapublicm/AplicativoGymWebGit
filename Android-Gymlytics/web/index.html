@@ -46,22 +46,42 @@ Supabase Pruebas</div></aside>
 
 
 <div class="exercise-tabs-wrap"><div class="exercise-tabs" id="exerciseTabs" role="tablist" aria-label="Ejercicios abiertos"></div><button type="button" class="exercise-tab-add" id="addExerciseTab" title="Abrir otro ejercicio" aria-label="Nueva pestaña de ejercicio">+</button></div>
-<div class="top-grid"><section class="panel context-panel"><div class="section-head"><span class="number">01</span><h2>Contexto del entrenamiento</h2></div>
-<div class="fields-grid"><label class="field"><span>Gimnasio <em>*</em></span><select id="gimnasio"></select></label><label class="field"><span>Sede <em>*</em></span><select id="sede"></select></label><label class="field full"><span>AnotaciónV2 <em>*</em></span><select id="zona" title="Columna de origen: AnotaciónV2"></select></label></div>
-<div class="field type-block"><span>Tipo de equipo <em>*</em></span><div class="type-options" id="typeOptions"><label><input name="tipo" type="radio" value="Máquina"/><span>Máquina</span></label><label><input name="tipo" type="radio" value="Implemento libre"/><span>Implemento libre</span></label><label><input name="tipo" type="radio" value="Peso corporal"/><span>Peso corporal</span></label><label><input name="tipo" type="radio" value="Otro"/><span>Otro</span></label></div></div>
-<label class="field"><span>Instrumento <em>*</em></span><select id="instrumento" title="Columna de origen: Instrumento"></select></label>
+<div class="registro-compact-panel panel">
+  <div class="registro-field-grid">
+    <label class="field"><span>Gimnasio <em>*</em></span><select id="gimnasio"></select></label>
+    <label class="field"><span>Sede <em>*</em></span><select id="sede"></select></label>
+    <label class="field"><span>AnotaciónV2 <em>*</em></span><select id="zona" title="Columna de origen: AnotaciónV2"></select></label>
+    <div class="field"><label for="instrumento"><span>Instrumento <em>*</em></span></label><select id="instrumento" title="Columna de origen: Instrumento"></select>
+      <details class="registro-secondary-control" id="registroTipoDetails"><summary>Tipo de equipo: <strong id="registroTipoLabel">Máquina</strong></summary>
+        <div class="type-options" id="typeOptions"><label><input name="tipo" type="radio" value="Máquina"/><span>Máquina</span></label><label><input name="tipo" type="radio" value="Implemento libre"/><span>Implemento libre</span></label><label><input name="tipo" type="radio" value="Peso corporal"/><span>Peso corporal</span></label><label><input name="tipo" type="radio" value="Otro"/><span>Otro</span></label></div>
+      </details>
+    </div>
+    <label class="field"><span>Ejercicio <em>*</em></span><select id="ejercicio"></select></label>
+    <div class="field"><label for="implemento"><span>Agarre / Implemento</span></label><select id="implemento" title="Implemento del ejercicio"></select>
+      <details class="registro-secondary-control" id="registroAgarreDetails"><summary>Especificar agarre</summary><label class="field" for="agarre"><span>Agarre específico</span><select id="agarre"></select></label></details>
+    </div>
+    <div class="field"><label for="tecnica"><span>Técnica <em>*</em></span></label><select id="tecnica" title="Columna Tecnica_Actualizada"></select></div>
+    <label class="field"><span>Número de serie</span><select id="registroNumeroSerie" aria-label="Seleccionar serie para editar"></select></label>
+    <label class="field"><span>Subdivisión</span><select id="registroModoSubdivision" aria-label="Tipo de subdivisión"><option value="normal">Sin subdivisiones</option><option value="sub">Subseries: Sub1 / Sub2</option><option value="lateral">Por lado: Derecha / Izquierda</option></select></label>
+    <div class="field registro-subdiv-button"><span>Opciones de subdivisión</span><button type="button" class="outline-btn subdivision-toggle" id="toggleSubdivisions" aria-controls="splitOptions" aria-expanded="false">▱ Gestionar subdivisiones</button></div>
+  </div>
+  <div id="splitOptions" class="split-options" hidden><div class="split-heading">¿Cómo quieres subdividir las series?</div><div class="split-choice-list"><button type="button" data-series-mode="sub">Subseries <small>Sub1 / Sub2</small></button><button type="button" data-series-mode="lateral">Por lado <small>Derecha / Izquierda</small></button><button type="button" data-series-mode="normal">Sin subdivisiones <small>Serie 1, Serie 2…</small></button></div></div>
+  <button type="button" class="outline-btn series-reset-division" id="resetSubdivisions" hidden>↩ Volver a sin subdivisiones</button>
+  <details class="registro-details-extra"><summary>Ver detalles y descripción técnica</summary><div class="detail-strip"><div><strong id="selected-summary">Elige un ejercicio</strong><span id="tech-caption">La referencia se habilitará al completar la selección.</span></div><button class="outline-btn" disabled id="openDetail" type="button">◉ Ver detalle</button></div><small>La técnica corresponde a la combinación seleccionada.</small></details>
+</div>
+<div class="mobile-continue" hidden><button type="button" id="continueToSeries">Continuar a series →</button></div>
+<section class="panel series-panel mode-normal registro-series-panel">
+  <div class="registro-table-head"><h2>Detalle de series</h2><span class="count-pill" id="seriesCount">0 filas con datos</span><p id="seriesModeLabel">4 series normales · sin subdivisiones</p><button type="button" id="backToContext" class="outline-btn series-back" hidden>← Editar ejercicio</button></div>
+  <div class="table-tools"><span>Desliza la tabla horizontalmente si necesitas ver más columnas.</span></div>
+  <div aria-label="Tabla editable de series; desplazar horizontalmente" class="table-scroll" role="region" tabindex="0">
+    <table class="series-table"><thead><tr><th>Serie</th><th class="division-col">Subdivisión</th><th>Peso / Unidad</th><th>Repeticiones</th><th>Asist.</th><th>Acciones</th></tr></thead><tbody id="seriesRows"></tbody></table>
+  </div>
+  <div class="registro-series-actions"><button type="button" class="outline-btn registro-add-serie" id="addSeriesGroup">+ Agregar serie</button><button type="button" class="outline-btn registro-remove-serie" id="removeSeriesGroup">− Quitar última</button><span id="seriesGroupCount">4 series</span></div>
+  <label class="field observations"><span>Observaciones generales (opcional)</span><textarea id="observaciones" placeholder="Dificultad, rango de movimiento u otras notas" rows="2"></textarea></label>
+  <div class="save-row"><button type="button" class="outline-btn registro-clear-button" id="clearSeries">↻ Limpiar</button><button type="button" class="primary-btn" id="saveRecords">✓ Guardar registro</button></div>
+  <p id="saveSummary" class="registro-save-summary">Introduce peso y repeticiones para guardar una serie.</p>
+  <p id="saveFeedback" class="save-feedback" role="status" hidden></p>
 </section>
-<section class="panel execution-panel"><div class="section-head"><span class="number">02</span><h2>Ejercicio y técnica</h2></div>
-<div class="fields-grid"><label class="field"><span>Accesorio / implemento</span><select id="implemento" title="Campo de origen: Agarre / Implemento"></select></label><label class="field"><span>Agarre</span><select id="agarre" title="Campo desdoblado: Agarre / Implemento"></select></label><label class="field full"><span>Ejercicio <em>*</em></span><select id="ejercicio"></select></label><label class="field full"><span>Técnica <em>*</em></span><select id="tecnica" title="Columna de origen: Tecnica_Actualizada"></select><small>Opciones según el historial de esta combinación, no una secuencia universal.</small></label></div>
-<div class="detail-strip"><div><strong id="selected-summary">Elige un ejercicio</strong><span id="tech-caption">La referencia se habilitará al completar la selección.</span></div><button class="outline-btn" disabled="" id="openDetail" type="button">◉ Ver detalle</button></div>
-</section></div>
-<div class="mobile-continue"><button class="primary-btn" id="continueToSeries" type="button">Continuar a series →</button></div>
-<section class="panel series-panel mode-normal"><div class="series-head"><div><div class="section-head"><span class="number">03</span><h2>Detalle de las series</h2></div><p id="seriesModeLabel">4 series normales · sin subdivisiones</p></div><span class="count-pill" id="seriesCount">0 filas con datos</span><button class="outline-btn series-back" id="backToContext" type="button">← Editar ejercicio</button></div>
-<div class="series-controls"><button aria-controls="splitOptions" aria-expanded="false" class="outline-btn subdivision-toggle" id="toggleSubdivisions" type="button">⊞ Adicionar subdivisiones</button><div class="series-group-controls"><button aria-label="Quitar última serie" class="group-ctrl" id="removeSeriesGroup" type="button">−</button><span id="seriesGroupCount">4 series</span><button aria-label="Añadir otra serie" class="group-ctrl" id="addSeriesGroup" type="button">+</button></div></div>
-<button class="outline-btn series-reset-division" id="resetSubdivisions" type="button" hidden>↩ Volver a sin subdivisiones</button><div class="split-options" hidden="" id="splitOptions"><div class="split-heading">¿Cómo quieres subdividir las series?</div><div class="split-choice-list"><button data-series-mode="sub" type="button">Subseries <small>Sub1 / Sub2</small></button><button data-series-mode="lateral" type="button">Por lado <small>Derecha / Izquierda</small></button><button data-series-mode="normal" type="button">Sin subdivisiones <small>Serie 1, Serie 2…</small></button></div></div>
-<div class="table-tools"><span>↔ Desliza horizontalmente si necesitas ver más columnas</span><button class="text-btn" id="clearSeries" type="button">Limpiar valores</button></div>
-<div aria-label="Tabla editable de series; desplazar horizontalmente" class="table-scroll" role="region" tabindex="0"><table class="series-table"><thead><tr><th>Número de serie</th><th class="division-col">Subdivisión</th><th>Unidad</th><th>Peso</th><th>Repeticiones</th><th>Asistencias</th></tr></thead><tbody id="seriesRows"></tbody></table></div>
-<label class="field observations"><span>Observaciones generales (opcional)</span><textarea id="observaciones" placeholder="Ej. dificultad, rango de movimiento, notas del entrenamiento" rows="2"></textarea></label><div class="save-row"><span id="saveSummary">Introduce al menos una fila con peso y repeticiones.</span><button class="primary-btn" id="saveRecords" type="button">✓ Guardar registro</button></div><p class="save-feedback" id="saveFeedback" role="status" hidden></p></section>
 <section class="panel last-panel"><div class="last-title"><h2>Últimos registros</h2><button class="text-btn" data-page="tablas">Ver historial →</button></div><div class="records-list" id="recentRecords"></div></section>
 </section>
 <section class="page" id="page-tablas"><div class="page-title"><div><div class="eyebrow">SEGUIMIENTO</div><h1>Historial registrado</h1><p>Filtra los registros sincronizados con Supabase. Los campos sin seleccionar incluyen todos los valores.</p></div></div>
