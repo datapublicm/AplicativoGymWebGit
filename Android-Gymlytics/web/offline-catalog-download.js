@@ -35,3 +35,35 @@ export function prepareDownloadedCatalog({base=[],exercises=[],gyms=[],sites=[],
  }));
  return {baseCatalog,entities,library,custom};
 }
+
+// Fusiona catálogos sin eliminar ni sobrescribir ediciones locales.
+// Si una misma entidad existe localmente, prevalece su valor local;
+// las nuevas referencias de la nube se incorporan después.
+export function mergeDownloadedCatalog(local,download){
+ const union=(existing=[],incoming=[],keys=[])=>{
+  const result=structuredClone(existing);
+  const key=row=>keys.map(k=>name(row[k]).toLocaleLowerCase('es')).join('|');
+  const ids=new Set(result.map(x=>String(x.id||x.cloud_id||x.cloud_base_id||'')));
+  const names=new Set(result.map(key));
+  for(const item of incoming){
+   const id=String(item.id||item.cloud_id||item.cloud_base_id||'');
+   const signature=key(item);
+   if(id&&ids.has(id)||signature&&names.has(signature))continue;
+   result.push(structuredClone(item));if(id)ids.add(id);if(signature)names.add(signature);
+  }
+  return result;
+ };
+ const current=local.entities||emptyCatalogue().entities;
+ const fetched=download.entities;
+ return {
+  baseCatalog:union(local.baseCatalog,download.baseCatalog,['g','s','e','i','a','gr','z']),
+  custom:union(local.custom,download.custom,['g','s','i','e','a','gr']),
+  library:union(local.library,download.library,['nombre']),
+  entities:{
+   gyms:union(current.gyms,fetched.gyms,['nombre']),
+   sites:union(current.sites,fetched.sites,['nombre','gimnasio_id']),
+   machines:union(current.machines,fetched.machines,['nombre','tipo_equipo']),
+   options:union(current.options,fetched.options,['tipo','nombre'])
+  }
+ };
+}
