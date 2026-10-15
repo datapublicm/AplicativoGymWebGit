@@ -5,7 +5,14 @@ Ejemplos de mantenimiento: `01.01` → `01.02` → `01.03` → `01.04`.
 Al pasar a una etapa principal: `02.01` → `02.02` (no `02.00`).
 
 ## Versión vigente
-**01.05 — Última APK compilada y versión principal Android** (15/10/2026).\n\n**01.06 — En desarrollo exclusivo en `apk/pruebas` (sin compilar).**\nModo offline-first, varios perfiles por dispositivo, catálogo de referencia incorporado, historial en IndexedDB, eliminaciones con lápidas de sincronización, respaldo/restauración por perfil, alta de cuenta opcional y descarga manual sin sobrescrituras. La subida bidireccional queda pendiente de RPC idempotente de servidor; nunca sincronizar o purgar por simple conexión.
+**01.05 — Última APK compilada y versión principal Android** (15/10/2026).
+
+**01.06 — Preparada en `apk/pruebas`, sin compilar.**
+Modo offline-first, perfiles múltiples, respaldo íntegro, sincronización manual versionada e idempotente de series y advertencias ante cambios desde clientes antiguos.
+
+La compilación `compilar-gymlytics-01.06-pruebas.yml` se ejecuta **solo manualmente**. Genera un paquete independiente `com.datapublicm.gymlytics.pruebas` («Gymlytics Pruebas») con `versionCode 6` y `versionName 01.06`: puede convivir con la 01.05 y no actualiza ni borra su instalación.
+
+**Precaución:** la 01.05 se distribuyó con firma de depuración generada en la compilación, sin una clave privada estable documentada. Una APK nueva con firma diferente podría no poder actualizarla en el mismo paquete. No desinstalar la 01.05 ni prometer migración automática. La futura distribución principal requiere una estrategia de firma y migración validada, o respaldos completos recuperables.
 
 La APK original `Gymlytics-v0.1.3-Pruebas-debug.apk` se distribuyó inicialmente con una denominación ajena a este formato.
 Se corrigió el **nombre externo de distribución**, sin alterar ni recompilar sus bytes, a `Gymlytics_01.03_Pruebas.apk`.
