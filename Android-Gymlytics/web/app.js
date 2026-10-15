@@ -232,10 +232,10 @@ function catalogOpenCard(kind,action='add'){
   if(other===detail)return;
   other.hidden=true;
   const toggle=other.closest('.catalog-compact-card')?.querySelector('.catalog-compact-toggle');
-  if(toggle){toggle.setAttribute('aria-expanded','false');toggle.textContent='＋';}
+  if(toggle){toggle.setAttribute('aria-expanded','false');toggle.textContent='+';}
  });
  detail.hidden=!open;
- if(btn){btn.textContent=open?'−':'＋';btn.setAttribute('aria-expanded',String(open));}
+ if(btn){btn.textContent=open?'−':'+';btn.setAttribute('aria-expanded',String(open));}
  if(!open)return;
  if(['zone','grip','technique'].includes(kind)){
   const form=$('addOptionForm'),type=form.querySelector('[name="tipo"]');
@@ -300,7 +300,7 @@ function setupCatalogCompact(){
   if(!item.count)count.id=item.kind==='series'?'catalogSeriesLookupCount':item.kind==='subdivision'?'catalogSubdivisionLookupCount':'catalogShortcutCount'+item.kind;
   count.textContent='0';
   const add=document.createElement('button');add.className='catalog-compact-toggle';add.type='button';
-  add.textContent=item.readOnly?'↗':'＋';
+  add.textContent=item.readOnly?'›':'+';
   add.setAttribute('aria-label',item.readOnly?'Consultar o configurar '+item.label:'Agregar o modificar '+item.label);
   const detail=document.createElement('div');detail.className='catalog-compact-detail';detail.hidden=true;
   detail.id='catalogDetail'+item.kind;add.setAttribute('aria-controls',detail.id);add.setAttribute('aria-expanded','false');
