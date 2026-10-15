@@ -17,6 +17,7 @@ let serial=0,latest={data:{
 const uuid=()=> 'uuid-'+(++serial);
 const tidy=x=>String(x??'').trim();
 const flush=async update=>update(latest.data);
+const assertEditable=()=>{if(latest.data.readOnly)throw Error('Cuenta de prueba: solo lectura');};
 const catalogUpdate=()=>{};
 const snapshot=()=>structuredClone(latest.data);
 const activeId='local-uno',profileEpoch=1,window={GymBaseCatalog:[]};
