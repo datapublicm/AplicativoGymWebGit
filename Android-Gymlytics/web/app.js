@@ -228,6 +228,12 @@ function catalogOpenCard(kind,action='add'){
  const detail=row.querySelector('.catalog-compact-detail'),btn=row.querySelector('.catalog-compact-toggle');
  if(!detail){toast('Este catálogo es de referencia y solo permite consultar.');return;}
  const open=action==='toggle'?!detail.hidden:true;
+ if(open)document.querySelectorAll('#catalogCompactRows .catalog-compact-detail').forEach(other=>{
+  if(other===detail)return;
+  other.hidden=true;
+  const toggle=other.closest('.catalog-compact-card')?.querySelector('.catalog-compact-toggle');
+  if(toggle){toggle.setAttribute('aria-expanded','false');toggle.textContent='＋';}
+ });
  detail.hidden=!open;
  if(btn){btn.textContent=open?'−':'＋';btn.setAttribute('aria-expanded',String(open));}
  if(!open)return;
@@ -325,7 +331,7 @@ function setupCatalogCompact(){
    if(!window.GymCloud?.deleteCatalogItem){toast('La eliminación no está disponible.');return;}
    if(!confirm('¿Eliminar este elemento de tu catálogo? Si está relacionado con registros, Supabase puede impedirlo.'))return;
    button.disabled=true;
-   try{await window.GymCloud.deleteCatalogItem(kind,id);$('catalogQuickFeedback').textContent='Elemento eliminado. Catálogos actualizados.';}
+   try{await window.GymCloud.deleteCatalogItem(['zone','grip','technique'].includes(kind)?'option':kind,id);$('catalogQuickFeedback').textContent='Elemento eliminado. Catálogos actualizados.';}
    catch(e){$('catalogQuickFeedback').textContent='No se pudo eliminar: '+String(e.message||e).slice(0,160);}
    finally{button.disabled=false;}
    return;
