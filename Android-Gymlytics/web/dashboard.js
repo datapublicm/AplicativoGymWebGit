@@ -169,7 +169,7 @@
   const latestRows=ordered.get(latest)||[];
   const refTech=latestRows.slice().sort((a,b)=>kg(b)-kg(a))[0]?.technique||'';
   const points=[...ordered.entries()].sort((a,b)=>a[0].localeCompare(b[0])).slice(-12).map(([date,series])=>{
-   const eligible=techOn()?series.filter(r=>r.technique===refTech):series;
+   const eligible=techOn()?series.filter(r=>clean(r.technique)===clean(refTech)):series;
    if(!eligible.length)return null;
    const top=eligible.slice().sort((a,b)=>metric==='weight'?kg(b)-kg(a):Number(b.reps)-Number(a.reps))[0];
    return {date,technique:top.technique,value:metric==='weight'?kg(top):Number(top.reps)};
