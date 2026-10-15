@@ -73,7 +73,7 @@ test('La fusión conserva modificaciones locales y añade referencias sin duplic
  const merged=mergeDownloadedCatalog(local,remote);
  assert.equal(merged.entities.gyms[0].nombre,'Mi nombre local');
  assert.equal(merged.entities.gyms.length,2);
- assert.equal(merged.baseCatalog.length,2);
+ assert.equal(merged.baseCatalog.length,1,'No duplicar el mismo ID del catálogo aunque se haya modificado su descripción local');
  assert.equal(merged.baseCatalog[0].e,'Remo modificado');
  assert.deepEqual(local.entities.gyms[0],{id:'g1',nombre:'Mi nombre local'});
 });
