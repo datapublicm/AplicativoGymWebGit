@@ -198,7 +198,7 @@ try{
  assert.equal(await evaluate('model.records[0].weight'),80);
  const blocked=await evaluate('window.GymCloud.saveWorkout('+JSON.stringify(workout('2026-10-15',200))+').then(()=>false,e=>/solo lectura/.test(e.message))');
  assert.equal(blocked,true);
- await navigate(url);await until('window.GymCloud?.canWrite?.()','se mantiene perfil personal al reiniciar');
+ await navigate(url);await until('!window.GymCloud?.canWrite?.()&&document.querySelector("#offlineProfiles").value==="perfil-demo-chrome"','se conserva modo prueba solo lectura al reiniciar');
  await evaluate(`(()=>{const x=document.querySelector('#offlineProfiles');
   x.value='perfil-demo-chrome';x.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
  await until('!window.GymCloud?.canWrite?.()','perfil prueba sigue bloqueado');
