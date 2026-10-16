@@ -174,25 +174,15 @@ function hasSeriesData(){return getEntries().length>0}
 let catalogActiveKind='gym',catalogActiveOptionType='zona';
 const catalogNorm=v=>String(v??'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es');
 const catalogOwnOptions=()=>window.GymEntities?.options||[];
-const catalogBaseOptions=(kind)=>{
- const all=window.GymBaseCatalog||[];
- if(kind==='gym')return all.map(x=>x.g);
- if(kind==='site'){
-  const chosen=$('gymExistingSelect')?.value||'';
-  const own=(window.GymEntities?.gyms||[]).find(g=>String(g.id)===chosen);
-  const gymName=own?.nombre||(chosen.startsWith('base:')?chosen.slice(5):'');
-  return gymName?all.filter(x=>catalogNorm(x.g)===catalogNorm(gymName)).map(x=>x.s):[];
- }
- if(kind==='machine')return all.map(x=>x.i);
- if(kind==='exercise')return all.map(x=>x.e);
- if(kind==='zone')return all.map(x=>x.z);
- if(kind==='grip')return all.flatMap(x=>[x.gr,x.a]);
- if(kind==='technique')return all.flatMap(x=>Array.isArray(x.t)?x.t:[x.t]);
- return [];
+const catalogBaseOptions=kind=>{
+ const selected=$('gymExistingSelect')?.value||'';
+ const gymName=kind==='site'?catalogChoices('gym').find(x=>x.id===selected)?.name||'':'';
+ return window.GymReferenceChoices?.(kind,{gymId:selected,gymName})||[];
 };
 function catalogChoices(kind){
  let own=[];
- if(['gym','site','machine','exercise'].includes(kind))own=existingCatalogItems(kind).map(x=>({id:String(x.id),name:x.nombre,own:true}));
+ if(['gym','site','machine','exercise'].includes(kind))
+  own=existingCatalogItems(kind).map(x=>({id:String(x.id),name:x.nombre,own:true}));
  if(kind==='site'){
   const selected=$('gymExistingSelect')?.value||'';
   const sites=window.GymEntities?.sites||[];
@@ -201,13 +191,11 @@ function catalogChoices(kind){
  if(kind==='zone')own=catalogOwnOptions().filter(x=>x.tipo==='zona').map(x=>({id:String(x.id),name:x.nombre,own:true,type:x.tipo}));
  if(kind==='grip')own=catalogOwnOptions().filter(x=>['agarre','accesorio'].includes(x.tipo)).map(x=>({id:String(x.id),name:x.nombre,own:true,type:x.tipo}));
  if(kind==='technique')own=catalogOwnOptions().filter(x=>x.tipo==='tecnica').map(x=>({id:String(x.id),name:x.nombre,own:true,type:x.tipo}));
- const seen=new Set(own.map(x=>catalogNorm(x.name))),refs=[];
- for(const raw of catalogBaseOptions(kind)){
-  const name=String(raw||'').trim();
-  if(!name||['-','No especificado','Sin clasificar','Pendiente'].includes(name)||seen.has(catalogNorm(name)))continue;
-  seen.add(catalogNorm(name));refs.push({id:'base:'+name,name,own:false});
- }
- return [...own,...refs].sort((a,b)=>a.name.localeCompare(b.name,'es',{numeric:true}));
+ const refs=catalogBaseOptions(kind);
+ // Los IDs de las referencias nunca cambian al modificar sus nombres locales.
+ // Conservar ambas fuentes distinguibles, incluso si tienen nombres iguales.
+ return [...own,...refs].sort((a,b)=>a.name.localeCompare(b.name,'es',{numeric:true})||
+  Number(b.own)-Number(a.own));
 }
 function catalogFillSelect(select,choices,placeholder){
  if(!select)return;
@@ -235,7 +223,7 @@ function catalogActiveCard(kind){
   const item=catalogChoices(kind).find(x=>x.id===id);
   quick.textContent=kind==='series'||kind==='subdivision'
    ?title+': estos valores se gestionan dentro de Registro, no como un catálogo independiente.'
-   :item?title+' · '+item.name+(item.own?' · Elemento personal: puedes modificarlo o eliminarlo.':' · Referencia: puedes consultarla, pero no modificarla ni eliminarla.')
+   :item?title+' · '+item.name+(item.own?' · Elemento personal: puedes modificarlo o eliminarlo.':' · Referencia compartida: puedes modificarla u ocultarla solo en este perfil offline.')
    :'Categoría seleccionada: '+title+'.';
  }
 }
@@ -250,7 +238,6 @@ function catalogOpenCard(kind,action='add'){
  if(action==='edit'){
   const selected=row.querySelector('.catalog-compact-picker select')?.value||'';
   if(!selected){toast('Selecciona primero un elemento para modificar.');return;}
-  if(selected.startsWith('base:')){toast('Es un valor del catálogo de referencia. Agrega una copia propia para editarlo.');return;}
  }
  const detail=row.querySelector('.catalog-compact-detail'),btn=row.querySelector('.catalog-compact-toggle');
  if(!detail){toast('Este catálogo es de referencia y solo permite consultar.');return;}
@@ -274,15 +261,16 @@ function catalogOpenCard(kind,action='add'){
   else catalogActiveOptionType=entry?.type||'agarre';
   type.value=catalogActiveOptionType;
   renderIndependentCatalog();
-  $('optionExistingSelect').value=entry?.own?entry.id:'';
-  $('optionEditName').value=entry?.own?entry.name:'';
+  $('optionExistingSelect').value=entry?.id||'';
+  $('optionEditName').value=entry?.name||'';
   const feedback=$('optionFeedback');
-  if(feedback)feedback.textContent=entry&&!entry.own?'Valor de referencia: puedes utilizarlo, pero solo es posible modificar o eliminar valores propios.':'';
+  if(feedback)feedback.textContent=entry&&!entry.own?'Modificación exclusivamente local; la referencia compartida permanece intacta.':'';
  }
  if(['gym','site','machine'].includes(kind)){
   const selected=row.querySelector('.catalog-compact-picker select')?.value;
   const current=existingCatalogItems(kind).find(x=>String(x.id)===selected);
-  const field=$(kind+'EditName');if(field)field.value=current?.nombre||'';
+  const field=$(kind+'EditName');
+  if(field)field.value=current?.nombre||catalogChoices(kind).find(x=>x.id===selected)?.name||'';
   if(kind==='site'){
    const gymId=$('gymExistingSelect')?.value||'';
    if(gymId)$('siteGymSelect').value=gymId;
@@ -290,7 +278,7 @@ function catalogOpenCard(kind,action='add'){
  }
  if(kind==='exercise'){
   const entry=catalogChoices(kind).find(x=>x.id===$('exerciseExistingSelect')?.value);
-  if(entry&&!entry.own)$('exerciseEditFeedback').textContent='Ejercicio de referencia: no editable. Puedes agregar uno propio.';
+  if(entry&&!entry.own)$('exerciseEditFeedback').textContent='Referencia: puedes modificar su nombre en este perfil offline, sin editar Supabase.';
  }
  if(action==='add'){
   const form=detail.querySelector('form');const field=form?.querySelector('[name="nombre"],[name="e"]');field?.focus();
@@ -388,12 +376,11 @@ function setupCatalogCompact(){
    }
    if(['gym','site','machine'].includes(item.kind)){
     const entry=existingCatalogItems(item.kind).find(x=>String(x.id)===select.value);
-    const input=$(item.kind+'EditName');if(input)input.value=entry?.nombre||'';
+    const input=$(item.kind+'EditName');if(input)input.value=entry?.nombre||catalogChoices(item.kind).find(x=>x.id===select.value)?.name||'';
    }
    catalogActiveCard(item.kind);
-   // El selector muestra los existentes; solo los elementos personales
-   // pueden abrirse en modo de modificación.
-   if(['zone','grip','technique'].includes(item.kind)&&select.value&&!select.value.startsWith('base:'))
+   // Las referencias compartidas también permiten una modificación local.
+   if(['zone','grip','technique'].includes(item.kind)&&select.value)
     catalogOpenCard(item.kind,'edit');
   });
   add.addEventListener('click',()=>catalogOpenCard(item.kind,item.readOnly?'configure':'toggle'));
@@ -414,9 +401,11 @@ function setupCatalogCompact(){
    return;
   }
   if(action==='delete'){
-   if(!id||id.startsWith('base:')){toast('Selecciona un valor propio para eliminar; los de referencia se conservan.');return;}
+   if(!id){toast('Selecciona primero el elemento que quieres eliminar.');return;}
    if(!window.GymCloud?.deleteCatalogItem){toast('La eliminación no está disponible.');return;}
-   if(!confirm('¿Eliminar este elemento del catálogo local? El registro se quitará de este perfil sin modificar inmediatamente Supabase.'))return;
+   if(!confirm(id.startsWith('base:')?
+    '¿Ocultar esta referencia únicamente en el perfil local? No se borrará el catálogo compartido ni el historial.':
+    '¿Eliminar este elemento de tu perfil local? Su eliminación en tu nube personal dependerá de la modalidad de sincronización.'))return;
    button.disabled=true;
    try{await window.GymCloud.deleteCatalogItem(['zone','grip','technique'].includes(kind)?'option':kind,id);$('catalogQuickFeedback').textContent='Elemento eliminado. Catálogos actualizados.';}
    catch(e){$('catalogQuickFeedback').textContent='No se pudo eliminar: '+String(e.message||e).slice(0,160);}
@@ -474,7 +463,9 @@ function renderIndependentCatalog(){
  populateCatalogSelect('siteExistingSelect',ent.sites||[],x=>x.nombre+' · '+(gymById.get(x.gimnasio_id)||'Sin gimnasio'));
  populateCatalogSelect('machineExistingSelect',ent.machines||[],x=>x.nombre+' · '+(x.tipo_equipo||'Equipo'));
  const values=existingCatalogItems('option');
- populateCatalogSelect('optionExistingSelect',values,x=>x.nombre);
+ if(['zone','grip','technique'].includes(catalogActiveKind))
+  catalogFillSelect($('optionExistingSelect'),catalogChoices(catalogActiveKind),'Selecciona un valor…');
+ else populateCatalogSelect('optionExistingSelect',values,x=>x.nombre);
  for(const [id,count] of [['siteCount',ent.sites.length],['machineCount',ent.machines.length]])
   if($(id))$(id).textContent=String(count);
  if($('optionCount'))$('optionCount').textContent=values.length+' / '+ent.options.length+' total';
@@ -854,7 +845,8 @@ function install(){$('addExerciseTab').addEventListener('click',()=>newDraft());
 document.querySelectorAll('[data-catalog-existing]').forEach(select=>select.addEventListener('change',()=>{
  const kind=select.dataset.catalogExisting;
  const item=existingCatalogItems(kind).find(x=>x.id===select.value);
- const field=$(kind+'EditName');if(field)field.value=item?.nombre||'';
+ const field=$(kind+'EditName');if(field)field.value=item?.nombre||
+  catalogChoices(kind==='option'?catalogActiveKind:kind).find(x=>x.id===select.value)?.name||'';
 }));
 document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEventListener('click',async()=>{
  const kind=button.dataset.catalogModify;
