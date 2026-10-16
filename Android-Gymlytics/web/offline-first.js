@@ -6,9 +6,10 @@ import {sourceKey} from './sync-engine.js';
 import {createCloudSync} from './cloud-sync.js';
 import {profileMeta,validateProfileName,validateProfileBinding,verifyRestoreBackup} from './profile-policy.js';
 import {prepareDownloadedCatalog} from './offline-catalog-download.js';
+import {materializeReferenceCatalog,parseReferenceId,setReferenceOverride,listReferenceChoices} from './reference-overrides.js';
 const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
- records:[],photos:{},baseCatalog:[],muscles:[],custom:[],library:[],readOnly:false,demo:false,
+ records:[],photos:{},baseCatalog:[],referenceOverrides:{},muscles:[],custom:[],library:[],readOnly:false,demo:false,
  entities:{gyms:[],sites:[],machines:[],options:[]},
  tombstones:[],pending:[],conflicts:[],cloudUserId:null,lastPull:null,syncMode:'later'
 });
@@ -82,11 +83,12 @@ function renderSyncStatus(){
   'No vinculado · todos los cambios se guardan en este dispositivo.';
 }
 function catalogInit(){
- // Nunca precargar datos de otro usuario: los perfiles nuevos empiezan vacíos.
  const source=Array.isArray(latest?.data?.baseCatalog)?latest.data.baseCatalog:[];
- return source.map(x=>({
-  g:x.g,s:x.s,z:x.z,kind:x.kind,i:x.i,a:x.a,gr:x.gr,e:x.e,
-  t:[...(x.t||[])],m:x.m,ms:x.ms,n:0,last:null
+ const map=latest?.data?.referenceOverrides||{};
+ window.GymReferenceCatalog=structuredClone(source);
+ window.GymReferenceOverrides=structuredClone(map);
+ return materializeReferenceCatalog(source,map).map(x=>({
+  ...x,t:[...(x.t||[])],n:0,last:null
  }));
 }
 async function activate(id,initial=false){
@@ -106,7 +108,7 @@ async function activate(id,initial=false){
   rotateCloudClient();
   activeId=null;latest=null;
   model.records=[];model.photos={};
-  window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
+  window.GymBaseCatalog=[];window.GymReferenceCatalog=[];window.GymReferenceOverrides={};window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
   window.GymEntities={gyms:[],sites:[],machines:[],options:[]};
   drawRecent();drawHistory();drawReports();
   const p=await get(id);
@@ -179,6 +181,7 @@ async function renameProfile(){
 }
 
 function catalogUpdate(){
+ window.GymBaseCatalog=catalogInit();
  window.GymEntities=structuredClone(latest.data.entities);
  window.GymExerciseLibrary=structuredClone(latest.data.library);
  window.GymCustomCatalog=structuredClone(latest.data.custom);
@@ -292,9 +295,11 @@ const api={
    // Si el gimnasio seleccionado es una referencia del catálogo base, crear
    // su copia local antes de añadir la sede, conservando una relación por ID.
    if(kind==='site'&&String(values.gimnasio_id||'').startsWith('base:')){
-    const gymName=tidy(String(values.gimnasio_id).slice(5));
-    if(!data.baseCatalog.some(row=>tidy(row.g).toLocaleLowerCase('es')===gymName.toLocaleLowerCase('es')))
-     throw Error('El gimnasio seleccionado no existe en el catálogo descargado');
+    const ref=parseReferenceId(String(values.gimnasio_id));
+    if(!ref||ref.kind!=='gym')throw Error('Referencia de gimnasio inválida');
+    const visible=listReferenceChoices(data.baseCatalog,data.referenceOverrides||{},'gym').find(x=>x.id===values.gimnasio_id);
+    if(!visible)throw Error('El gimnasio fue eliminado del catálogo local');
+    const gymName=visible.name;
     let gym=data.entities.gyms.find(row=>tidy(row.nombre).toLocaleLowerCase('es')===gymName.toLocaleLowerCase('es'));
     if(!gym){gym={id:uuid(),nombre:gymName};data.entities.gyms.push(gym);
      data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'gym',localId:gym.id});}
@@ -327,6 +332,17 @@ const api={
  async updateCatalogItem(kind,id,name){
   assertEditable();
   name=tidy(name);if(!name)throw Error('Introduce el nombre nuevo');
+  if(String(id).startsWith('base:')){
+   await flush(data=>{
+    const ref=parseReferenceId(id);
+    if(!ref||!['gym','site','machine','exercise','zone','grip','technique'].includes(ref.kind))
+     throw Error('Referencia inválida');
+    if(kind!==ref.kind&&!(kind==='option'&&['zone','grip','technique'].includes(ref.kind)))
+     throw Error('Tipo de referencia incorrecto');
+    data.referenceOverrides=setReferenceOverride(data.baseCatalog,data.referenceOverrides||{},id,{name});
+   });
+   catalogUpdate();return id;
+  }
   await flush(data=>{
    const list=kind==='exercise'
     ?(data.library.some(x=>String(x.id)===String(id))?data.library:data.custom)
@@ -353,6 +369,15 @@ const api={
  },
  async deleteCatalogItem(kind,id){
   assertEditable();
+  if(String(id).startsWith('base:')){
+   await flush(data=>{
+    const ref=parseReferenceId(id);
+    if(!ref||!(kind===ref.kind||kind==='option'&&['zone','grip','technique'].includes(ref.kind)))
+     throw Error('Tipo de referencia incorrecto');
+    data.referenceOverrides=setReferenceOverride(data.baseCatalog,data.referenceOverrides||{},id,{deleted:true});
+   });
+   catalogUpdate();return id;
+  }
   await flush(data=>{
    const list=kind==='exercise'
     ?(data.library.some(x=>String(x.id)===String(id))?data.library:data.custom)
