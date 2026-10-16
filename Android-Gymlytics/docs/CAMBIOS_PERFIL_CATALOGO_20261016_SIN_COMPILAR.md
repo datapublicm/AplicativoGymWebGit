@@ -31,7 +31,7 @@
 - **No se ejecutó compilación ni pruebas completas de Android.** No se tocó el APK existente ni la rama de entrega.
 
 ## Limitaciones identificadas para resolver antes de publicar
-- **Bloque 1 implementado:** «Actualizar» envía series y operaciones de catálogos personales (gimnasios, sedes, máquinas, opciones y ejercicios) mediante un RPC idempotente por cuenta. Las fotografías aún no se sincronizan (Bloque 3).
+- **Bloque 1 implementado:** «Actualizar» envía series y operaciones de catálogos personales (gimnasios, sedes, máquinas, opciones y ejercicios) mediante un RPC idempotente por cuenta. La sincronización fotográfica se implementó posteriormente en el Bloque 3.
 - **Bloque 2 implementado en código:** los elementos de referencia se renombran u ocultan mediante una capa de sustituciones por perfil local. El catálogo compartido original no se altera ni se envían estas sustituciones a la nube.
 - Falta ejecutar batería completa de pruebas, incluyendo renderizado en Android real, tras incorporar los demás cambios dictados.
 
@@ -74,24 +74,24 @@
 
 ## Bloque 2 — Sustituciones de referencias del catálogo (implementado, sin APK)
 
-**Fecha:** 16/10/2026. **Rama:** \`cambios/gymlytics-perfil-catalogo-20261016\`.
+**Fecha:** 16/10/2026. **Rama:** `cambios/gymlytics-perfil-catalogo-20261016`.
 
 ### Funcionamiento
 
-- \`web/reference-overrides.js\` define identificadores \`base:\` estables frente a los cambios de nombre locales, basados en la identidad original de la referencia. Se almacenan en \`data.referenceOverrides\`, exclusivo de cada perfil IndexedDB.
-- «Modificar» cambia la denominación **visible** en el catálogo local (copy-on-write). El original \`baseCatalog\`, sus relaciones y los registros históricos se preservan. «Eliminar» oculta la referencia del perfil, sin borrar el dato compartido ni el historial.
+- `web/reference-overrides.js` define identificadores `base:` estables frente a los cambios de nombre locales, basados en la identidad original de la referencia. Se almacenan en `data.referenceOverrides`, exclusivo de cada perfil IndexedDB.
+- «Modificar» cambia la denominación **visible** en el catálogo local (copy-on-write). El original `baseCatalog`, sus relaciones y los registros históricos se preservan. «Eliminar» oculta la referencia del perfil, sin borrar el dato compartido ni el historial.
 - Los identificadores de sede incorporan el gimnasio original: una sede «La Rambla» de Smart Fit no afecta una sede con el mismo nombre de Evolution.
 - Los cambios de gimnasio se reflejan en sus sedes y en los campos derivados de Registro y Catálogo. El mecanismo abarca gimnasio, sede, instrumento, ejercicio, AnotaciónV2, agarre/implemento y técnica.
 - Los ejercicios personales con gimnasio/sede se renderizan usando los nombres más recientes de las entidades a las que están asociados, sin modificar la fuente ni el historial.
-- Las copias de seguridad completas incluyen automáticamente \`referenceOverrides\`. Restaurarlas en otro perfil recupera las sustituciones sin intervenir sobre otros perfiles.
+- Las copias de seguridad completas incluyen automáticamente `referenceOverrides`. Restaurarlas en otro perfil recupera las sustituciones sin intervenir sobre otros perfiles.
 - Una descarga posterior conserva las sustituciones. Si un registro base cambia en la nube mientras tiene una sustitución local, se conserva la referencia anterior y se genera un aviso de conflicto; no se sobrescribe sin avisar.
 - Las sustituciones de referencia **no generan operaciones de subida de catálogo**. Solo los elementos personales, incluidos los gimnasios que se copien explícitamente al agregar una sede, pueden formar parte de la sincronización definida en Bloque 1.
 
 ### Cambios de código
 
-- Nuevo: \`web/reference-overrides.js\`; \`tests/reference-overrides.test.mjs\`.
-- Modificados: \`web/offline-first.js\`, \`web/app.js\`, \`web/offline-catalog-download.js\`, \`web/cloud-sync.js\`.
-- Sin migración de base de datos para este bloque, sin alterar \`main\` ni la versión APK de entrega.
+- Nuevo: `web/reference-overrides.js`; `tests/reference-overrides.test.mjs`.
+- Modificados: `web/offline-first.js`, `web/app.js`, `web/offline-catalog-download.js`, `web/cloud-sync.js`.
+- Sin migración de base de datos para este bloque, sin alterar `main` ni la versión APK de entrega.
 
 ### Verificación sin compilar
 
@@ -103,12 +103,12 @@
 
 ## Bloque 3 — Fotografías offline y sincronización de nube (sin APK)
 
-**Base:** Gymlytics 01.06, rama \`cambios/gymlytics-perfil-catalogo-20261016\`.
+**Base:** Gymlytics 01.06, rama `cambios/gymlytics-perfil-catalogo-20261016`.
 
 ### Funcionalidad incorporada
-- Fotografía de máquina/equipo, ejercicio y referencia anatómica asociada a un ejercicio, con vistas \`frontal\`, \`posterior\`, \`lateral_izquierda\` y \`lateral_derecha\` diferenciadas. El perfil conserva los datos JPEG en IndexedDB; puede visualizarse sin conexión.
-- Subida opcional al bucket privado existente \`gymlog-usuarios\` con ruta \`{uid}/gymlytics/{revision}.jpg\`, exclusiva del propietario. Se utiliza imagen JPEG de hasta 3 MB.
-- Metadatos en la nueva tabla \`sch_android_gymlytics.tbl_fotos_offline\`; función \`confirmar_foto_offline(jsonb)\`. Cada subida verifica identidad, estado habilitado, tipo, ruta y versión anterior. RLS limita lecturas al propietario.
+- Fotografía de máquina/equipo, ejercicio y referencia anatómica asociada a un ejercicio, con vistas `frontal`, `posterior`, `lateral_izquierda` y `lateral_derecha` diferenciadas. El perfil conserva los datos JPEG en IndexedDB; puede visualizarse sin conexión.
+- Subida opcional al bucket privado existente `gymlog-usuarios` con ruta `{uid}/gymlytics/{revision}.jpg`, exclusiva del propietario. Se utiliza imagen JPEG de hasta 3 MB.
+- Metadatos en la nueva tabla `sch_android_gymlytics.tbl_fotos_offline`; función `confirmar_foto_offline(jsonb)`. Cada subida verifica identidad, estado habilitado, tipo, ruta y versión anterior. RLS limita lecturas al propietario.
 - El archivo se sube primero a Storage y después se confirma la relación con RPC. La cola conserva un JPEG inmutable por operación, permitiendo reintentos sin confundir revisiones.
 - Subida con «Actualizar al momento» para cuenta personal vinculada cuando hay Internet, o manual con «Actualizar después». Cuenta de prueba: lectura y edición offline, **sin escritura en su Supabase**.
 - Descarga al perfil local de fotografías propias del usuario autenticado, con comprobación de integridad, versiones y preexistencia local. Las ediciones locales y los conflictos se conservan sin sobrescribir automáticamente.
@@ -117,20 +117,20 @@
 - Migración conservadora de tareas antiguas de máquina/ejercicio identificables. Fotos anatómicas antiguas sin lado definido no se asignan automáticamente a una vista; sus datos se conservan en el dispositivo y requieren una nueva selección.
 
 ### Archivos
-- Nuevo: \`web/photo-sync-engine.js\`, \`tests/photo-sync.test.mjs\`.
-- Modificados: \`web/offline-first.js\`, \`web/cloud-sync.js\`, \`web/app.js\`.
-- Nueva migración SQL: \`supabase/migrations/20261016_photo_offline.sql\`.
+- Nuevo: `web/photo-sync-engine.js`, `tests/photo-sync.test.mjs`.
+- Modificados: `web/offline-first.js`, `web/cloud-sync.js`, `web/app.js`, `web/sw.js`, `vite.config.js` (caché de módulos nuevos para arranque offline).
+- Nueva migración SQL: `supabase/migrations/20261016_photo_offline.sql`.
 
 ### Verificación
-- Migración \`gymlytics_fotografias_offline_20261016\` aplicada a Supabase con éxito.
-- Tabla verificada: \`tbl_fotos_offline\`, RLS activado y 0 filas (sin escrituras de prueba sobre fotos de usuarios).
+- Migración `gymlytics_fotografias_offline_20261016` aplicada a Supabase con éxito.
+- Tabla verificada: `tbl_fotos_offline`, RLS activado y 0 filas (sin escrituras de prueba sobre fotos de usuarios).
 - **14 de 14 pruebas** del motor de fotografías superadas, incluidas vistas, relaciones, conflictos, propiedad de cuenta, reintento y migración conservadora.
 - Simulación integral de subida con dos revisiones consecutivas: 2 confirmaciones, 0 pendientes y versión esperada correcta tras cada una.
 - Simulación integral de descarga de imagen anatómica desde bucket privado al perfil offline: copia y versión correctas.
-- Análisis de sintaxis V8 de \`app.js\`, \`offline-first.js\`, \`cloud-sync.js\` y motor fotográfico correcto.
+- Análisis de sintaxis V8 de `app.js`, `offline-first.js`, `cloud-sync.js` y motor fotográfico correcto.
 - **Sin compilar APK.** No se ejecutaron pruebas de escritura/lectura autenticadas contra un usuario real, ni pruebas en Android; deben realizarse en Bloque 4.
 
 ### Notas
-- Las fotografías anatómicas de este flujo son imágenes asociadas a la ficha/contexto del ejercicio y su vista 2D. No modifica el catálogo compartido de imágenes musculares \`tbl_musculo_imagenes\`, ni construye un modelo 3D.
+- Las fotografías anatómicas de este flujo son imágenes asociadas a la ficha/contexto del ejercicio y su vista 2D. No modifica el catálogo compartido de imágenes musculares `tbl_musculo_imagenes`, ni construye un modelo 3D.
 - Las modificaciones de referencias base del Bloque 2 permanecen exclusivamente locales.
 - El APK principal 01.06 y las ramas principales permanecen intactos.
