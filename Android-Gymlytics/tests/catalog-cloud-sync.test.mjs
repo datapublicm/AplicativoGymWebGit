@@ -88,3 +88,16 @@ test('Migración antigua con modificación sin baseline: no subir hasta revisió
  assert.equal(merged.catalogWarnings[0].kind,'catalog_conflict');
  assert.equal(d.entities.gyms[0].cloudSnapshot,undefined,'la fusión original no se modifica');
 });
+
+test('Ejercicio descargado con sede: se modifica con el mismo identificador',()=>{
+ const d=state(), id='00000000-0000-4000-8000-000000000006';
+ d.custom=[{id,cloud_id:id,nombre:'Remo actualizado',e:'Remo actualizado',
+  gimnasio_id:g,sede_id:s,cloudOwnerId:uid,
+  cloudSnapshot:{nombre:'Remo',activo:true,zona_entrenamiento:'Espalda',tecnica_actualizada:'Base'},
+  zona_entrenamiento:'Espalda',tecnica_actualizada:'Base'}];
+ d.pending=[pending(o,'update_catalog',id,'exercise')];
+ const plan=planCatalogUpload(d,uid);
+ assert.equal(plan.ops.length,1);assert.equal(plan.ops[0].request.action,'update');
+ assert.equal(plan.ops[0].request.id,id);
+ assert.equal(plan.ops[0].request.payload.nombre,'Remo actualizado');
+});
