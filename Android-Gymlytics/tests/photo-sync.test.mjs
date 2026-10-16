@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {photoLocalKey,photoRevisionPath,photoJobPlan,acknowledgePhoto,decidePhotoDownload,applyDownloadedPhoto} from '../web/photo-sync-engine.js';
+import {photoLocalKey,photoRevisionPath,photoJobPlan,acknowledgePhoto,decidePhotoDownload,applyDownloadedPhoto,migrateLegacyPhotoJobs} from '../web/photo-sync-engine.js';
 const uid='11111111-1111-4111-8111-111111111111',other='22222222-2222-4222-8222-222222222222';
 const ex={g:'Smart Fit',s:'La Rambla',i:'Polea alta',e:'Jalón al pecho'};
 const id='33333333-3333-4333-8333-333333333333',id2='44444444-4444-4444-8444-444444444444';
@@ -82,4 +82,25 @@ test('Foto remota distinta y edición local anterior generan conflicto',()=>{
  const d=state(),key=photoLocalKey(ex,'maquina');
  d.photos[key]=bytes;d.photoVersions[key]={ownerId:uid,revision:id};
  assert.equal(decidePhotoDownload(d,{photo_key:key,revision:id2,storage_path:photoRevisionPath(uid,id2)},uid),'conflict');
+});
+
+test('Migra fotografía de máquina pendiente sin perder bytes ni duplicar trabajo',()=>{
+ const d=state();const oldSuffix=[ex.g,ex.s,ex.i].join('|');
+ const key='equipo:'+oldSuffix;
+ d.photos[key]=bytes;
+ d.pending=[{kind:'photo',id,key:oldSuffix},{kind:'photo',id:id2,key:oldSuffix}];
+ const r=migrateLegacyPhotoJobs(d);
+ assert.equal(r.converted,1);assert.equal(r.removed,1);
+ assert.equal(d.pending.length,1);assert.equal(d.pending[0].photoType,'maquina');
+ assert.equal(d.photoPayloads[id2],bytes);
+ assert.equal(photoJobPlan(d,uid).ops.length,1);
+});
+test('Foto anatómica antigua sin lado se conserva sin suponer frontal ni posterior',()=>{
+ const d=state(),oldSuffix=[ex.g,ex.s,ex.i,ex.e].join('|');
+ d.photos['anatomia:'+oldSuffix]=bytes;
+ d.pending=[{kind:'photo',id,key:oldSuffix}];
+ const r=migrateLegacyPhotoJobs(d);
+ assert.equal(r.unresolved,1);assert.equal(d.pending.length,1);
+ assert.equal(d.photos['anatomia:'+oldSuffix],bytes);
+ assert.equal(photoJobPlan(d,uid).ops.length,0);
 });
