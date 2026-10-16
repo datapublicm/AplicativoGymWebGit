@@ -1,0 +1,38 @@
+name: Gymlytics - Bloque 4 integridad sin APK
+on:
+  push:
+    branches:
+      - cambios/gymlytics-perfil-catalogo-20261016
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pruebas-estaticas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Android-Gymlytics
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Ejecutar todas las pruebas del proyecto
+        run: npm run test:static
+      - name: Verificar sintaxis de módulos modificados
+        run: |
+          node --check web/offline-first.js
+          node --check web/app.js
+          node --check web/cloud-sync.js
+          node --check web/offline-catalog-download.js
+          node --check web/catalog-sync-engine.js
+          node --check web/reference-overrides.js
+          node --check web/photo-sync-engine.js
+          node --check vite.config.js
+      - name: Confirmar que no se compiló APK
+        run: |
+          test ! -d android/app
+          test ! -d dist
+          test ! -d node_modules
+          echo "Bloque 4: comprobación estática; ningún APK compilado."
