@@ -148,6 +148,11 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
     local.entities=snap.entities;
     local.library=snap.library;
     local.custom=snap.custom;
+    local.conflicts??=[];
+    for(const item of snap.catalogWarnings||[]){
+     if(!local.conflicts.some(x=>x.kind==='catalog_conflict'&&x.catalogKind===item.catalogKind&&x.localId===item.localId))
+      local.conflicts.push(item);
+    }
     local.readOnly=false; // La restricción de prueba nunca se aplica al perfil offline.
     local.demo=!!readOnly;
     const alert=legacyAlerts(local,legacy,mirror);
