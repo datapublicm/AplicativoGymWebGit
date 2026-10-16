@@ -66,21 +66,37 @@ export function mergeDownloadedCatalog(local,download){
    if(kind&&removed.has(kind+':'+id))continue;
    const index=result.findIndex(x=>id&&String(x.id||x.cloud_id||x.cloud_base_id||'')===id);
    if(index>=0){
-    if(kind==='base'&&hasEditedReference(result[index])&&
-       JSON.stringify(result[index])!==JSON.stringify(item)){
-     // La edición local depende del nombre de origen: conservarlo intacto
-     // hasta que el usuario revise la nueva referencia compartida.
+    const before=result[index],changed=JSON.stringify(before)!==JSON.stringify(item),
+     original=before.cloudSnapshot,remoteSnapshot=item.cloudSnapshot;
+    if(kind==='base'&&changed){
+     // El catálogo compartido es referencia: sin confirmación no se reemplaza
+     // un valor local existente, aunque venga de una versión antigua.
      warnings.push({kind:'reference_conflict',refId:id,sourceKey:'base:'+id,
       reason:'referencia_compartida_modificada'});
      continue;
     }
+    if(kind!=='base'&&changed&&!dirty.has(kind+':'+id)){
+     const fields=kind==='exercise'?['nombre','zona_entrenamiento','tecnica_actualizada']:
+      kind==='site'?['nombre','gimnasio_id']:kind==='machine'?['nombre','tipo_equipo']:
+      kind==='option'?['nombre','tipo']:['nombre'];
+     const localChanged=original?
+      fields.some(field=>JSON.stringify(before[field]??null)!==JSON.stringify(original[field]??null)):
+      true;
+     const otherOwner=!!before.cloudOwnerId&&!!item.cloudOwnerId&&before.cloudOwnerId!==item.cloudOwnerId;
+     if(localChanged||otherOwner){
+      warnings.push({kind:'catalog_conflict',catalogKind:kind,localId:id,
+       reason:otherOwner?'cuenta_ajena':'cambio_local_sin_confirmar',
+       current:remoteSnapshot||null});
+      continue;
+     }
+    }
     if(!dirty.has(kind+':'+id))result[index]=structuredClone(item);
-    else if(kind&&item.cloudSnapshot&&!result[index].cloudSnapshot){
-     // Perfil creado antes de registrar versiones: exigir confirmación explícita.
-     result[index].cloudSnapshot=structuredClone(item.cloudSnapshot);
-     result[index].cloudOwnerId=item.cloudOwnerId;
+    else if(kind&&remoteSnapshot&&!before.cloudSnapshot){
+     // No adivinar la versión previa de una modificación heredada.
+     before.cloudSnapshot=structuredClone(remoteSnapshot);
+     before.cloudOwnerId=item.cloudOwnerId;
      warnings.push({kind:'catalog_conflict',catalogKind:kind,localId:id,
-      reason:'baseline_recuperada_requiere_revision',current:structuredClone(item.cloudSnapshot)});
+      reason:'baseline_recuperada_requiere_revision',current:structuredClone(remoteSnapshot)});
     }
     continue;
    }
