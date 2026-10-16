@@ -21,7 +21,7 @@ declare
  v_table text; v_name text := btrim(p_change->'payload'->>'nombre');
  v_expected jsonb := p_change->'expected';
  v_gym uuid; v_tipo text; v_team text;
- v_previous jsonb; v_saved jsonb; v_row jsonb; v_snapshot jsonb; v_result jsonb;
+ v_previous jsonb; v_saved jsonb; v_row jsonb; v_snapshot jsonb; v_result jsonb; v_owner uuid;
 begin
  if v_uid is null or not sch_android_gymlytics.usuario_habilitado()
     or sch_android_gymlytics.es_cuenta_prueba() then
@@ -41,9 +41,10 @@ begin
   raise exception 'Nombre de catálogo inválido'; end if;
  -- Serializar por usuario/categoría: no hay dos escrituras simultáneas con el mismo nombre.
  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_uid::text||':'||v_kind,0));
- select solicitud,respuesta into v_previous,v_saved
+ select solicitud,respuesta,user_id into v_previous,v_saved,v_owner
  from sch_android_gymlytics.tbl_sync_catalogo_operaciones where op_id=v_op;
  if found then
+  if v_owner<>v_uid then raise exception 'Operación perteneciente a otra cuenta'; end if;
   if v_previous <> p_change then raise exception 'El identificador de operación fue reutilizado con otros datos'; end if;
   return v_saved || jsonb_build_object('status','duplicate');
  end if;
@@ -51,6 +52,12 @@ begin
  into v_row using v_id,v_uid;
  if v_action='create' then
   if v_row is not null then return jsonb_build_object('op_id',v_op,'status','conflict','reason','id_exists'); end if;
+  -- No permitir UUID remoto reutilizado aunque esté asignado a otra cuenta.
+  execute format('select 1 from sch_android_gymlytics.%I where id=$1',v_table)
+  into v_previous using v_id;
+  if v_previous is not null then
+   return jsonb_build_object('op_id',v_op,'status','conflict','reason','id_exists');
+  end if;
   if v_kind='site' then
    begin v_gym := (p_change->'payload'->>'gimnasio_id')::uuid;
    exception when others then raise exception 'Gimnasio asociado inválido'; end;
