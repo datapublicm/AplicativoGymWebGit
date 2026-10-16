@@ -67,7 +67,7 @@
 
 ### Próximos bloques
 - Bloque 2: implementado en fuentes; pendiente de validación funcional en Android.
-- Bloque 3: sincronización de fotografías.
+- Bloque 3: implementado en fuentes y Supabase; pendiente de pruebas integrales autenticadas y Android.
 - Bloque 4: pruebas end-to-end autenticadas con perfiles reales y Android.
 - Bloque 5: compilación, **solo después de las demás modificaciones solicitadas**.
 
@@ -99,3 +99,38 @@
 - Prueba aislada de representación de ejercicio personal: nombres de gimnasio/sede/ejercicio actualizados sin cambiar la fuente almacenada.
 - Verificación sintáctica V8 correcta de los archivos JavaScript modificados.
 - **No** se efectuaron pruebas con Android real ni pruebas E2E con perfiles de Supabase; quedan para el bloque de integridad.
+
+
+## Bloque 3 — Fotografías offline y sincronización de nube (sin APK)
+
+**Base:** Gymlytics 01.06, rama \`cambios/gymlytics-perfil-catalogo-20261016\`.
+
+### Funcionalidad incorporada
+- Fotografía de máquina/equipo, ejercicio y referencia anatómica asociada a un ejercicio, con vistas \`frontal\`, \`posterior\`, \`lateral_izquierda\` y \`lateral_derecha\` diferenciadas. El perfil conserva los datos JPEG en IndexedDB; puede visualizarse sin conexión.
+- Subida opcional al bucket privado existente \`gymlog-usuarios\` con ruta \`{uid}/gymlytics/{revision}.jpg\`, exclusiva del propietario. Se utiliza imagen JPEG de hasta 3 MB.
+- Metadatos en la nueva tabla \`sch_android_gymlytics.tbl_fotos_offline\`; función \`confirmar_foto_offline(jsonb)\`. Cada subida verifica identidad, estado habilitado, tipo, ruta y versión anterior. RLS limita lecturas al propietario.
+- El archivo se sube primero a Storage y después se confirma la relación con RPC. La cola conserva un JPEG inmutable por operación, permitiendo reintentos sin confundir revisiones.
+- Subida con «Actualizar al momento» para cuenta personal vinculada cuando hay Internet, o manual con «Actualizar después». Cuenta de prueba: lectura y edición offline, **sin escritura en su Supabase**.
+- Descarga al perfil local de fotografías propias del usuario autenticado, con comprobación de integridad, versiones y preexistencia local. Las ediciones locales y los conflictos se conservan sin sobrescribir automáticamente.
+- «Conflicto de fotografía» informa sobre divergencias. El usuario puede conservar la versión offline y revisar su sincronización mediante una confirmación explícita.
+- Las copias de seguridad de perfil exportan/restauran las imágenes y sus trabajos pendientes. Alternar perfiles no comparte sus datos.
+- Migración conservadora de tareas antiguas de máquina/ejercicio identificables. Fotos anatómicas antiguas sin lado definido no se asignan automáticamente a una vista; sus datos se conservan en el dispositivo y requieren una nueva selección.
+
+### Archivos
+- Nuevo: \`web/photo-sync-engine.js\`, \`tests/photo-sync.test.mjs\`.
+- Modificados: \`web/offline-first.js\`, \`web/cloud-sync.js\`, \`web/app.js\`.
+- Nueva migración SQL: \`supabase/migrations/20261016_photo_offline.sql\`.
+
+### Verificación
+- Migración \`gymlytics_fotografias_offline_20261016\` aplicada a Supabase con éxito.
+- Tabla verificada: \`tbl_fotos_offline\`, RLS activado y 0 filas (sin escrituras de prueba sobre fotos de usuarios).
+- **14 de 14 pruebas** del motor de fotografías superadas, incluidas vistas, relaciones, conflictos, propiedad de cuenta, reintento y migración conservadora.
+- Simulación integral de subida con dos revisiones consecutivas: 2 confirmaciones, 0 pendientes y versión esperada correcta tras cada una.
+- Simulación integral de descarga de imagen anatómica desde bucket privado al perfil offline: copia y versión correctas.
+- Análisis de sintaxis V8 de \`app.js\`, \`offline-first.js\`, \`cloud-sync.js\` y motor fotográfico correcto.
+- **Sin compilar APK.** No se ejecutaron pruebas de escritura/lectura autenticadas contra un usuario real, ni pruebas en Android; deben realizarse en Bloque 4.
+
+### Notas
+- Las fotografías anatómicas de este flujo son imágenes asociadas a la ficha/contexto del ejercicio y su vista 2D. No modifica el catálogo compartido de imágenes musculares \`tbl_musculo_imagenes\`, ni construye un modelo 3D.
+- Las modificaciones de referencias base del Bloque 2 permanecen exclusivamente locales.
+- El APK principal 01.06 y las ramas principales permanecen intactos.
