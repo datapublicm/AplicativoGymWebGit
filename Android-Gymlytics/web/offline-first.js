@@ -7,9 +7,10 @@ import {createCloudSync} from './cloud-sync.js';
 import {profileMeta,validateProfileName,validateProfileBinding,verifyRestoreBackup} from './profile-policy.js';
 import {prepareDownloadedCatalog} from './offline-catalog-download.js';
 import {materializeReferenceCatalog,parseReferenceId,setReferenceOverride,listReferenceChoices} from './reference-overrides.js';
+import {photoLocalKey} from './photo-sync-engine.js';
 const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
- records:[],photos:{},baseCatalog:[],referenceOverrides:{},muscles:[],custom:[],library:[],readOnly:false,demo:false,
+ records:[],photos:{},photoVersions:{},photoPayloads:{},baseCatalog:[],referenceOverrides:{},muscles:[],custom:[],library:[],readOnly:false,demo:false,
  entities:{gyms:[],sites:[],machines:[],options:[]},
  tombstones:[],pending:[],conflicts:[],cloudUserId:null,lastPull:null,syncMode:'later'
 });
@@ -26,7 +27,8 @@ let client=newClient(),remote=client?.schema(config.schema);
 function rotateCloudClient(){client=newClient();remote=client?.schema(config.schema);remoteSession=null;cloudAccountKind=null;}
 const remoteGateway={
  from:(...args)=>{if(!remote)throw Error('Supabase no está configurado');return remote.from(...args)},
- rpc:(...args)=>{if(!remote)throw Error('Supabase no está configurado');return remote.rpc(...args)}
+ rpc:(...args)=>{if(!remote)throw Error('Supabase no está configurado');return remote.rpc(...args)},
+ storage:{from:(...args)=>{if(!client)throw Error('Supabase no está configurado');return client.storage.from(...args)}}
 };
 function openDB(){
  return new Promise((resolve,reject)=>{
@@ -409,26 +411,44 @@ const api={
  },
  async loadAnatomy(exercise){
   const photos={};
-  const keys=[['maquina','equipo'],['ejercicio','ejercicio'],['musculos','anatomia']];
-  for(const [type,prefix] of keys){
-   const key=type==='maquina'?`${exercise.g}|${exercise.s}|${exercise.i}`:`${exercise.g}|${exercise.s}|${exercise.i}|${exercise.e}`;
-   if(latest.data.photos[prefix+':'+key])photos[type+':general']=latest.data.photos[prefix+':'+key];
+  for(const [type,view] of [['maquina',null],['ejercicio',null],
+   ...['frontal','posterior','lateral_izquierda','lateral_derecha'].map(v=>['musculos',v])]){
+   const key=photoLocalKey(exercise,type,view);
+   if(latest.data.photos?.[key])photos[(type==='maquina'?'maquina':type)+':'+(view||'general')]=latest.data.photos[key];
   }
   return {id:null,primary:[],secondary:[],images:{},zones3d:[],photos};
  },
  async uploadUserPhoto({exercise,type,side,blob}){
   assertEditable();
   const ownerStamp=stamp();
-  if(!blob||blob.size>3*1024*1024)throw Error('Fotografía demasiado grande (máximo 3 MB)');
-  const key=type==='maquina'?`${exercise.g}|${exercise.s}|${exercise.i}`:`${exercise.g}|${exercise.s}|${exercise.i}|${exercise.e}`;
-  const base64=await new Promise((resolve,reject)=>{
-   const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob);
+  if(!blob||blob.type!=='image/jpeg'||blob.size>3*1024*1024||blob.size<1)
+   throw Error('Fotografía JPEG inválida o demasiado grande (máximo 3 MB)');
+  const key=photoLocalKey(exercise,type,side);
+  const dataUrl=await new Promise((resolve,reject)=>{
+   const reader=new FileReader();
+   reader.onload=()=>resolve(reader.result);
+   reader.onerror=()=>reject(reader.error||Error('No se pudo leer fotografía'));
+   reader.readAsDataURL(blob);
   });
-  if(ownerStamp!==stamp())throw Error('Cambiaste de perfil antes de guardar la fotografía.');
-  await flush(data=>{data.photos[(type==='maquina'?'equipo':type==='ejercicio'?'ejercicio':'anatomia')+':'+key]=base64;
-   data.pending.push({id:uuid(),kind:'photo',key,at:new Date().toISOString()});
+  if(ownerStamp!==stamp())throw Error('Cambiaste de perfil antes de guardar la fotografía');
+  if(!/^data:image\/jpeg;base64,[A-Za-z0-9+/=\s]+$/.test(dataUrl))
+   throw Error('La fotografía no pudo codificarse de forma segura');
+  await flush(data=>{
+   data.photoPayloads??={};data.photoVersions??={};data.photos??={};
+   // Los envíos ya intentados conservan su archivo inmutable.
+   for(const job of [...data.pending]){
+    if(job.kind==='photo'&&job.photoKey===key&&!job.submittedRequest){
+     data.pending=data.pending.filter(x=>x.id!==job.id);
+     delete data.photoPayloads[job.id];
+    }
+   }
+   const id=uuid();
+   data.photoPayloads[id]=dataUrl;
+   data.photos[key]=dataUrl;
+   data.pending.push({id,kind:'photo',photoKey:key,photoType:type,side:side||null,
+    createdAt:new Date().toISOString()});
   });
-  return 'local:'+key;
+  return key;
  }
 };
 function refreshCloudControls(){
@@ -451,7 +471,7 @@ function scheduleAutoUpload(){
  if(autoUploadTimer)clearTimeout(autoUploadTimer);
  if(!navigator.onLine||!remoteSession?.user||cloudAccountKind!=='personal'||
     latest?.data?.cloudUserId!==remoteSession.user.id||latest?.data?.syncMode!=='instant')return;
- if(!latest?.data?.pending?.some(op=>['create_series','update_series','delete_series','add_catalog','update_catalog','delete_catalog'].includes(op.kind)))return;
+ if(!latest?.data?.pending?.some(op=>['create_series','update_series','delete_series','add_catalog','update_catalog','delete_catalog','photo'].includes(op.kind)))return;
  autoUploadTimer=setTimeout(async()=>{
   autoUploadTimer=null;
   if(syncController?.isBusy()){scheduleAutoUpload();return;}
@@ -459,7 +479,7 @@ function scheduleAutoUpload(){
   catch(error){status('Los cambios siguen offline. Error de actualización: '+error.message)}
  },1100);
 }
-for(const name of ['saveWorkout','deleteSeries','updateSeries','addIndependentItem','saveCustomExercise','updateCatalogItem','deleteCatalogItem']){
+for(const name of ['saveWorkout','deleteSeries','updateSeries','addIndependentItem','saveCustomExercise','updateCatalogItem','deleteCatalogItem','uploadUserPhoto']){
  const action=api[name].bind(api);
  api[name]=async(...args)=>{const result=await action(...args);scheduleAutoUpload();return result;};
 }
@@ -622,6 +642,7 @@ function updateFromProfile(){
  window.GymBaseCatalog=catalogInit();
  catalogUpdate();
  model.records=structuredClone(latest.data.records||[]);
+ model.photos=structuredClone(latest.data.photos||{});
  drawRecent();drawHistory(true);drawReports();
  renderSyncStatus();renderConflictButtons();refreshCloudControls();
 }
