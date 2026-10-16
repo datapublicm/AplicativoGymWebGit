@@ -44,6 +44,7 @@ export function prepareDownloadedCatalog({base=[],exercises=[],gyms=[],sites=[],
 export function mergeDownloadedCatalog(local,download){
  const removed=new Set((local.tombstones||[]).filter(x=>x.catalogKind).map(x=>x.catalogKind+':'+x.localId));
  const dirty=new Set((local.pending||[]).filter(x=>x.catalogKind).map(x=>x.catalogKind+':'+x.localId));
+ const warnings=[];
  const union=(existing=[],incoming=[],keys=[],kind='')=>{
   const result=structuredClone(existing);
   const key=row=>keys.map(k=>name(row[k]).toLocaleLowerCase('es')).join('|');
@@ -53,6 +54,13 @@ export function mergeDownloadedCatalog(local,download){
    const index=result.findIndex(x=>id&&String(x.id||x.cloud_id||x.cloud_base_id||'')===id);
    if(index>=0){
     if(!dirty.has(kind+':'+id))result[index]=structuredClone(item);
+    else if(kind&&item.cloudSnapshot&&!result[index].cloudSnapshot){
+     // Perfil creado antes de registrar versiones: exigir confirmación explícita.
+     result[index].cloudSnapshot=structuredClone(item.cloudSnapshot);
+     result[index].cloudOwnerId=item.cloudOwnerId;
+     warnings.push({kind:'catalog_conflict',catalogKind:kind,localId:id,
+      reason:'baseline_recuperada_requiere_revision',current:structuredClone(item.cloudSnapshot)});
+    }
     continue;
    }
    if(result.some(x=>key(x)===key(item)))continue;
@@ -75,6 +83,7 @@ export function mergeDownloadedCatalog(local,download){
   muscles:union(local.muscles,download.muscles,['nombre'],'muscle'),
   custom:union(local.custom,download.custom,['g','s','i','e','a','gr'],'custom'),
   library:union(local.library,download.library,['nombre'],'exercise'),
+  catalogWarnings:warnings,
   entities:{
    gyms,
    sites:union(current.sites,remoteSites,['nombre','gimnasio_id'],'site'),
