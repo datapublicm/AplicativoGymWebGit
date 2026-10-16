@@ -336,6 +336,15 @@ const api={
      (kind!=='site'||x.gimnasio_id===item.gimnasio_id)&&
      (kind!=='option'||x.tipo===item.tipo)))throw Error('Ya existe otro elemento con ese nombre');
    item.nombre=name;
+   // Un intento con conflicto NO quedó confirmado: la nueva edición habilita
+   // reintento con UUID nuevo sin reutilizar la solicitud anterior.
+   const conflicted=data.conflicts?.some(x=>x.kind==='catalog_conflict'&&x.catalogKind===kind&&x.localId===id);
+   if(conflicted){
+    data.conflicts=data.conflicts.filter(x=>!(x.kind==='catalog_conflict'&&x.catalogKind===kind&&x.localId===id));
+    for(const op of data.pending.filter(x=>x.catalogKind===kind&&x.localId===id)){
+     delete op.submittedRequest;delete op.attemptedAt;
+    }
+   }
    data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:kind,localId:id});
   });catalogUpdate();return id;
  },
@@ -501,6 +510,39 @@ function renderConflictButtons(){
  holder.replaceChildren();
  for(const c of latest?.data?.conflicts||[]){
   const box=document.createElement('div');box.className='offline-conflict';
+  if(c.kind==='catalog_conflict'){
+   const info=document.createElement('p');
+   info.textContent='Conflicto de catálogo ('+c.catalogKind+') · '+c.reason+
+    '. Tus modificaciones siguen offline y la nube no se sobrescribió.';
+   box.append(info);
+   if(c.current?.activo===true){
+    const keep=document.createElement('button');keep.type='button';
+    keep.textContent='Conservar mi cambio local';
+    keep.addEventListener('click',async()=>{
+     if(!confirm('El registro cambió en Supabase. ¿Intentar aplicar tu versión sobre la versión remota actual? No se enviará nada hasta pulsar Actualizar o activar la sincronización automática.'))return;
+     try{
+      await flush(data=>{
+       const group={gym:'gyms',site:'sites',machine:'machines',option:'options',exercise:'library'}[c.catalogKind];
+       const row=c.catalogKind==='exercise'?data.library.find(x=>x.id===c.localId):data.entities[group]?.find(x=>x.id===c.localId);
+       const tomb=data.tombstones.find(x=>x.catalogKind===c.catalogKind&&x.localId===c.localId);
+       if(!row&&!tomb)throw Error('El elemento local ya no existe');
+       const owner=row||tomb;owner.cloudSnapshot=structuredClone(c.current);
+       owner.cloudOwnerId=remoteSession?.user?.id;
+       for(const op of data.pending.filter(x=>x.catalogKind===c.catalogKind&&x.localId===c.localId)){
+        delete op.submittedRequest;delete op.attemptedAt;
+       }
+       data.conflicts=data.conflicts.filter(x=>x!==c&&!(x.kind==='catalog_conflict'&&x.catalogKind===c.catalogKind&&x.localId===c.localId));
+      });
+      renderConflictButtons();status('Conflicto de catálogo revisado. Puedes volver a Actualizar.');
+     }catch(error){status('No se pudo revisar el conflicto: '+error.message);}
+    });box.append(keep);
+   }else{
+    const hint=document.createElement('p');
+    hint.textContent='Revisa o cambia el nombre local. Si falta el elemento remoto, no se aplicará una actualización automáticamente.';
+    box.append(hint);
+   }
+   holder.append(box);continue;
+  }
   const title=document.createElement('p');title.textContent=(c.kind==='legacy_unversioned'?'Alerta de cliente antiguo · ':'Conflicto de versiones · ')+c.sourceKey;
   const local=document.createElement('button');local.type='button';local.textContent='Conservar este dispositivo';
   const cloud=document.createElement('button');cloud.type='button';cloud.textContent='Usar datos de la nube';
