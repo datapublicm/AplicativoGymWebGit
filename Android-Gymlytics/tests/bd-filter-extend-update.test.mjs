@@ -66,3 +66,31 @@ test('No se pierde una referencia creada solamente en el perfil offline',()=>{
  const merged=mergeDownloadedCatalog(before,full([row('id-1')]));
  assert.equal(merged.baseCatalog.length,2);
 });
+
+test('Gymlytics utiliza nombres actuales de las columnas P y U sin cambiar el orden del formulario',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const html=readFileSync(new URL('../web/index.html',import.meta.url),'utf8');
+ assert.doesNotMatch(html,/AnotaciónV2/);
+ assert.match(html,/Origen Excel: Anotación \(columna P\)/);
+ assert.match(html,/Origen Excel: Tecnica_Actualizada \(columna U\)/);
+ assert.match(html,/Técnica actualizada/);
+ assert.match(html,/id="zona"/);
+ assert.match(html,/id="tecnica"/);
+});
+test('La proyección del catálogo respeta los encabezados reales de BD_Filter_Extend',()=>{
+ const sample={id:'ref-001',gimnasio:'Evolution',sede:'VES',
+  anotacion:'Espalda alta y media',zona_entrenamiento:'Espalda alta y media',
+  instrumento:'Máquina Barra T',ejercicio:'Remo en barra T - Agarre prono',
+  accesorio_implemento:'-',tecnica_original:'Inicio',
+  tecnica_actualizada:'01 - Ejecución base',activo:true};
+ const parsed=full([sample]).baseCatalog[0];
+ assert.equal(parsed.g,'Evolution');
+ assert.equal(parsed.s,'VES');
+ assert.equal(parsed.z,'Espalda alta y media');
+ assert.equal(parsed.i,'Máquina Barra T');
+ assert.equal(parsed.e,'Remo en barra T - Agarre prono');
+ assert.equal(parsed.a,'-');
+ assert.deepEqual(parsed.t,['01 - Ejecución base']);
+ // La técnica original se almacena en staging, pero no se confunde con la actualizada.
+ assert.notEqual(parsed.t[0],sample.tecnica_original);
+});
