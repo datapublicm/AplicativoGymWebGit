@@ -378,6 +378,21 @@ const api={
   return 'local:'+key;
  }
 };
+function refreshCloudControls(){
+ const linked=!!remoteSession?.user&&!transitioning;
+ $('offlineRemoteUser').textContent=linked?'Conectado: '+(remoteSession.user.email||remoteSession.user.id):'Sin sesión de nube';
+ const demo=cloudAccountKind==='demo';
+ $('offlineLinkAccount').disabled=!linked||demo||!!syncController?.isBusy()||!!latest?.data?.cloudUserId;
+ $('offlineLinkAccount').textContent=demo?'🔒 La cuenta de prueba no puede vincularse':latest?.data?.cloudUserId?'Perfil ya vinculado a esta cuenta':'Vincular este perfil con esta cuenta';
+ const personal=linked&&!demo&&latest?.data?.cloudUserId===remoteSession.user.id;
+ $('offlineCloudDownload').disabled=!linked||!!syncController?.isBusy();
+ $('offlineCloudDownload').textContent='↓ Descargar datos';
+ $('offlineCloudUpload').hidden=false;$('offlineCloudUpload').disabled=!personal||!!syncController?.isBusy();
+ $('offlineDemoDownload').hidden=true;$('offlineDemoDownload').disabled=true;
+ $('authLogout').hidden=true;
+ const state=$('offlineLinkStatus');if(state)state.textContent=personal?'✅ Vinculado':'No vinculado';
+ const mode=$('offlineSyncMode');if(mode){mode.closest('.offline-sync-mode').hidden=!personal;mode.value=latest?.data?.syncMode==='instant'?'instant':'later';}
+}
 let autoUploadTimer=null;
 function scheduleAutoUpload(){
  if(autoUploadTimer)clearTimeout(autoUploadTimer);
@@ -396,21 +411,6 @@ for(const name of ['saveWorkout','deleteSeries','updateSeries','addIndependentIt
  api[name]=async(...args)=>{const result=await action(...args);scheduleAutoUpload();return result;};
 }
 window.addEventListener('online',()=>scheduleAutoUpload());
-function refreshCloudControls(){
- const linked=!!remoteSession?.user&&!transitioning;
- $('offlineRemoteUser').textContent=linked?'Conectado: '+(remoteSession.user.email||remoteSession.user.id):'Sin sesión de nube';
- const demo=cloudAccountKind==='demo';
- $('offlineLinkAccount').disabled=!linked||demo||!!syncController?.isBusy()||!!latest?.data?.cloudUserId;
- $('offlineLinkAccount').textContent=demo?'🔒 La cuenta de prueba no puede vincularse':latest?.data?.cloudUserId?'Perfil ya vinculado a esta cuenta':'Vincular este perfil con esta cuenta';
- const personal=linked&&!demo&&latest?.data?.cloudUserId===remoteSession.user.id;
- $('offlineCloudDownload').disabled=!linked||!!syncController?.isBusy();
- $('offlineCloudDownload').textContent='↓ Descargar datos';
- $('offlineCloudUpload').hidden=false;$('offlineCloudUpload').disabled=!personal||!!syncController?.isBusy();
- $('offlineDemoDownload').hidden=true;$('offlineDemoDownload').disabled=true;
- $('authLogout').hidden=true;
- const state=$('offlineLinkStatus');if(state)state.textContent=personal?'✅ Vinculado':'No vinculado';
- const mode=$('offlineSyncMode');if(mode){mode.closest('.offline-sync-mode').hidden=!personal;mode.value=latest?.data?.syncMode==='instant'?'instant':'later';}
-}
 function requireCloudIdentity(uid,ownerStamp,ownerClient=client){
  if(ownerStamp!==stamp()||ownerClient!==client||!uid||transitioning)
   throw Error('Cambiaste de perfil durante la autenticación.');
