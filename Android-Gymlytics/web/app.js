@@ -176,6 +176,7 @@ const catalogNorm=v=>String(v??'').trim().normalize('NFD').replace(/[\u0300-\u03
 const catalogOwnOptions=()=>window.GymEntities?.options||[];
 const catalogBaseOptions=kind=>{
  const selected=$('gymExistingSelect')?.value||'';
+ if(kind==='site'&&!selected)return [];
  const gymName=kind==='site'?catalogChoices('gym').find(x=>x.id===selected)?.name||'':'';
  return window.GymReferenceChoices?.(kind,{gymId:selected,gymName})||[];
 };
@@ -278,6 +279,7 @@ function catalogOpenCard(kind,action='add'){
  }
  if(kind==='exercise'){
   const entry=catalogChoices(kind).find(x=>x.id===$('exerciseExistingSelect')?.value);
+  $('exerciseEditName').value=entry?.name||'';
   if(entry&&!entry.own)$('exerciseEditFeedback').textContent='Referencia: puedes modificar su nombre en este perfil offline, sin editar Supabase.';
  }
  if(action==='add'){
