@@ -32,7 +32,7 @@
 
 ## Limitaciones identificadas para resolver antes de publicar
 - **Bloque 1 implementado:** «Actualizar» envía series y operaciones de catálogos personales (gimnasios, sedes, máquinas, opciones y ejercicios) mediante un RPC idempotente por cuenta. Las fotografías aún no se sincronizan (Bloque 3).
-- Los elementos de **referencia base** siguen siendo consultables, pero no editables directamente: su edición mediante copias/sustituciones locales se abordará en Bloque 2, sin modificar datos compartidos.
+- **Bloque 2 implementado en código:** los elementos de referencia se renombran u ocultan mediante una capa de sustituciones por perfil local. El catálogo compartido original no se altera ni se envían estas sustituciones a la nube.
 - Falta ejecutar batería completa de pruebas, incluyendo renderizado en Android real, tras incorporar los demás cambios dictados.
 
 ## Bloque 1 — Sincronización de catálogo (implementado, sin APK)
@@ -66,7 +66,36 @@
 - Las eliminaciones remotas son lógicas (`activo=false`) para no romper claves foráneas históricas.
 
 ### Próximos bloques
-- Bloque 2: modificación/sustitución de referencias del catálogo compartido.
+- Bloque 2: implementado en fuentes; pendiente de validación funcional en Android.
 - Bloque 3: sincronización de fotografías.
 - Bloque 4: pruebas end-to-end autenticadas con perfiles reales y Android.
 - Bloque 5: compilación, **solo después de las demás modificaciones solicitadas**.
+
+
+## Bloque 2 — Sustituciones de referencias del catálogo (implementado, sin APK)
+
+**Fecha:** 16/10/2026. **Rama:** \`cambios/gymlytics-perfil-catalogo-20261016\`.
+
+### Funcionamiento
+
+- \`web/reference-overrides.js\` define identificadores \`base:\` estables frente a los cambios de nombre locales, basados en la identidad original de la referencia. Se almacenan en \`data.referenceOverrides\`, exclusivo de cada perfil IndexedDB.
+- «Modificar» cambia la denominación **visible** en el catálogo local (copy-on-write). El original \`baseCatalog\`, sus relaciones y los registros históricos se preservan. «Eliminar» oculta la referencia del perfil, sin borrar el dato compartido ni el historial.
+- Los identificadores de sede incorporan el gimnasio original: una sede «La Rambla» de Smart Fit no afecta una sede con el mismo nombre de Evolution.
+- Los cambios de gimnasio se reflejan en sus sedes y en los campos derivados de Registro y Catálogo. El mecanismo abarca gimnasio, sede, instrumento, ejercicio, AnotaciónV2, agarre/implemento y técnica.
+- Los ejercicios personales con gimnasio/sede se renderizan usando los nombres más recientes de las entidades a las que están asociados, sin modificar la fuente ni el historial.
+- Las copias de seguridad completas incluyen automáticamente \`referenceOverrides\`. Restaurarlas en otro perfil recupera las sustituciones sin intervenir sobre otros perfiles.
+- Una descarga posterior conserva las sustituciones. Si un registro base cambia en la nube mientras tiene una sustitución local, se conserva la referencia anterior y se genera un aviso de conflicto; no se sobrescribe sin avisar.
+- Las sustituciones de referencia **no generan operaciones de subida de catálogo**. Solo los elementos personales, incluidos los gimnasios que se copien explícitamente al agregar una sede, pueden formar parte de la sincronización definida en Bloque 1.
+
+### Cambios de código
+
+- Nuevo: \`web/reference-overrides.js\`; \`tests/reference-overrides.test.mjs\`.
+- Modificados: \`web/offline-first.js\`, \`web/app.js\`, \`web/offline-catalog-download.js\`, \`web/cloud-sync.js\`.
+- Sin migración de base de datos para este bloque, sin alterar \`main\` ni la versión APK de entrega.
+
+### Verificación sin compilar
+
+- **14/14 pruebas** de referencias (incluyen gimnasio→sede, coincidencia de nombres entre gimnasios, eliminación no destructiva, separación de perfiles, restauración de nombre y descarga posterior).
+- Prueba aislada de representación de ejercicio personal: nombres de gimnasio/sede/ejercicio actualizados sin cambiar la fuente almacenada.
+- Verificación sintáctica V8 correcta de los archivos JavaScript modificados.
+- **No** se efectuaron pruebas con Android real ni pruebas E2E con perfiles de Supabase; quedan para el bloque de integridad.
