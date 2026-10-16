@@ -45,7 +45,7 @@ test('Catálogo deja claros los valores de referencia y los personales',()=>{
  assert.match(app,/select\.title=select\.selectedOptions\?\.\[0\]\?\.textContent/);
  assert.match(app,/Referencia compartida: puedes modificarla u ocultarla solo en este perfil offline\./);
  assert.match(app,/Elemento personal: puedes modificarlo o eliminarlo\./);
- assert.match(app,/select\.value\.startsWith\('base:'\)/);
+ assert.match(app,/id\.startsWith\('base:'\)/);
 });
 test('Pestañas múltiples mantienen borradores independientes sin tocar tablas históricas',()=>{
  assert.match(app,/function storeActiveDraft\(/);
