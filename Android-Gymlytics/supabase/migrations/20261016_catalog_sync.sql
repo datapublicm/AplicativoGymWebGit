@@ -68,7 +68,7 @@ begin
    end if;
   else
    execute format('select 1 from sch_android_gymlytics.%I where user_id=$1 and activo=true and pg_catalog.lower(nombre)=pg_catalog.lower($2)%s limit 1',
-    v_table,case v_kind when 'site' then ' and gimnasio_id=$3'
+    v_table,case v_kind when 'site' then ' and gimnasio_id=$3::uuid'
      when 'option' then ' and tipo=$3' else '' end)
    into v_previous using v_uid,v_name,
     case v_kind when 'site' then v_gym::text when 'option' then v_tipo else null end;
@@ -113,7 +113,7 @@ begin
      return jsonb_build_object('op_id',v_op,'status','conflict','reason','duplicate_name'); end if;
    else
     execute format('select 1 from sch_android_gymlytics.%I where user_id=$1 and id<>$2 and activo=true and pg_catalog.lower(nombre)=pg_catalog.lower($3)%s limit 1',
-     v_table, case v_kind when 'site' then ' and gimnasio_id=$4'
+     v_table, case v_kind when 'site' then ' and gimnasio_id=$4::uuid'
       when 'option' then ' and tipo=$4' else '' end)
     into v_previous using v_uid,v_id,v_name,
      case v_kind when 'site' then v_row->>'gimnasio_id' when 'option' then v_row->>'tipo' else null end;
