@@ -87,6 +87,8 @@ function catalogInit(){
  const map=latest?.data?.referenceOverrides||{};
  window.GymReferenceCatalog=structuredClone(source);
  window.GymReferenceOverrides=structuredClone(map);
+ window.GymReferenceChoices=(kind,ctx)=>listReferenceChoices(
+  latest?.data?.baseCatalog||[],latest?.data?.referenceOverrides||{},kind,ctx);
  return materializeReferenceCatalog(source,map).map(x=>({
   ...x,t:[...(x.t||[])],n:0,last:null
  }));
@@ -108,7 +110,7 @@ async function activate(id,initial=false){
   rotateCloudClient();
   activeId=null;latest=null;
   model.records=[];model.photos={};
-  window.GymBaseCatalog=[];window.GymReferenceCatalog=[];window.GymReferenceOverrides={};window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
+  window.GymBaseCatalog=[];window.GymReferenceCatalog=[];window.GymReferenceOverrides={};window.GymReferenceChoices=()=>[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
   window.GymEntities={gyms:[],sites:[],machines:[],options:[]};
   drawRecent();drawHistory();drawReports();
   const p=await get(id);
