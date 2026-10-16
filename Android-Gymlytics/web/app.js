@@ -416,7 +416,7 @@ function setupCatalogCompact(){
   if(action==='delete'){
    if(!id||id.startsWith('base:')){toast('Selecciona un valor propio para eliminar; los de referencia se conservan.');return;}
    if(!window.GymCloud?.deleteCatalogItem){toast('La eliminación no está disponible.');return;}
-   if(!confirm('¿Eliminar este elemento de tu catálogo? Si está relacionado con registros, Supabase puede impedirlo.'))return;
+   if(!confirm('¿Eliminar este elemento del catálogo local? El registro se quitará de este perfil sin modificar inmediatamente Supabase.'))return;
    button.disabled=true;
    try{await window.GymCloud.deleteCatalogItem(['zone','grip','technique'].includes(kind)?'option':kind,id);$('catalogQuickFeedback').textContent='Elemento eliminado. Catálogos actualizados.';}
    catch(e){$('catalogQuickFeedback').textContent='No se pudo eliminar: '+String(e.message||e).slice(0,160);}
