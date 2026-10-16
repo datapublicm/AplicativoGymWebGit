@@ -16,7 +16,10 @@ export function catalogPayload(kind,row){
   ...(kind==='option'?{tipo}:{}),...(kind==='machine'?{tipo_equipo}:{}),
   ...(kind==='exercise'?{zona_entrenamiento,tecnica_actualizada}:{})};
 }
-const getRow=(data,kind,id)=>(kind==='exercise'?data.library:data.entities?.[groups[kind]])?.find(x=>String(x.id)===String(id));
+const getRow=(data,kind,id)=>kind==='exercise'?
+ (data.library||[]).find(x=>String(x.id)===String(id))||
+ (data.custom||[]).find(x=>String(x.id||x.cloud_id)===String(id)):
+ (data.entities?.[groups[kind]]||[]).find(x=>String(x.id)===String(id));
 export function planCatalogUpload(data,uid){
  const pending=(data.pending||[]).filter(x=>['add_catalog','update_catalog','delete_catalog'].includes(x.kind)),
   byKey=new Map(),ops=[],noops=[],blocked=[];
