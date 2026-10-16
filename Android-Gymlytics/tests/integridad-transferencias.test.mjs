@@ -23,12 +23,12 @@ function setup(initial=base()){
     maybeSingle:async()=>({data:{id:uid,activo:true},error:null}),
     async range(begin,end){
      if(denyPage&&begin>=500)return {data:null,error:{message:'Corte de red al descargar'}};
-     const all=name==='tbl_sync_series'?[...rows.values()]:view;
+     const all=name==='tbl_sync_series'?[...rows.values()]:name==='vw_historial_series'?view:[];
      const sorted=[...all].sort((a,b)=>name==='tbl_sync_series'?
       a.source_key.localeCompare(b.source_key):b.date.localeCompare(a.date)||a.id.localeCompare(b.id));
      return {data:sorted.slice(begin,end+1),error:null};
     },
-    then(ok){return Promise.resolve({count:name==='tbl_sync_series'?rows.size:view.length,error:null}).then(ok)}
+    then(ok){return Promise.resolve({count:name==='tbl_sync_series'?rows.size:name==='vw_historial_series'?view.length:0,error:null}).then(ok)}
    };
    return q;
   },
