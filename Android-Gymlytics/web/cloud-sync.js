@@ -1,6 +1,7 @@
 import {sourceKey,payloadOf,remoteToRow,planUpload,mergeDownload,acknowledge} from './sync-engine.js';
 import {legacyAlerts,normalizeLegacySnapshot} from './legacy-compat.js';
 import {mergeDownloadedCatalog} from './offline-catalog-download.js';
+import {planCatalogUpload,acknowledgeCatalog} from './catalog-sync-engine.js';
 
 // Adaptador de red local-first: toda escritura ocurre primero en IndexedDB.
 // El usuario puede elegir sincronizar manualmente o tras cada cambio.
@@ -45,18 +46,56 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
  async function upload(uid,stamp,{automatic=false}={}){
   if(busy)throw Error('Hay otra sincronización activa');
   await authorized(uid,stamp);
-  const {data,profileName}=getState(),plan=planUpload(data);
-  if(!plan.ops.length){notify('No hay series listas para subir; otros tipos de cambios siguen pendientes.');return {done:0,blocked:plan.blocked.length};}
-  if(!automatic&&!confirmAction('¿Subir '+plan.ops.length+' cambios de series de '+profileName+'? Solo se aplicarán si coinciden las versiones. '+plan.blocked.length+' operaciones no compatibles seguirán pendientes.'))return null;
+  validate(uid,stamp);
+  const initial=getState(),series=planUpload(initial.data),catalog=planCatalogUpload(initial.data,uid);
+  const expected=series.ops.length+catalog.ops.length;
+  if(!expected&&!catalog.noops.length){
+   notify('No hay cambios compatibles para subir. '+(catalog.blocked.length+series.blocked.length)+' pendientes requieren revisión.');
+   return {done:0,blocked:catalog.blocked.length+series.blocked.length};
+  }
+  if(!automatic&&!confirmAction('¿Actualizar Supabase con '+expected+' operaciones pendientes de «'+initial.profileName+'»? Las modificaciones se comprobarán antes de aplicar y nunca se mezclan cuentas.'))return null;
   busy=true;refresh();
-  let done=0,duplicates=0,conflicts=0;
+  let done=0,duplicates=0,conflicts=0,iterations=0,localOnly=0;
   try{
-   for(let i=0;i<plan.ops.length;i+=50){
+   while(true){
     validate(uid,stamp);
-    const chunk=plan.ops.slice(i,i+50);
-    // Persistir en IndexedDB el sobre exacto de solicitud ANTES de enviarlo.
-    // Si el servidor confirma pero la respuesta se pierde, reusar estos
-    // mismos bytes y UUID permite un reintento estrictamente idempotente.
+    const plan=planCatalogUpload(getState().data,uid);
+    if(plan.noops.length){
+     await mutate(data=>{
+      const ids=new Set(plan.noops);
+      data.pending=data.pending.filter(x=>!ids.has(x.id));
+      // Altas locales eliminadas antes de su primera subida jamás existieron en la nube.
+      const keys=new Set(plan.noops.map(id=>{const p=getState().data.pending.find(x=>x.id===id);return p?.catalogKind+':'+p?.localId;}));
+      data.tombstones=data.tombstones.filter(x=>!keys.has(x.catalogKind+':'+x.localId));
+     });
+     localOnly+=plan.noops.length;
+     continue;
+    }
+    if(!plan.ops.length)break;
+    if(++iterations>5000)throw Error('Se detuvo una cola de catálogo demasiado extensa');
+    const selected=plan.ops[0],op=selected.request;
+    await mutate(data=>{
+     validate(uid,stamp);
+     const item=data.pending.find(x=>x.id===op.op_id);
+     if(!item)throw Error('La operación de catálogo cambió antes del envío');
+     if(item.submittedRequest&&JSON.stringify(item.submittedRequest)!==JSON.stringify(op))
+      throw Error('Una operación de catálogo enviada no puede alterarse');
+     if(!item.submittedRequest){item.submittedRequest=structuredClone(op);item.attemptedAt=new Date().toISOString();}
+    });
+    const {data:response,error}=await remote.rpc('aplicar_cambio_catalogo',{p_change:op});
+    if(error)throw Error('Error de catálogo: '+error.message);
+    validate(uid,stamp);
+    await mutate(data=>{
+     validate(uid,stamp);
+     if(acknowledgeCatalog(data,selected,response,uid)) {
+      done++;if(response.status==='duplicate')duplicates++;
+     }else conflicts++;
+    });
+   }
+   const seriesPlan=planUpload(getState().data);
+   for(let i=0;i<seriesPlan.ops.length;i+=50){
+    validate(uid,stamp);
+    const chunk=seriesPlan.ops.slice(i,i+50);
     await mutate(local=>{
      validate(uid,stamp);
      for(const op of chunk){
@@ -74,11 +113,13 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
     await mutate(local=>{
      validate(uid,stamp);
      const result=acknowledge(local,chunk,response.data);
-     local.cloudUserId=uid;done+=result.done;duplicates+=result.duplicate;conflicts=result.conflicts;
+     local.cloudUserId=uid;done+=result.done;duplicates+=result.duplicate;conflicts+=result.conflicts;
     });
    }
-   notify('Subida confirmada: '+done+' operaciones · '+duplicates+' reintentos idempotentes · '+conflicts+' conflictos.');
-   return {done,duplicates,conflicts};
+   const last=getState().data,remaining=(last.pending||[]).length;
+   notify('Actualización: '+done+' confirmadas · '+duplicates+' reintentos · '+conflicts+' conflictos · '+
+    localOnly+' cancelaciones locales · '+remaining+' operaciones pendientes.');
+   return {done,duplicates,conflicts,remaining,blocked:planCatalogUpload(last,uid).blocked.length};
   }finally{busy=false;refresh();}
  }
  async function download(uid,stamp,{readOnly=false}={}){
