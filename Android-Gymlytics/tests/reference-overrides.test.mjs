@@ -32,7 +32,7 @@ test('Modificar una sede sólo afecta al gimnasio asociado',()=>{
  const current=materializeReferenceCatalog(rows,map);
  assert.equal(current.find(x=>x.g==='Smart Fit'&&x.e==='Jalón al pecho').s,'Rambla Nueva');
  assert.equal(current.find(x=>x.g==='Evolution').s,'La Rambla');
- assert.equal(listReferenceChoices(rows,map,'site',{gymId:gym})[0].id,site);
+ assert.equal(listReferenceChoices(rows,map,'site',{gymId:gym}).find(x=>x.name==='Rambla Nueva').id,site);
 });
 test('Eliminar una sede no borra otras sedes ni modifica el catálogo base',()=>{
  const map=setReferenceOverride(rows,{},site,{deleted:true});
