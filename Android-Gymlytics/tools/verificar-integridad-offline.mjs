@@ -89,7 +89,8 @@ try{
  assert.equal(await evaluate('(window.GymCustomCatalog||[]).length'),0);
  assert.equal(await evaluate('(window.GymEntities?.gyms||[]).length'),0);
  assert.equal(await evaluate('model.records.length'),0,'Tablas y Dashboard empiezan vacíos');
- assert.equal(await evaluate('document.querySelector("#offlineCloudUpload").hidden'),true);
+ assert.equal(await evaluate('document.querySelector("#offlineCloudUpload").disabled'),true,
+  'Actualizar debe quedar deshabilitado sin cuenta personal vinculada');
  assert.equal(await evaluate('!!document.querySelector("#offlineDemoDownload")'),true);
  console.log('PASS 1: instalación web vacía, sin login, sin catálogo ajeno ni subida automática');
 
