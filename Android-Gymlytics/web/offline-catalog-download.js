@@ -22,7 +22,7 @@ export function prepareDownloadedCatalog({base=[],exercises=[],gyms=[],sites=[],
    gr:'No especificado',t:[name(x.tecnica_actualizada)||'01 - Ejecución base'],
    m:name(x.musculos_principales)||'No especificado',
    ms:name(x.musculos_secundarios)||'No especificado',n:0,last:null};
- }).filter(x=>x.g&&x.s&&x.e);
+ }).filter(x=>x.g&&x.s&&x.e&&x.e!=='-');
  const active=exercises.filter(x=>x.activo!==false);
  const library=active.filter(x=>!x.gimnasio_id||!x.sede_id).map(x=>({
   id:x.id,nombre:x.nombre,origen:x.origen,zona_entrenamiento:x.zona_entrenamiento,
@@ -69,10 +69,19 @@ export function mergeDownloadedCatalog(local,download){
     const before=result[index],changed=JSON.stringify(before)!==JSON.stringify(item),
      original=before.cloudSnapshot,remoteSnapshot=item.cloudSnapshot;
     if(kind==='base'&&changed){
-     // El catálogo compartido es referencia: sin confirmación no se reemplaza
-     // un valor local existente, aunque venga de una versión antigua.
-     warnings.push({kind:'reference_conflict',refId:id,sourceKey:'base:'+id,
-      reason:'referencia_compartida_modificada'});
+     // Los cambios realizados por el usuario se guardan como overrides.
+     // La edición directa heredada de g/s/i/e/a/t tampoco se descarta.
+     const identityFields=['g','s','i','e','a','gr','kind','t'];
+     const legacyChanged=identityFields.some(field=>
+      JSON.stringify(before[field]??null)!==JSON.stringify(item[field]??null));
+     if(hasEditedReference(before)||legacyChanged){
+      warnings.push({kind:'reference_conflict',refId:id,sourceKey:'base:'+id,
+       reason:'referencia_compartida_modificada'});
+      continue;
+     }
+     // Se actualiza zona/anotación de la fuente sin cambiar IDs ni los
+     // músculos que ya estaban en el perfil.
+     result[index]={...structuredClone(item),m:before.m??item.m,ms:before.ms??item.ms};
      continue;
     }
     if(kind!=='base'&&changed&&!dirty.has(kind+':'+id)){
@@ -100,11 +109,24 @@ export function mergeDownloadedCatalog(local,download){
     }
     continue;
    }
-   if(result.some(x=>key(x)===key(item)))continue;
+   if(kind!=='base'&&result.some(x=>key(x)===key(item)))continue;
    result.push(structuredClone(item));
   }
   return result;
  };
+ const remoteIds=new Set((download.baseCatalog||[]).map(x=>String(x.cloud_base_id)).filter(Boolean));
+ const retainedBase=(local.baseCatalog||[]).filter(row=>{
+  const id=String(row.cloud_base_id||'');
+  if(!id||remoteIds.has(id))return true;
+  if(hasEditedReference(row)){
+   warnings.push({kind:'reference_conflict',refId:id,sourceKey:'base:'+id,
+    reason:'referencia_retirada_con_modificacion_local'});
+   return true;
+  }
+  // La plantilla retirada ya no se propone en los selectores, pero
+  // los registros históricos y cambios personales no se eliminan.
+  return false;
+ });
  const current=local.entities||emptyCatalogue().entities;
  const fetched=download.entities;
  const gyms=union(current.gyms,fetched.gyms,['nombre'],'gym');
@@ -116,7 +138,7 @@ export function mergeDownloadedCatalog(local,download){
  }));
  const remoteSites=fetched.sites.map(x=>({...x,gimnasio_id:remap.get(x.gimnasio_id)||x.gimnasio_id}));
  return {
-  baseCatalog:union(local.baseCatalog,download.baseCatalog,['g','s','e','i','a','gr','z'],'base'),
+  baseCatalog:union(retainedBase,download.baseCatalog,['g','s','e','i','a','gr','z'],'base'),
   muscles:union(local.muscles,download.muscles,['nombre'],'muscle'),
   custom:union(local.custom,download.custom,['g','s','i','e','a','gr'],'custom'),
   library:union(local.library,download.library,['nombre'],'exercise'),
