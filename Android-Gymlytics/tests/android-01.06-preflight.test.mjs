@@ -13,15 +13,17 @@ test('01.06 solo admite ejecución manual o cambio explícito de su propio workf
  assert.match(next,/refs\/heads\/apk\/pruebas/);
  assert.match(next,/test ! -d android\/app/);
 });
-test('01.06 se instala en paralelo sin reemplazar ni desinstalar 01.05',()=>{
+test('01.06 corregida se instala en paralelo sin reemplazar 01.05 ni 01.06 previa',()=>{
  assert.equal(settings.appId,'com.datapublicm.gymlytics');
  assert.equal(pkg.version,'0.1.6');
- assert.match(next,/config\.appId='com\.datapublicm\.gymlytics\.pruebas'/);
- assert.match(next,/config\.appName='Gymlytics Pruebas'/);
- assert.match(next,/name='com\.datapublicm\.gymlytics\.pruebas'/);
+ assert.match(next,/config\.appId='com\.datapublicm\.gymlytics\.pruebas\.corregida'/);
+ assert.match(next,/config\.appName='Gymlytics Corregida'/);
+ assert.match(next,/name='com\.datapublicm\.gymlytics\.pruebas\.corregida'/);
  assert.match(next,/versionCode 6/);
  assert.match(next,/01\.06/);
  assert.match(next,/Verificar APK y firma digital/);
+ assert.match(next,/getWriteStatus:writeStatus/);
+ assert.match(next,/Gymlytics_01\.06_Pruebas_Corregida\.apk/);
 });
 test('La preparación nueva no sustituye el workflow o versión 01.05',()=>{
  assert.match(old,/0\.1\.5/);
