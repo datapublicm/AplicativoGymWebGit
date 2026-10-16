@@ -53,7 +53,7 @@ async function online(fn){
 test('Instalación limpia: sin catálogo incrustado ni historial antes de descargar',()=>{
  const src=read('offline-first.js'),html=read('index.html');
  assert.deepEqual(emptyCatalogue().baseCatalog,[]);
- assert.match(src,/baseCatalog:\[\],muscles:\[\],custom:\[\],library:\[\]/);
+ assert.match(src,/baseCatalog:\[\],referenceOverrides:\{\},muscles:\[\],custom:\[\],library:\[\]/);
  assert.match(src,/const source=Array\.isArray\(latest\?\.data\?\.baseCatalog\)/);
  assert.doesNotMatch(html,/src="\.\/catalogo\.js"/);
  assert.match(html,/id="offlineDemoDownload"/);
