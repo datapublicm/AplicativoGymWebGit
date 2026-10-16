@@ -1,4 +1,4 @@
-# Recompilación correctiva 01.06 autorizada el 2026-10-15: corregir Guardar con perfil activo y validar APK.
+# Recompilación correctiva 01.06 autorizada el 2026-10-15: validación preflight de paquete aislado y Guardar en perfil activo.
 # Instalación paralela a 01.05, sin reemplazarla ni tocar main.
 name: Gymlytics - APK 01.06 Corregida (instalación segura paralela)
 on:
