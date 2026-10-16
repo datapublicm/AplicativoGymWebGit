@@ -436,6 +436,7 @@ async function linkAccount(){
  await flush(data=>{
   validateProfileBinding(profiles,activeId,user.id);
   data.cloudUserId=user.id;
+  data.demo=false; // Una vinculación personal deja de mostrar el perfil como prueba.
  });
  renderSyncStatus();refreshCloudControls();
  status('Vinculado. Tus cambios se guardan localmente; elige cuándo actualizar Supabase.');
