@@ -130,12 +130,13 @@ async function activate(id,initial=false){
   const p=await get(id);
   if(!p||epoch!==profileEpoch)throw Error('No se pudo abrir el nuevo perfil.');
   // Migración segura: la restricción de la cuenta de prueba solo afecta a Supabase.
-  if(p.data?.readOnly){p.data.demo=true;p.data.readOnly=false;p.data.cloudUserId=null;}
+  const wasReadOnly=!!p.data?.readOnly;
+  if(wasReadOnly){p.data.demo=true;p.data.readOnly=false;p.data.cloudUserId=null;}
   // Convertir fotografías JPEG pendientes de la versión anterior sin perder archivos.
   // Las anatómicas antiguas sin vista identificable quedan intactas y requieren
   // que se seleccione nuevamente la vista: nunca adivinar frontal/posterior.
   const legacyPhotos=migrateLegacyPhotoJobs(p.data);
-  if(legacyPhotos.converted||legacyPhotos.removed||p.data?.readOnly)await put(p);
+  if(legacyPhotos.converted||legacyPhotos.removed||wasReadOnly)await put(p);
   activeId=id;latest=p;profiles=(await all()).map(profileMeta);
   $('offlineProfiles').replaceChildren(...profiles.map(x=>new Option(x.demo?'◌ '+x.name+' · prueba':x.name,x.id)));
   $('offlineProfiles').value=id;
