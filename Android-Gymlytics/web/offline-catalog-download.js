@@ -1,4 +1,5 @@
 import {catalogSnapshot} from './catalog-sync-engine.js';
+import {referenceKey} from './reference-overrides.js';
 // Transformación pura de tablas Supabase a catálogos offline. Sin escritura remota.
 export const emptyCatalogue=()=>({baseCatalog:[],muscles:[],custom:[],library:[],
  entities:{gyms:[],sites:[],machines:[],options:[]}});
@@ -48,6 +49,15 @@ export function mergeDownloadedCatalog(local,download){
  const removed=new Set((local.tombstones||[]).filter(x=>x.catalogKind).map(x=>x.catalogKind+':'+x.localId));
  const dirty=new Set((local.pending||[]).filter(x=>x.catalogKind).map(x=>x.catalogKind+':'+x.localId));
  const warnings=[];
+ const hasEditedReference=row=>{
+  const edits=local.referenceOverrides||{};
+  return [
+   referenceKey('gym',row.g),referenceKey('site',row.s,row.g),
+   referenceKey('machine',row.i),referenceKey('exercise',row.e),
+   referenceKey('zone',row.z),referenceKey('grip',row.gr),referenceKey('grip',row.a),
+   ...(row.t||[]).map(v=>referenceKey('technique',v))
+  ].some(key=>Object.prototype.hasOwnProperty.call(edits,key));
+ };
  const union=(existing=[],incoming=[],keys=[],kind='')=>{
   const result=structuredClone(existing);
   const key=row=>keys.map(k=>name(row[k]).toLocaleLowerCase('es')).join('|');
@@ -56,6 +66,14 @@ export function mergeDownloadedCatalog(local,download){
    if(kind&&removed.has(kind+':'+id))continue;
    const index=result.findIndex(x=>id&&String(x.id||x.cloud_id||x.cloud_base_id||'')===id);
    if(index>=0){
+    if(kind==='base'&&hasEditedReference(result[index])&&
+       JSON.stringify(result[index])!==JSON.stringify(item)){
+     // La edición local depende del nombre de origen: conservarlo intacto
+     // hasta que el usuario revise la nueva referencia compartida.
+     warnings.push({kind:'reference_conflict',refId:id,sourceKey:'base:'+id,
+      reason:'referencia_compartida_modificada'});
+     continue;
+    }
     if(!dirty.has(kind+':'+id))result[index]=structuredClone(item);
     else if(kind&&item.cloudSnapshot&&!result[index].cloudSnapshot){
      // Perfil creado antes de registrar versiones: exigir confirmación explícita.
