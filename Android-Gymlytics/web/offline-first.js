@@ -93,6 +93,16 @@ function catalogInit(){
   ...x,t:[...(x.t||[])],n:0,last:null
  }));
 }
+function personalCatalogInit(){
+ const entities=latest?.data?.entities||EMPTY().entities;
+ const gyms=new Map(entities.gyms.map(x=>[String(x.id),x.nombre]));
+ const sites=new Map(entities.sites.map(x=>[String(x.id),x.nombre]));
+ return (latest?.data?.custom||[]).map(x=>({
+  ...x,g:gyms.get(String(x.gimnasio_id))||x.g,
+  s:sites.get(String(x.sede_id))||x.s,
+  e:x.nombre||x.e
+ }));
+}
 async function activate(id,initial=false){
  if(transitioning)throw Error('Hay un cambio de perfil en curso.');
  if(syncController?.isBusy())throw Error('Termina la sincronización antes de cambiar de perfil.');
@@ -123,7 +133,7 @@ async function activate(id,initial=false){
   window.GymBaseCatalog=catalogInit();
   window.GymEntities=structuredClone(p.data.entities||EMPTY().entities);
   window.GymExerciseLibrary=structuredClone(p.data.library||[]);
-  window.GymCustomCatalog=structuredClone(p.data.custom||[]);
+  window.GymCustomCatalog=personalCatalogInit();
   model.records=structuredClone(p.data.records||[]);
   model.photos=structuredClone(p.data.photos||{});
   if(typeof resetHistoryFilters==='function')resetHistoryFilters();
@@ -186,7 +196,7 @@ function catalogUpdate(){
  window.GymBaseCatalog=catalogInit();
  window.GymEntities=structuredClone(latest.data.entities);
  window.GymExerciseLibrary=structuredClone(latest.data.library);
- window.GymCustomCatalog=structuredClone(latest.data.custom);
+ window.GymCustomCatalog=personalCatalogInit();
  if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
  if(typeof renderOwnCatalog==='function')renderOwnCatalog();
  if(typeof cascade==='function')cascade(0);
