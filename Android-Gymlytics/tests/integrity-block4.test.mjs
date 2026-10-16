@@ -95,3 +95,39 @@ test('La caché offline conserva foto, referencias y motores de sincronización'
   assert.ok(vite.includes("'"+file+"'"),file);
  }
 });
+
+test('Sin Internet: no consulta ni escribe en Supabase, conserva operaciones pendientes',async()=>{
+ const old=globalThis.navigator;
+ Object.defineProperty(globalThis,'navigator',{value:{onLine:false},configurable:true});
+ try{
+  const data=defaultData();data.cloudUserId='cuenta-uno';
+  data.pending=[{id:'pendiente',kind:'add_catalog',catalogKind:'gym',localId:'local'}];
+  let reads=0,writes=0;
+  const sync=createCloudSync({
+   remote:{from:()=>{reads++;throw Error('No se debe consultar Supabase offline')}},
+   getState:()=>({data,profileName:'Offline'}),
+   mutate:async()=>{writes++},refresh:()=>{},
+   isCurrent:(uid,stamp)=>uid==='cuenta-uno'&&stamp==='token',isLinkedElsewhere:()=>false,
+   confirmAction:()=>true,notify:()=>{},catalogFetch:async()=>({})
+  });
+  await assert.rejects(sync.upload('cuenta-uno','token'),/No hay conexión/);
+  assert.equal(reads,0);assert.equal(writes,0);
+  assert.equal(data.pending.length,1);
+ }finally{
+  if(old===undefined)delete globalThis.navigator;
+  else Object.defineProperty(globalThis,'navigator',{value:old,configurable:true});
+ }
+});
+test('Intentar sincronizar otro perfil o cuenta aborta antes de contactar Supabase',async()=>{
+ const data=defaultData();data.cloudUserId='cuenta-uno';
+ let reads=0,writes=0;
+ const sync=createCloudSync({
+  remote:{from:()=>{reads++;throw Error('Consulta inesperada')}},
+  getState:()=>({data,profileName:'Offline'}),mutate:async()=>{writes++},
+  refresh:()=>{},isCurrent:(uid,stamp)=>uid==='cuenta-uno'&&stamp==='token',
+  isLinkedElsewhere:()=>false,confirmAction:()=>true,notify:()=>{},catalogFetch:async()=>({})
+ });
+ await assert.rejects(sync.upload('cuenta-dos','token'),/Cambió la cuenta o el perfil/);
+ await assert.rejects(sync.upload('cuenta-uno','token-antiguo'),/Cambió la cuenta o el perfil/);
+ assert.equal(reads,0);assert.equal(writes,0);
+});
