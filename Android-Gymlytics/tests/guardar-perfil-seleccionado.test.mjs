@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const read=name=>readFileSync(new URL('../web/'+name,import.meta.url),'utf8');
 const offline=read('offline-first.js'),app=read('app.js');
-test('Perfil editable y prueba tienen mensajes diferentes al guardar',()=>{
+test('Perfil offline editable, incluido el de prueba, conserva estados de guardado',()=>{
  assert.match(offline,/const writeStatus=\(\)=>\{/);
- assert.match(offline,/code:'read_only'/);
+ assert.doesNotMatch(offline,/code:'read_only'/);
  assert.match(offline,/code:'ready'/);
  assert.match(offline,/code:'loading'/);
  assert.match(offline,/code:'switching'/);
