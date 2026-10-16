@@ -543,6 +543,18 @@ function renderConflictButtons(){
  holder.replaceChildren();
  for(const c of latest?.data?.conflicts||[]){
   const box=document.createElement('div');box.className='offline-conflict';
+  if(c.kind==='reference_conflict'){
+   const info=document.createElement('p');
+   info.textContent='La referencia compartida cambió en la nube ('+c.refId+'). Se conservó tu versión offline para no reemplazarla sin autorización.';
+   const keep=document.createElement('button');keep.type='button';
+   keep.textContent='Entendido, conservar datos locales';
+   keep.addEventListener('click',async()=>{
+    try{
+     await flush(data=>{data.conflicts=data.conflicts.filter(x=>!(x.kind==='reference_conflict'&&x.refId===c.refId));});
+     renderConflictButtons();
+    }catch(error){status('No se pudo confirmar el aviso: '+error.message);}
+   });box.append(info,keep);holder.append(box);continue;
+  }
   if(c.kind==='catalog_conflict'){
    const info=document.createElement('p');
    info.textContent='Conflicto de catálogo ('+c.catalogKind+') · '+c.reason+
