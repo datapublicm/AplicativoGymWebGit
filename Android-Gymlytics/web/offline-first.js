@@ -435,6 +435,10 @@ const api={
    throw Error('La fotografía no pudo codificarse de forma segura');
   await flush(data=>{
    data.photoPayloads??={};data.photoVersions??={};data.photos??={};
+   // Una nueva foto escogida por el usuario permite copiarla al perfil personal
+   // sin heredar la revisión de la cuenta de prueba descargada.
+   if(data.cloudUserId&&data.photoVersions[key]?.ownerId&&
+      data.photoVersions[key].ownerId!==data.cloudUserId)delete data.photoVersions[key];
    // Los envíos ya intentados conservan su archivo inmutable.
    for(const job of [...data.pending]){
     if(job.kind==='photo'&&job.photoKey===key&&!job.submittedRequest){
@@ -573,6 +577,33 @@ function renderConflictButtons(){
  holder.replaceChildren();
  for(const c of latest?.data?.conflicts||[]){
   const box=document.createElement('div');box.className='offline-conflict';
+  if(c.kind==='photo_conflict'){
+   const info=document.createElement('p');
+   info.textContent='Conflicto de fotografía. La imagen guardada en este dispositivo se conserva; Supabase no ha sido sobrescrito.';
+   const keep=document.createElement('button');keep.type='button';
+   keep.textContent='Conservar mi fotografía offline';
+   keep.addEventListener('click',async()=>{
+    const uid=remoteSession?.user?.id;
+    const personal=cloudAccountKind==='personal'&&latest?.data?.cloudUserId===uid;
+    if(personal&&!confirm('La fotografía remota es diferente. ¿Preparar tu versión local para reemplazarla en la próxima actualización de Supabase?'))return;
+    try{
+     await flush(data=>{
+      if(personal){
+       if(c.currentRevision)data.photoVersions[c.photoKey]={revision:c.currentRevision,ownerId:uid};
+       else delete data.photoVersions[c.photoKey];
+       for(const op of data.pending.filter(x=>x.kind==='photo'&&x.photoKey===c.photoKey)){
+        delete op.submittedRequest;delete op.attemptedAt;
+       }
+       // Si el conflicto provino de una descarga sin modificaciones en cola,
+       // no se subirá nada hasta que la persona vuelva a guardar la foto.
+      }
+      data.conflicts=data.conflicts.filter(x=>!(x.kind==='photo_conflict'&&x.photoKey===c.photoKey));
+     });
+     renderConflictButtons();
+     status(personal?'Fotografía local conservada. Podrás sincronizarla tras volver a guardar o mediante Actualizar si ya estaba pendiente.':'Fotografía local conservada. Cuenta de prueba: la nube permanece intacta.');
+    }catch(error){status('No se pudo revisar la fotografía: '+error.message);}
+   });box.append(info,keep);holder.append(box);continue;
+  }
   if(c.kind==='reference_conflict'){
    const info=document.createElement('p');
    info.textContent='La referencia compartida cambió en la nube ('+c.refId+'). Se conservó tu versión offline para no reemplazarla sin autorización.';
