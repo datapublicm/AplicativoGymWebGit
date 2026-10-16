@@ -155,9 +155,12 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
     });
    }
    // Subir imagen versionada y confirmar su relación sin sobrescribir silenciosamente.
-   const photoPlan=photoJobPlan(getState().data,uid);
-   for(const pending of photoPlan.ops){
+   let photoAttempts=0;
+   while(true){
     validate(uid,stamp);
+    const pending=photoJobPlan(getState().data,uid).ops[0];
+    if(!pending)break;
+    if(++photoAttempts>5000)throw Error('Cola de fotografías demasiado extensa');
     const request=pending.request;
     await mutate(local=>{
      validate(uid,stamp);
