@@ -1,3 +1,4 @@
+import {catalogSnapshot} from './catalog-sync-engine.js';
 // Transformación pura de tablas Supabase a catálogos offline. Sin escritura remota.
 export const emptyCatalogue=()=>({baseCatalog:[],muscles:[],custom:[],library:[],
  entities:{gyms:[],sites:[],machines:[],options:[]}});
@@ -5,10 +6,11 @@ const name=v=>String(v??'').trim();
 export function prepareDownloadedCatalog({base=[],exercises=[],gyms=[],sites=[],machines=[],options=[],muscles=[]}={}){
  const byGym=new Map(gyms.map(x=>[x.id,name(x.nombre)]));
  const bySite=new Map(sites.map(x=>[x.id,name(x.nombre)]));
- const entities={gyms:gyms.map(x=>({id:x.id,nombre:x.nombre})),
-  sites:sites.map(x=>({id:x.id,nombre:x.nombre,gimnasio_id:x.gimnasio_id})),
-  machines:machines.map(x=>({id:x.id,nombre:x.nombre,tipo_equipo:x.tipo_equipo})),
-  options:options.map(x=>({id:x.id,nombre:x.nombre,tipo:x.tipo}))};
+ const personal=(kind,x,values)=>({...values,cloudOwnerId:x.user_id,cloudSnapshot:catalogSnapshot(kind,x)});
+ const entities={gyms:gyms.filter(x=>x.activo!==false).map(x=>personal('gym',x,{id:x.id,nombre:x.nombre})),
+  sites:sites.filter(x=>x.activo!==false).map(x=>personal('site',x,{id:x.id,nombre:x.nombre,gimnasio_id:x.gimnasio_id})),
+  machines:machines.filter(x=>x.activo!==false).map(x=>personal('machine',x,{id:x.id,nombre:x.nombre,tipo_equipo:x.tipo_equipo})),
+  options:options.filter(x=>x.activo!==false).map(x=>personal('option',x,{id:x.id,nombre:x.nombre,tipo:x.tipo}))};
  const baseCatalog=base.filter(x=>x.activo!==false).map(x=>{
   const equipment=name(x.instrumento);
   const kind=/máquina|maquina|freemotion|estación|polea|hack|peck deck/i.test(equipment)?'Máquina':
@@ -23,7 +25,7 @@ export function prepareDownloadedCatalog({base=[],exercises=[],gyms=[],sites=[],
  const active=exercises.filter(x=>x.activo!==false);
  const library=active.filter(x=>!x.gimnasio_id||!x.sede_id).map(x=>({
   id:x.id,nombre:x.nombre,origen:x.origen,zona_entrenamiento:x.zona_entrenamiento,
-  tecnica_actualizada:x.tecnica_actualizada
+  tecnica_actualizada:x.tecnica_actualizada,cloudOwnerId:x.user_id,cloudSnapshot:catalogSnapshot('exercise',x)
  }));
  const custom=active.filter(x=>x.gimnasio_id&&x.sede_id).map(x=>({
   cloud_id:x.id,g:byGym.get(x.gimnasio_id)||'',s:bySite.get(x.sede_id)||'',
@@ -40,22 +42,27 @@ export function prepareDownloadedCatalog({base=[],exercises=[],gyms=[],sites=[],
 // Si una misma entidad existe localmente, prevalece su valor local;
 // las nuevas referencias de la nube se incorporan después.
 export function mergeDownloadedCatalog(local,download){
- const union=(existing=[],incoming=[],keys=[])=>{
+ const removed=new Set((local.tombstones||[]).filter(x=>x.catalogKind).map(x=>x.catalogKind+':'+x.localId));
+ const dirty=new Set((local.pending||[]).filter(x=>x.catalogKind).map(x=>x.catalogKind+':'+x.localId));
+ const union=(existing=[],incoming=[],keys=[],kind='')=>{
   const result=structuredClone(existing);
   const key=row=>keys.map(k=>name(row[k]).toLocaleLowerCase('es')).join('|');
-  const ids=new Set(result.map(x=>String(x.id||x.cloud_id||x.cloud_base_id||'')));
-  const names=new Set(result.map(key));
   for(const item of incoming){
    const id=String(item.id||item.cloud_id||item.cloud_base_id||'');
-   const signature=key(item);
-   if(id&&ids.has(id)||signature&&names.has(signature))continue;
-   result.push(structuredClone(item));if(id)ids.add(id);if(signature)names.add(signature);
+   if(kind&&removed.has(kind+':'+id))continue;
+   const index=result.findIndex(x=>id&&String(x.id||x.cloud_id||x.cloud_base_id||'')===id);
+   if(index>=0){
+    if(!dirty.has(kind+':'+id))result[index]=structuredClone(item);
+    continue;
+   }
+   if(result.some(x=>key(x)===key(item)))continue;
+   result.push(structuredClone(item));
   }
   return result;
  };
  const current=local.entities||emptyCatalogue().entities;
  const fetched=download.entities;
- const gyms=union(current.gyms,fetched.gyms,['nombre']);
+ const gyms=union(current.gyms,fetched.gyms,['nombre'],'gym');
  // Un gimnasio existente puede tener otro UUID local. Reasociar las sedes
  // descargadas evita referencias huérfanas y conserva la estructura offline.
  const remap=new Map(fetched.gyms.map(g=>{
@@ -64,15 +71,15 @@ export function mergeDownloadedCatalog(local,download){
  }));
  const remoteSites=fetched.sites.map(x=>({...x,gimnasio_id:remap.get(x.gimnasio_id)||x.gimnasio_id}));
  return {
-  baseCatalog:union(local.baseCatalog,download.baseCatalog,['g','s','e','i','a','gr','z']),
-  muscles:union(local.muscles,download.muscles,['nombre']),
-  custom:union(local.custom,download.custom,['g','s','i','e','a','gr']),
-  library:union(local.library,download.library,['nombre']),
+  baseCatalog:union(local.baseCatalog,download.baseCatalog,['g','s','e','i','a','gr','z'],'base'),
+  muscles:union(local.muscles,download.muscles,['nombre'],'muscle'),
+  custom:union(local.custom,download.custom,['g','s','i','e','a','gr'],'custom'),
+  library:union(local.library,download.library,['nombre'],'exercise'),
   entities:{
    gyms,
-   sites:union(current.sites,remoteSites,['nombre','gimnasio_id']),
-   machines:union(current.machines,fetched.machines,['nombre','tipo_equipo']),
-   options:union(current.options,fetched.options,['tipo','nombre'])
+   sites:union(current.sites,remoteSites,['nombre','gimnasio_id'],'site'),
+   machines:union(current.machines,fetched.machines,['nombre','tipo_equipo'],'machine'),
+   options:union(current.options,fetched.options,['tipo','nombre'],'option')
   }
  };
 }
