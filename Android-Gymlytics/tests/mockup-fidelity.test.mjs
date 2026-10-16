@@ -33,7 +33,7 @@ test('La compilación web verifica que empaquete los archivos reales del mockup'
   assert.ok(vite.includes("'"+id+"'"),id);
  assert.match(vite,/source\.equals\(output\)/);
  assert.match(vite,/throw Error\('El APK empaquetaría una versión antigua/);
- assert.match(sw,/gymlytics-perfiles-descarga-20261015-v05/);
+ assert.match(sw,/gymlytics-bloques-perfil-catalogo-fotos-20261016-v06/);
 });
 test('Se mantienen Tablas y Dashboard independientes, sin cambiar su vista',()=>{
  assert.match(html,/id="page-tablas"/);
@@ -43,7 +43,7 @@ test('Se mantienen Tablas y Dashboard independientes, sin cambiar su vista',()=>
 
 test('Catálogo deja claros los valores de referencia y los personales',()=>{
  assert.match(app,/select\.title=select\.selectedOptions\?\.\[0\]\?\.textContent/);
- assert.match(app,/Referencia: puedes consultarla, pero no modificarla ni eliminarla\./);
+ assert.match(app,/Referencia compartida: puedes modificarla u ocultarla solo en este perfil offline\./);
  assert.match(app,/Elemento personal: puedes modificarlo o eliminarlo\./);
  assert.match(app,/select\.value\.startsWith\('base:'\)/);
 });
