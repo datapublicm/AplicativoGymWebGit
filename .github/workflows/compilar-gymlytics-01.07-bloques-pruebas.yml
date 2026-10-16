@@ -1,0 +1,125 @@
+# APK aislada de pruebas para Bloques 1–4. No altera main, apk/pruebas ni la versión principal.
+name: Gymlytics 01.07 - APK Pruebas Bloques 1-4
+on:
+  push:
+    branches:
+      - cambios/gymlytics-perfil-catalogo-20261016
+    paths:
+      - .github/workflows/compilar-gymlytics-01.07-bloques-pruebas.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compilar-apk-aislada:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        working-directory: Android-Gymlytics
+    env:
+      VITE_SUPABASE_URL: https://jasuqnxrskhqfobsazwd.supabase.co
+      VITE_SUPABASE_SCHEMA: sch_android_gymlytics
+      VITE_GYMLYTICS_ENVIRONMENT: pruebas
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_sQH_z37OD2mzNMoL4M3Lwg_jF8Lpmx2
+      VITE_GYMLYTICS_RECOVERY_URL: ''
+    steps:
+      - name: Obtener exclusivamente la rama aislada
+        uses: actions/checkout@v4
+        with:
+          ref: cambios/gymlytics-perfil-catalogo-20261016
+      - name: Proteger la versión principal
+        run: |
+          test "${GITHUB_REF_NAME}" = "cambios/gymlytics-perfil-catalogo-20261016"
+          test ! -d android/app
+          test -f android/README.md
+          node -e 'const p=require("./package.json"),c=require("./capacitor.config.json");if(p.name!=="gymlytics"||p.version!=="0.1.6"||c.appId!=="com.datapublicm.gymlytics")process.exit(1)'
+      - name: Preparar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preparar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Configurar SDK Android
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          test -x "$SDK/cmdline-tools/latest/bin/sdkmanager"
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+      - name: Ejecutar 288 pruebas de regresión
+        run: npm run test:static
+      - name: Instalar dependencias de la APK
+        run: npm install --no-package-lock --no-audit --no-fund
+      - name: Comprobar versión de Supabase JS
+        run: node -e 'if(require("./node_modules/@supabase/supabase-js/package.json").version!=="2.76.1")process.exit(1)'
+      - name: Construir recursos web reales
+        run: |
+          npm run build:web
+          test -s dist/index.html
+          for name in app.js dashboard.js offline-first.js offline-catalog-download.js profile-policy.js cloud-sync.js catalog-sync-engine.js reference-overrides.js photo-sync-engine.js sync-engine.js legacy-compat.js sw.js; do
+            test -s "dist/$name"
+          done
+          grep -q 'id="catalogCompactRows"' dist/index.html
+          grep -q 'id="registroModoSubdivision"' dist/index.html
+      - name: Comprobar IndexedDB y arranque offline en Chromium
+        run: node tools/verificar-integridad-offline.mjs
+      - name: Preparar paquete separado y nombre de pruebas
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs'),f='capacitor.config.json';
+          const c=JSON.parse(fs.readFileSync(f,'utf8'));
+          if(c.appId!=='com.datapublicm.gymlytics')throw Error('ID inesperado');
+          c.appId='com.datapublicm.gymlytics.pruebas.bloques';
+          c.appName='Gymlytics 01.07 Pruebas';
+          fs.writeFileSync(f,JSON.stringify(c,null,2)+'\n');
+          NODE
+      - name: Crear proyecto Android temporal
+        run: |
+          test "$(find android -mindepth 1 -maxdepth 1 | wc -l)" -eq 1
+          mv android/README.md android-notas-de-plataforma.txt
+          rmdir android
+          npx cap add android
+          npx cap sync android
+          for name in app.js dashboard.js offline-first.js offline-catalog-download.js profile-policy.js cloud-sync.js catalog-sync-engine.js reference-overrides.js photo-sync-engine.js sync-engine.js legacy-compat.js; do
+            test -s "android/app/src/main/assets/public/$name"
+          done
+      - name: Establecer versión Android 01.07
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs'),f='android/app/build.gradle';
+          let text=fs.readFileSync(f,'utf8');
+          if(!/versionCode\s+\d+/.test(text)||!/versionName\s+["'][^"']+["']/.test(text))throw Error('No se encontró la versión Android');
+          text=text.replace(/versionCode\s+\d+/,'versionCode 7')
+                   .replace(/versionName\s+["'][^"']+["']/,'versionName "01.07"');
+          fs.writeFileSync(f,text);
+          NODE
+      - name: Compilar APK debug
+        working-directory: Android-Gymlytics/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace assembleDebug
+      - name: Verificar contenido, identidad y firma del APK
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          for name in app.js offline-first.js catalog-sync-engine.js reference-overrides.js photo-sync-engine.js; do
+            unzip -Z1 "$APK" | grep -Fxq "assets/public/$name"
+          done
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep '^package:' | tee /tmp/gymlytics-apk-identity.txt
+          grep -q "name='com.datapublicm.gymlytics.pruebas.bloques'" /tmp/gymlytics-apk-identity.txt
+          grep -q "versionCode='7'" /tmp/gymlytics-apk-identity.txt
+          grep -q "versionName='01.07'" /tmp/gymlytics-apk-identity.txt
+          mkdir -p entregables
+          cp "$APK" entregables/Gymlytics_01.07_Pruebas_Bloques1-4.apk
+          (cd entregables && sha256sum Gymlytics_01.07_Pruebas_Bloques1-4.apk > SHA256.txt)
+          ls -lh entregables/
+      - name: Publicar APK aislado de pruebas
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gymlytics_01.07_Pruebas_Bloques1-4_APK
+          path: Android-Gymlytics/entregables/
+          if-no-files-found: error
+          retention-days: 30
