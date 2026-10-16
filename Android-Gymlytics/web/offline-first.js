@@ -181,6 +181,7 @@ function renderProfileControls(){
  const control=$('offlineRenameName');if(control)control.value=latest?.name||'';
  const count=$('offlineProfileCount');
  if(count)count.textContent=profiles.length+' perfiles locales independientes';
+ const del=document.querySelector('[data-profile-action="delete"]');if(del)del.disabled=profiles.length<2;
  const hint=$('offlineReadOnlyWarning');if(hint)hint.hidden=true;
  document.querySelectorAll('#page-catalogos [data-catalog-quick],#page-catalogos .catalog-compact-toggle,#page-catalogos [data-catalog-modify],#page-catalogos .catalog-form button[type=submit],#page-registro #saveRecords,#page-registro #clearSeries,#page-registro #addSeriesGroup,#page-registro #removeSeriesGroup').forEach(b=>{b.disabled=false;b.title='';});
 }
@@ -202,6 +203,25 @@ async function renameProfile(){
  status('Perfil renombrado sin modificar registros ni vínculos de nube.');
 }
 
+async function deleteActiveProfile(){
+ if(transitioning||syncController?.isBusy())throw Error('Termina la operación actual.');
+ if(profiles.length<2)throw Error('No se puede eliminar el único perfil local.');
+ const deleting=activeId,profile=await get(deleting),replacement=profiles.find(x=>x.id!==deleting);
+ if(!profile||!replacement)throw Error('No hay otro perfil disponible.');
+ if(!confirm('¿Eliminar definitivamente el perfil local «'+profile.name+'» y todos sus datos guardados en este dispositivo? Esta acción no elimina datos de Supabase. Se recomienda respaldarlo antes.'))return false;
+ if(deleting!==activeId||transitioning||syncController?.isBusy())throw Error('El perfil cambió; no se eliminó nada.');
+ // Activar primero el destino: se terminan guardados pendientes y se invalida
+ // la sesión de nube antes de borrar el perfil saliente.
+ await activate(replacement.id);
+ await requestFrom('profiles','readwrite',store=>store.delete(deleting));
+ profiles=(await all()).map(profileMeta);
+ const select=$('offlineProfiles');
+ select.replaceChildren(...profiles.map(x=>new Option(x.name,x.id)));
+ select.value=replacement.id;
+ renderProfileControls();
+ status('Perfil eliminado únicamente de este dispositivo. La cuenta en Supabase, si existe, no ha cambiado.');
+ return true;
+}
 function catalogUpdate(){
  window.GymBaseCatalog=catalogInit();
  window.GymEntities=structuredClone(latest.data.entities);
@@ -783,6 +803,11 @@ async function init(){
  $('offlineProfileMenuToggle')?.addEventListener('click',()=>{$('offlineProfileMenu').hidden=!$('offlineProfileMenu').hidden;});
  document.querySelectorAll('[data-profile-action]').forEach(button=>button.addEventListener('click',()=>{
   const action=button.dataset.profileAction;
+  if(action==='delete'){
+   $('offlineProfileMenu').hidden=true;
+   deleteActiveProfile().catch(error=>status('No se pudo eliminar el perfil: '+error.message));
+   return;
+  }
   $('offlineNewProfileFields').hidden=action!=='add';$('offlineRenameProfileFields').hidden=action!=='rename';
   $('offlineProfileMenu').hidden=true;(action==='add'?$('offlineNewName'):$('offlineRenameName')).focus();
  }));
