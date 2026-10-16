@@ -7,7 +7,7 @@ import {createCloudSync} from './cloud-sync.js';
 import {profileMeta,validateProfileName,validateProfileBinding,verifyRestoreBackup} from './profile-policy.js';
 import {prepareDownloadedCatalog} from './offline-catalog-download.js';
 import {materializeReferenceCatalog,parseReferenceId,setReferenceOverride,listReferenceChoices} from './reference-overrides.js';
-import {photoLocalKey} from './photo-sync-engine.js';
+import {photoLocalKey,migrateLegacyPhotoJobs} from './photo-sync-engine.js';
 const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
  records:[],photos:{},photoVersions:{},photoPayloads:{},baseCatalog:[],referenceOverrides:{},muscles:[],custom:[],library:[],readOnly:false,demo:false,
@@ -77,7 +77,9 @@ function status(message){$('authStatus').textContent=message;}
 function renderSyncStatus(){
  if(!latest)return;
  const data=latest.data,counts=(data.pending||[]).length,deleted=(data.tombstones||[]).length;
- $('offlinePending').textContent=counts+' operaciones pendientes · '+deleted+' eliminaciones conservadas';
+ const oldPhotos=(data.pending||[]).filter(x=>x.kind==='photo'&&!x.photoKey).length;
+ $('offlinePending').textContent=counts+' operaciones pendientes · '+deleted+' eliminaciones conservadas'+
+  (oldPhotos?' · '+oldPhotos+' fotos antiguas necesitan volver a seleccionarse':'');
  $('offlineProfileInfo').textContent=(data.demo?'PRUEBA · EDICIÓN LOCAL · ':'Perfil offline · ')+latest.name+' · '+data.records.length+' series visibles';
  $('offlineConflictSummary').textContent=(data.conflicts||[]).length+' conflictos por revisar';
  $('offlineSyncState').textContent=data.demo&&!data.cloudUserId?'Cuenta de prueba descargada: puedes agregar, modificar y eliminar datos offline.':
@@ -128,7 +130,12 @@ async function activate(id,initial=false){
   const p=await get(id);
   if(!p||epoch!==profileEpoch)throw Error('No se pudo abrir el nuevo perfil.');
   // Migración segura: la restricción de la cuenta de prueba solo afecta a Supabase.
-  if(p.data?.readOnly){p.data.demo=true;p.data.readOnly=false;p.data.cloudUserId=null;await put(p);}
+  if(p.data?.readOnly){p.data.demo=true;p.data.readOnly=false;p.data.cloudUserId=null;}
+  // Convertir fotografías JPEG pendientes de la versión anterior sin perder archivos.
+  // Las anatómicas antiguas sin vista identificable quedan intactas y requieren
+  // que se seleccione nuevamente la vista: nunca adivinar frontal/posterior.
+  const legacyPhotos=migrateLegacyPhotoJobs(p.data);
+  if(legacyPhotos.converted||legacyPhotos.removed||p.data?.readOnly)await put(p);
   activeId=id;latest=p;profiles=(await all()).map(profileMeta);
   $('offlineProfiles').replaceChildren(...profiles.map(x=>new Option(x.demo?'◌ '+x.name+' · prueba':x.name,x.id)));
   $('offlineProfiles').value=id;
