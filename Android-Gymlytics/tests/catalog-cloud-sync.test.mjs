@@ -76,3 +76,15 @@ test('Descarga conserva dueño, baseline y relación sede-gimnasio',()=>{
  assert.equal(cloud.entities.sites[0].cloudSnapshot.gimnasio_id,g);
  assert.deepEqual(catalogSnapshot('site',cloud.entities.sites[0]),cloud.entities.sites[0].cloudSnapshot);
 });
+
+test('Migración antigua con modificación sin baseline: no subir hasta revisión explícita',()=>{
+ const d=state();d.entities.gyms=[{id:g,nombre:'Mi edición antigua'}];
+ d.pending=[pending(o,'update_catalog',g,'gym')];
+ const cloud=prepareDownloadedCatalog({gyms:[{id:g,user_id:uid,nombre:'Nombre remoto',activo:true}]});
+ const merged=mergeDownloadedCatalog(d,cloud);
+ assert.equal(merged.entities.gyms[0].nombre,'Mi edición antigua');
+ assert.equal(merged.entities.gyms[0].cloudSnapshot.nombre,'Nombre remoto');
+ assert.equal(merged.catalogWarnings.length,1);
+ assert.equal(merged.catalogWarnings[0].kind,'catalog_conflict');
+ assert.equal(d.entities.gyms[0].cloudSnapshot,undefined,'la fusión original no se modifica');
+});
