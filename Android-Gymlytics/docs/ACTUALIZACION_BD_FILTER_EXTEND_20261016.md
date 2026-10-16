@@ -43,3 +43,41 @@
 
 - Probar una descarga manual de catálogo con una cuenta autenticada real en Android; no se provocaron cambios artificiales en datos personales.
 - Validar visualmente en teléfono la nueva variante y la eliminación de la opción antigua.
+
+
+## Revisión posterior: 27 columnas reales y etiquetas de Gymlytics
+La hoja BD_Filter_Extend tiene **27 columnas (A:AA)** y **9.432 registros**. Se completó la copia en `stg_gymlytics_excel_20261016`: 27 campos fuente, más la proyección adicional `zona_entrenamiento` que procede de Anotación (P).
+
+| Columna | Encabezado exacto Excel | Campo de Supabase | Gymlytics |
+|---|---|---|---|
+| A | Categoria | categoria | Metadato |
+| B | Subcategoria | subcategoria | Metadato |
+| C | NroGeneral | nro_general | Metadato |
+| D | Nro | nro_registro | Metadato |
+| E | Id | id_origen | Identificador de fuente |
+| F | Dia semana | dia_semana | Metadato |
+| G | Fecha y hora | fecha_hora_excel | Metadato |
+| H | Dia | dia | Metadato |
+| I | Hora | hora | Metadato |
+| J | Emisor | emisor | Metadato |
+| K | Mensaje | mensaje | Metadato |
+| L | Gimnasio | gimnasio | Selector |
+| M | Sede | sede | Selector |
+| N | Agrupación | agrupacion | Conservado; sin selector nuevo |
+| O | Anotación (Q sera borrada) | anotacion_antigua | Histórico |
+| P | Anotación | anotacion y zona_entrenamiento | Selector Anotación |
+| Q | Instrumento | instrumento | Selector |
+| R | Ejercicio | ejercicio | Selector |
+| S | Agarre / Implemento | accesorio_implemento | Selector |
+| T | Tecnica | tecnica_original | Histórico |
+| U | Tecnica_Actualizada | tecnica_actualizada | Selector Técnica actualizada |
+| V | Numero Serie | numero_serie | Número de serie |
+| W | Subdivision | subdivision | Subdivisiones |
+| X | Peso | peso | Peso |
+| Y | Repeticiones | repeticiones | Repeticiones |
+| Z | Asistencia / Pausa | asistencias | Campo de apoyo |
+| AA | Otros Detalles | otros_detalles | Metadato |
+
+**Verificación SQL:** 9.432 filas e identificadores de origen, 12/12 metadatos adicionales presentes, cero cambios en campos musculares existentes.
+**Correcciones en la rama 01.08:** se retiraron cuatro etiquetas antiguas «AnotaciónV2»; ahora se muestra «Anotación» para P y «Técnica actualizada» para U. No se modificó el orden de los controles, los músculos ni la APK 01.07 vigente.
+Las 27 columnas son las de la fuente Excel, no 27 campos obligatorios en el formulario Android. Los metadatos quedan preservados en Supabase.
