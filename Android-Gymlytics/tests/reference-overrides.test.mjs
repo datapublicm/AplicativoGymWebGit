@@ -84,3 +84,27 @@ test('Identificadores invalidos o ajenos no se modifican',()=>{
  assert.throws(()=>setReferenceOverride(rows,{},referenceId('site','No existe','Smart Fit'),{deleted:true}),/no pertenece/);
  assert.throws(()=>setReferenceOverride(rows,{},'base:abc',{name:'Otro'}),/no pertenece/);
 });
+
+test('Una descarga posterior preserva renombrados y nuevas referencias',async()=>{
+ const {mergeDownloadedCatalog,emptyCatalogue}=await import('../web/offline-catalog-download.js');
+ const map=setReferenceOverride(rows,{},gym,{name:'Smart Fit Gold'});
+ const offline={...emptyCatalogue(),baseCatalog:structuredClone(rows),referenceOverrides:map,
+  pending:[],tombstones:[],conflicts:[]};
+ const downloaded={...emptyCatalogue(),baseCatalog:[...structuredClone(rows),
+  {cloud_base_id:'d',g:'Evolution',s:'Sede Sur',z:'Piernas',kind:'Máquina',i:'Sentadilla',a:'No especificado',gr:'No especificado',e:'Sentadilla',t:['Controlado']}]};
+ const merged=mergeDownloadedCatalog(offline,downloaded);
+ const updated=materializeReferenceCatalog(merged.baseCatalog,map);
+ assert.equal(updated.filter(x=>x.g==='Smart Fit Gold').length,2);
+ assert.equal(updated.some(x=>x.s==='Sede Sur'),true);
+});
+test('Una referencia modificada en Supabase conserva la versión local y crea aviso',async()=>{
+ const {mergeDownloadedCatalog,emptyCatalogue}=await import('../web/offline-catalog-download.js');
+ const map=setReferenceOverride(rows,{},gym,{name:'Smart Fit Gold'});
+ const offline={...emptyCatalogue(),baseCatalog:structuredClone(rows),referenceOverrides:map,
+  pending:[],tombstones:[],conflicts:[]};
+ const changed=structuredClone(rows);changed[0].g='Smart Fit Plus';
+ const merged=mergeDownloadedCatalog(offline,{...emptyCatalogue(),baseCatalog:changed});
+ assert.equal(merged.baseCatalog[0].g,'Smart Fit');
+ assert.equal(merged.catalogWarnings[0].kind,'reference_conflict');
+ assert.equal(materializeReferenceCatalog(merged.baseCatalog,map)[0].g,'Smart Fit Gold');
+});
