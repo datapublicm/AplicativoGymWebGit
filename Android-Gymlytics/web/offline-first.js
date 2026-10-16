@@ -328,14 +328,17 @@ const api={
   assertEditable();
   name=tidy(name);if(!name)throw Error('Introduce el nombre nuevo');
   await flush(data=>{
-   const list=kind==='exercise'?data.library:data.entities[groups[kind]];
+   const list=kind==='exercise'
+    ?(data.library.some(x=>String(x.id)===String(id))?data.library:data.custom)
+    :data.entities[groups[kind]];
    if(!list)throw Error('Categoría inválida');
-   const item=list.find(x=>x.id===id);
+   const item=list.find(x=>String(x.id||x.cloud_id)===String(id));
    if(!item)throw Error('No se encontró el elemento personal');
    if(list.some(x=>x.id!==id&&tidy(x.nombre).toLocaleLowerCase('es')===name.toLocaleLowerCase('es')&&
      (kind!=='site'||x.gimnasio_id===item.gimnasio_id)&&
      (kind!=='option'||x.tipo===item.tipo)))throw Error('Ya existe otro elemento con ese nombre');
    item.nombre=name;
+   if(kind==='exercise'&&item.cloud_id)item.e=name;
    // Un intento con conflicto NO quedó confirmado: la nueva edición habilita
    // reintento con UUID nuevo sin reutilizar la solicitud anterior.
    const conflicted=data.conflicts?.some(x=>x.kind==='catalog_conflict'&&x.catalogKind===kind&&x.localId===id);
@@ -351,9 +354,11 @@ const api={
  async deleteCatalogItem(kind,id){
   assertEditable();
   await flush(data=>{
-   const list=kind==='exercise'?data.library:data.entities[groups[kind]];
+   const list=kind==='exercise'
+    ?(data.library.some(x=>String(x.id)===String(id))?data.library:data.custom)
+    :data.entities[groups[kind]];
    if(!list)throw Error('Categoría inválida');
-   const idx=list.findIndex(x=>String(x.id)===String(id));
+   const idx=list.findIndex(x=>String(x.id||x.cloud_id)===String(id));
    if(idx<0)throw Error('No se encontró el elemento personal');
    const removed=structuredClone(list[idx]);
    if(kind==='gym'&&data.entities.sites.some(x=>x.gimnasio_id===id))
@@ -524,7 +529,9 @@ function renderConflictButtons(){
      try{
       await flush(data=>{
        const group={gym:'gyms',site:'sites',machine:'machines',option:'options',exercise:'library'}[c.catalogKind];
-       const row=c.catalogKind==='exercise'?data.library.find(x=>x.id===c.localId):data.entities[group]?.find(x=>x.id===c.localId);
+       const row=c.catalogKind==='exercise'
+        ?data.library.find(x=>x.id===c.localId)||data.custom.find(x=>String(x.id||x.cloud_id)===c.localId)
+        :data.entities[group]?.find(x=>x.id===c.localId);
        const tomb=data.tombstones.find(x=>x.catalogKind===c.catalogKind&&x.localId===c.localId);
        if(!row&&!tomb)throw Error('El elemento local ya no existe');
        const owner=row||tomb;owner.cloudSnapshot=structuredClone(c.current);
