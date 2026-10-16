@@ -1,6 +1,6 @@
-# Compilación 01.06 autorizada por el usuario el 2026-10-15; verificar empaquetado offline-first íntegro.
+# Recompilación correctiva 01.06 autorizada el 2026-10-15: corregir Guardar con perfil activo y validar APK.
 # Instalación paralela a 01.05, sin reemplazarla ni tocar main.
-name: Gymlytics - APK 01.06 Pruebas (instalación paralela)
+name: Gymlytics - APK 01.06 Corregida (instalación segura paralela)
 on:
   workflow_dispatch:
   push:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 jobs:
   compilar-apk:
-    name: Construir APK debug Gymlytics 01.06 aislado
+    name: Construir APK debug Gymlytics 01.06 corregida aislada
     if: github.ref == 'refs/heads/apk/pruebas'
     runs-on: ubuntu-latest
     timeout-minutes: 55
@@ -65,6 +65,8 @@ jobs:
           test -s dist/index.html
           test -s dist/legacy-compat.js
           test -s dist/offline-first.js
+          grep -q 'getWriteStatus:writeStatus' dist/offline-first.js
+          grep -q 'getWriteStatus' dist/app.js
           test -s dist/offline-catalog-download.js
           test ! -e dist/catalogo.js
           test -s dist/app.js
@@ -82,8 +84,9 @@ jobs:
           const file='capacitor.config.json';
           const config=JSON.parse(fs.readFileSync(file,'utf8'));
           if(config.appId!=='com.datapublicm.gymlytics') throw Error('Paquete base Android inesperado');
-          config.appId='com.datapublicm.gymlytics.pruebas';
-          config.appName='Gymlytics Pruebas';
+          // Firma debug efímera: instalación separada para no desinstalar la APK 01.06 previa.
+          config.appId='com.datapublicm.gymlytics.pruebas.corregida';
+          config.appName='Gymlytics Corregida';
           fs.writeFileSync(file,JSON.stringify(config,null,2)+'\n');
           NODE
       - name: Crear plataforma Android temporal
@@ -97,6 +100,8 @@ jobs:
           test -s android/app/src/main/assets/public/dashboard.js
           test -s android/app/src/main/assets/public/legacy-compat.js
           test -s android/app/src/main/assets/public/offline-first.js
+          grep -q 'getWriteStatus:writeStatus' android/app/src/main/assets/public/offline-first.js
+          grep -q 'getWriteStatus' android/app/src/main/assets/public/app.js
           test -s android/app/src/main/assets/public/offline-catalog-download.js
           test ! -e android/app/src/main/assets/public/catalogo.js
           test -s android/app/src/main/assets/public/app.js
@@ -133,17 +138,17 @@ jobs:
           unzip -Z1 "$APK" | grep -Fxq 'assets/public/index.html'
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep '^package:' | tee /tmp/gymlytics-package.txt
-          grep -q "name='com.datapublicm.gymlytics.pruebas'" /tmp/gymlytics-package.txt
+          grep -q "name='com.datapublicm.gymlytics.pruebas.corregida'" /tmp/gymlytics-package.txt
           grep -q "versionCode='6'" /tmp/gymlytics-package.txt
           grep -q "versionName='01.06'" /tmp/gymlytics-package.txt
           mkdir -p entregables
-          cp "$APK" entregables/Gymlytics_01.06_Pruebas.apk
-          (cd entregables && sha256sum Gymlytics_01.06_Pruebas.apk > SHA256.txt)
+          cp "$APK" entregables/Gymlytics_01.06_Pruebas_Corregida.apk
+          (cd entregables && sha256sum Gymlytics_01.06_Pruebas_Corregida.apk > SHA256.txt)
           ls -lh entregables/
       - name: Publicar APK para descarga
         uses: actions/upload-artifact@v4
         with:
-          name: Gymlytics_01.06_Pruebas_APK
+          name: Gymlytics_01.06_Pruebas_Corregida_APK
           path: Android-Gymlytics/entregables/
           if-no-files-found: error
           retention-days: 30
