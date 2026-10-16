@@ -63,7 +63,7 @@ Almacenamiento local · Nube opcional</div></aside>
   <div class="registro-field-grid">
     <label class="field"><span>Gimnasio <em>*</em></span><select id="gimnasio"></select></label>
     <label class="field"><span>Sede <em>*</em></span><select id="sede"></select></label>
-    <label class="field"><span>AnotaciónV2 <em>*</em></span><select id="zona" title="Columna de origen: AnotaciónV2"></select></label>
+    <label class="field"><span>Anotación <em>*</em></span><select id="zona" title="Origen Excel: Anotación (columna P)"></select></label>
     <div class="field"><label for="instrumento"><span>Instrumento <em>*</em></span></label><select id="instrumento" title="Columna de origen: Instrumento"></select>
       <details class="registro-secondary-control" id="registroTipoDetails"><summary>Tipo de equipo: <strong id="registroTipoLabel">Máquina</strong></summary>
         <div class="type-options" id="typeOptions"><label><input name="tipo" type="radio" value="Máquina"/><span>Máquina</span></label><label><input name="tipo" type="radio" value="Implemento libre"/><span>Implemento libre</span></label><label><input name="tipo" type="radio" value="Peso corporal"/><span>Peso corporal</span></label><label><input name="tipo" type="radio" value="Otro"/><span>Otro</span></label></div>
@@ -73,7 +73,7 @@ Almacenamiento local · Nube opcional</div></aside>
     <div class="field"><label for="implemento"><span>Agarre / Implemento</span></label><select id="implemento" title="Implemento del ejercicio"></select>
       <details class="registro-secondary-control" id="registroAgarreDetails"><summary>Especificar agarre</summary><label class="field" for="agarre"><span>Agarre específico</span><select id="agarre"></select></label></details>
     </div>
-    <div class="field"><label for="tecnica"><span>Técnica <em>*</em></span></label><select id="tecnica" title="Columna Tecnica_Actualizada"></select></div>
+    <div class="field"><label for="tecnica"><span>Técnica actualizada <em>*</em></span></label><select id="tecnica" title="Origen Excel: Tecnica_Actualizada (columna U)"></select></div>
     <label class="field"><span>Número de serie</span><select id="registroNumeroSerie" aria-label="Seleccionar serie para editar"></select></label>
     <label class="field"><span>Subdivisión</span><select id="registroModoSubdivision" aria-label="Tipo de subdivisión"><option value="normal">Sin subdivisiones</option><option value="sub">Subseries: Sub1 / Sub2</option><option value="lateral">Por lado: Derecha / Izquierda</option></select></label>
     <div class="field registro-subdiv-button"><span>Opciones de subdivisión</span><button type="button" class="outline-btn subdivision-toggle" id="toggleSubdivisions" aria-controls="splitOptions" aria-expanded="false">▱ Gestionar subdivisiones</button></div>
@@ -103,11 +103,11 @@ Almacenamiento local · Nube opcional</div></aside>
 <div class="history-filters">
 <label>Gimnasio<select id="historyGym" data-history-field="gym"></select></label>
 <label>Sede<select id="historySede" data-history-field="sede"></select></label>
-<label>AnotaciónV2<select id="historyZone" data-history-field="zone"></select></label>
+<label>Anotación<select id="historyZone" data-history-field="zone"></select></label>
 <label>Instrumento<select id="historyEquipment" data-history-field="equipment"></select></label>
 <label>Ejercicio<select id="historyExercise" data-history-field="exercise"></select></label>
 <label>Agarre / Implemento<select id="historyAccessory" data-history-field="accessory"></select></label>
-<label>Tecnica_Actualizada<select id="historyTechnique" data-history-field="technique"></select></label>
+<label>Técnica actualizada<select id="historyTechnique" data-history-field="technique"></select></label>
 <label>Número de serie<select id="historySeries" data-history-field="series"></select></label>
 <label>Subdivisión<select id="historySubdivision" data-history-field="subdivision"></select></label>
 <label>Desde<input id="historyDateFrom" type="date" aria-label="Fecha inicial del historial"/></label>
@@ -145,7 +145,7 @@ Almacenamiento local · Nube opcional</div></aside>
   <section class="dash-card"><h2>Ejercicios que destacan</h2><div id="dashTop"></div></section>
   <section class="dash-card"><h2>Ejercicios por revisar</h2><div id="dashReview"></div></section>
  </div>
- <section class="dash-card"><h2>Periodicidad por zona de entrenamiento</h2><p>Basada en AnotaciónV2, no es una estimación de trabajo muscular.</p><div id="dashZones"></div></section>
+ <section class="dash-card"><h2>Periodicidad por zona de entrenamiento</h2><p>Basada en Anotación, no es una estimación de trabajo muscular.</p><div id="dashZones"></div></section>
 </div>
 <div id="dash-progreso" class="dash-pane" role="tabpanel" hidden>
  <div class="dash-detail-filters">
