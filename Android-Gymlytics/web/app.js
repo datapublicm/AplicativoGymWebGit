@@ -873,8 +873,8 @@ function gymlyticsAnatomyDraw(){
  const r=chosenRow();if(!r)return;
  $('anatomyPrimary').textContent=anatomyData?.primary.length?anatomyData.primary.join(', '):(r.m||'Pendiente');$('anatomySecondary').textContent=anatomyData?.secondary.length?anatomyData.secondary.join(', '):(r.ms||'Pendiente');
  document.querySelectorAll('[data-anatomy-side]').forEach(b=>{let on=b.dataset.anatomySide===gymlyticsAnatomySide;b.classList.toggle('selected',on);b.setAttribute('aria-pressed',String(on))});
- const key='anatomia:'+gymlyticsAnatomySide+':'+r.e;
- const src=model.photos[key]||anatomyData?.photos['musculos:'+gymlyticsAnatomySide]||anatomyData?.images[gymlyticsAnatomySide];$('anatomyPhoto').hidden=!src;$('anatomyPhoto').removeAttribute('src');if(src)$('anatomyPhoto').src=src;
+ const key='anatomia:'+gymlyticsAnatomySide+':'+[r.g,r.s,r.i,r.e].join('|');
+ const src=model.photos[key]||model.photos['anatomia:'+gymlyticsAnatomySide+':'+r.e]||anatomyData?.photos['musculos:'+gymlyticsAnatomySide]||anatomyData?.images[gymlyticsAnatomySide];$('anatomyPhoto').hidden=!src;$('anatomyPhoto').removeAttribute('src');if(src)$('anatomyPhoto').src=src;
  $('anatomyEmpty').hidden=Boolean(src);
 }
 function gymlyticsAnatomyView(side){gymlyticsAnatomySide=side;gymlyticsAnatomyDraw()}
@@ -892,8 +892,8 @@ async function gymlyticsAnatomyUpload(event){
   if(!current())return;
   await window.GymCloud.uploadUserPhoto({exercise:r,technique:getValue('t'),type:'musculos',side,blob});
   if(!current())return;
-  model.photos['anatomia:'+side+':'+r.e]=canvas.toDataURL('image/jpeg',.78);
-  gymlyticsAnatomyDraw();toast('Foto anatómica guardada en Supabase ✓');
+  model.photos['anatomia:'+side+':'+[r.g,r.s,r.i,r.e].join('|')]=canvas.toDataURL('image/jpeg',.78);
+  gymlyticsAnatomyDraw();toast('Foto anatómica guardada offline ✓');
  }catch(error){if(current())toast('Error al guardar foto: '+error.message.slice(0,110));}
  finally{event.target.value='';}
 }
