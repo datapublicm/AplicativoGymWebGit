@@ -289,6 +289,17 @@ const api={
   if(!nombre||nombre.length>180)throw Error('Escribe un nombre válido');
   return flush(data=>{
    const target=data.entities[group];
+   // Si el gimnasio seleccionado es una referencia del catálogo base, crear
+   // su copia local antes de añadir la sede, conservando una relación por ID.
+   if(kind==='site'&&String(values.gimnasio_id||'').startsWith('base:')){
+    const gymName=tidy(String(values.gimnasio_id).slice(5));
+    if(!data.baseCatalog.some(row=>tidy(row.g).toLocaleLowerCase('es')===gymName.toLocaleLowerCase('es')))
+     throw Error('El gimnasio seleccionado no existe en el catálogo descargado');
+    let gym=data.entities.gyms.find(row=>tidy(row.nombre).toLocaleLowerCase('es')===gymName.toLocaleLowerCase('es'));
+    if(!gym){gym={id:uuid(),nombre:gymName};data.entities.gyms.push(gym);
+     data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'gym',localId:gym.id});}
+    values={...values,gimnasio_id:gym.id};
+   }
    if(target.some(x=>x.nombre.toLocaleLowerCase('es')===nombre.toLocaleLowerCase('es')&&
     (kind!=='site'||x.gimnasio_id===values.gimnasio_id)&&
     (kind!=='option'||x.tipo===values.tipo)))throw Error('Ya existe ese elemento');
@@ -367,6 +378,24 @@ const api={
   return 'local:'+key;
  }
 };
+let autoUploadTimer=null;
+function scheduleAutoUpload(){
+ if(autoUploadTimer)clearTimeout(autoUploadTimer);
+ if(!navigator.onLine||!remoteSession?.user||cloudAccountKind!=='personal'||
+    latest?.data?.cloudUserId!==remoteSession.user.id||latest?.data?.syncMode!=='instant')return;
+ if(!latest?.data?.pending?.some(op=>['create_series','update_series','delete_series'].includes(op.kind)))return;
+ autoUploadTimer=setTimeout(async()=>{
+  autoUploadTimer=null;
+  if(syncController?.isBusy()){scheduleAutoUpload();return;}
+  try{await remoteAction('upload',{automatic:true})}
+  catch(error){status('Los cambios siguen offline. Error de actualización: '+error.message)}
+ },1100);
+}
+for(const name of ['saveWorkout','deleteSeries','updateSeries','addIndependentItem','saveCustomExercise','updateCatalogItem','deleteCatalogItem']){
+ const action=api[name].bind(api);
+ api[name]=async(...args)=>{const result=await action(...args);scheduleAutoUpload();return result;};
+}
+window.addEventListener('online',()=>scheduleAutoUpload());
 function refreshCloudControls(){
  const linked=!!remoteSession?.user&&!transitioning;
  $('offlineRemoteUser').textContent=linked?'Conectado: '+(remoteSession.user.email||remoteSession.user.id):'Sin sesión de nube';
@@ -600,7 +629,8 @@ async function init(){
   const mode=event.target.value;
   try{if(cloudAccountKind!=='personal'||!remoteSession?.user||latest?.data?.cloudUserId!==remoteSession.user.id)throw Error('Primero vincula una cuenta personal.');
    await flush(data=>{data.syncMode=mode==='instant'?'instant':'later'});
-   renderSyncStatus();refreshCloudControls();status(mode==='instant'?'Actualizar al momento activado.':'Actualizar después: guardado local hasta pulsar Actualizar.');
+   renderSyncStatus();refreshCloudControls();if(mode==='instant')scheduleAutoUpload();
+   status(mode==='instant'?'Actualizar al momento activado.':'Actualizar después: guardado local hasta pulsar Actualizar.');
   }catch(error){refreshCloudControls();status(error.message)}
  });
  $('offlineProfiles').addEventListener('change',async event=>{
