@@ -28,7 +28,10 @@ export function prepareDownloadedCatalog({base=[],exercises=[],gyms=[],sites=[],
   tecnica_actualizada:x.tecnica_actualizada,cloudOwnerId:x.user_id,cloudSnapshot:catalogSnapshot('exercise',x)
  }));
  const custom=active.filter(x=>x.gimnasio_id&&x.sede_id).map(x=>({
-  cloud_id:x.id,g:byGym.get(x.gimnasio_id)||'',s:bySite.get(x.sede_id)||'',
+  id:x.id,cloud_id:x.id,nombre:x.nombre,gimnasio_id:x.gimnasio_id,sede_id:x.sede_id,
+  origen:x.origen,cloudOwnerId:x.user_id,cloudSnapshot:catalogSnapshot('exercise',x),
+  zona_entrenamiento:x.zona_entrenamiento,tecnica_actualizada:x.tecnica_actualizada,
+  g:byGym.get(x.gimnasio_id)||'',s:bySite.get(x.sede_id)||'',
   z:name(x.zona_entrenamiento)||'Sin clasificar',kind:name(x.tipo_equipo)||'Otro',
   i:name(x.instrumento)||'Sin equipo',a:name(x.accesorio||x.implemento)||'No especificado',
   gr:name(x.agarre)||'No especificado',e:name(x.nombre),
