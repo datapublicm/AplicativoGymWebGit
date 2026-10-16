@@ -390,7 +390,7 @@ function refreshCloudControls(){
  $('offlineCloudUpload').hidden=false;$('offlineCloudUpload').disabled=!personal||!!syncController?.isBusy();
  $('offlineDemoDownload').hidden=true;$('offlineDemoDownload').disabled=true;
  $('authLogout').hidden=true;
- const state=$('offlineLinkStatus');if(state)state.textContent=personal?'✅ Vinculado':'No vinculado';
+ const state=$('offlineLinkStatus');if(state)state.textContent=personal?'✅ Vinculado':latest?.data?.cloudUserId?'✅ Vinculado · inicia sesión para actualizar':'No vinculado';
  const mode=$('offlineSyncMode');if(mode){mode.closest('.offline-sync-mode').hidden=!personal;mode.value=latest?.data?.syncMode==='instant'?'instant':'later';}
 }
 let autoUploadTimer=null;
