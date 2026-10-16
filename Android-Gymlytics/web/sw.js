@@ -1,6 +1,6 @@
 const PREFIX='gymlytics-mobile-';
-const CACHE=PREFIX+'gymlytics-perfiles-descarga-20261015-v05';
-const ASSETS=['./','./index.html','./styles.css','./app.js','./dashboard.js','./offline-first.js','./offline-catalog-download.js','./profile-policy.js','./cloud-sync.js','./sync-engine.js','./legacy-compat.js','./manifest.webmanifest','./assets/polea-alta.webp','./assets/jalon-pecho.webp','./icons/icon-192.png','./icons/icon-512.png'];
+const CACHE=PREFIX+'gymlytics-bloques-perfil-catalogo-fotos-20261016-v06';
+const ASSETS=['./','./index.html','./styles.css','./app.js','./dashboard.js','./offline-first.js','./offline-catalog-download.js','./catalog-sync-engine.js','./reference-overrides.js','./photo-sync-engine.js','./profile-policy.js','./cloud-sync.js','./sync-engine.js','./legacy-compat.js','./manifest.webmanifest','./assets/polea-alta.webp','./assets/jalon-pecho.webp','./icons/icon-192.png','./icons/icon-512.png'];
 const STATIC_URLS=new Set(ASSETS.map(path=>new URL(path,self.location.href).href));
 
 self.addEventListener('install',event=>event.waitUntil(
