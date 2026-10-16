@@ -6,6 +6,7 @@ on:
       - cambios/gymlytics-perfil-catalogo-20261016
     paths:
       - .github/workflows/compilar-gymlytics-01.07-bloques-pruebas.yml
+      - Android-Gymlytics/tools/verificar-integridad-offline.mjs
   workflow_dispatch:
 permissions:
   contents: read
