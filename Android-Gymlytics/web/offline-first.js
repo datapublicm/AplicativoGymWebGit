@@ -10,7 +10,7 @@ const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
  records:[],photos:{},baseCatalog:[],muscles:[],custom:[],library:[],readOnly:false,demo:false,
  entities:{gyms:[],sites:[],machines:[],options:[]},
- tombstones:[],pending:[],conflicts:[],cloudUserId:null,lastPull:null
+ tombstones:[],pending:[],conflicts:[],cloudUserId:null,lastPull:null,syncMode:'later'
 });
 const uuid=()=>crypto.randomUUID();
 const tidy=v=>String(v??'').trim();
@@ -75,11 +75,11 @@ function renderSyncStatus(){
  if(!latest)return;
  const data=latest.data,counts=(data.pending||[]).length,deleted=(data.tombstones||[]).length;
  $('offlinePending').textContent=counts+' operaciones pendientes · '+deleted+' eliminaciones conservadas';
- $('offlineProfileInfo').textContent=(data.readOnly?'🔒 PRUEBA · SOLO CONSULTA · ':'Perfil personal offline · ')+latest.name+' · '+data.records.length+' series visibles';
+ $('offlineProfileInfo').textContent=(data.demo?'PRUEBA · EDICIÓN LOCAL · ':'Perfil offline · ')+latest.name+' · '+data.records.length+' series visibles';
  $('offlineConflictSummary').textContent=(data.conflicts||[]).length+' conflictos por revisar';
- $('offlineSyncState').textContent=data.readOnly?'Cuenta de prueba descargada: datos visibles offline. Edición y eliminación BLOQUEADAS.':
-  data.cloudUserId?'Cuenta vinculada: '+data.cloudUserId.slice(0,8)+'… · Los cambios permanecen solamente en este dispositivo.':
-  'Solo en este dispositivo. Puedes crear una cuenta más adelante sin perder tus registros.';
+ $('offlineSyncState').textContent=data.demo&&!data.cloudUserId?'Cuenta de prueba descargada: puedes agregar, modificar y eliminar datos offline.':
+  data.cloudUserId?'Cuenta personal asociada · '+(data.syncMode==='instant'?'sincronización automática':'actualización manual')+'.':
+  'No vinculado · todos los cambios se guardan en este dispositivo.';
 }
 function catalogInit(){
  // Nunca precargar datos de otro usuario: los perfiles nuevos empiezan vacíos.
@@ -111,8 +111,10 @@ async function activate(id,initial=false){
   drawRecent();drawHistory();drawReports();
   const p=await get(id);
   if(!p||epoch!==profileEpoch)throw Error('No se pudo abrir el nuevo perfil.');
+  // Migración segura: la restricción de la cuenta de prueba solo afecta a Supabase.
+  if(p.data?.readOnly){p.data.demo=true;p.data.readOnly=false;p.data.cloudUserId=null;await put(p);}
   activeId=id;latest=p;profiles=(await all()).map(profileMeta);
-  $('offlineProfiles').replaceChildren(...profiles.map(x=>new Option(x.readOnly?'🔒 '+x.name+' · prueba':x.name,x.id)));
+  $('offlineProfiles').replaceChildren(...profiles.map(x=>new Option(x.demo?'◌ '+x.name+' · prueba':x.name,x.id)));
   $('offlineProfiles').value=id;
   window.GymBaseCatalog=catalogInit();
   window.GymEntities=structuredClone(p.data.entities||EMPTY().entities);
@@ -132,7 +134,7 @@ async function activate(id,initial=false){
   $('offlineCloudPanel').hidden=true;$('offlineRemoteUser').textContent='';
   localStorage.setItem('gymlytics-active-profile',id);
   renderSyncStatus();renderProfileControls();
-  status((p.data?.readOnly?'Perfil de PRUEBA solo lectura':'Perfil local editable')+' · '+p.name+' · funciona sin conexión');
+  status('Perfil local editable · '+p.name+' · funciona sin conexión');
   document.body.classList.remove('auth-locked');
   document.querySelectorAll('[data-page]').forEach(x=>{x.disabled=false;x.setAttribute('aria-disabled','false');});
   renderConflictButtons();refreshCloudControls();
@@ -155,11 +157,8 @@ function renderProfileControls(){
  const control=$('offlineRenameName');if(control)control.value=latest?.name||'';
  const count=$('offlineProfileCount');
  if(count)count.textContent=profiles.length+' perfiles locales independientes';
- const locked=!!latest?.data?.readOnly;
- document.querySelectorAll('#page-catalogos [data-catalog-quick],#page-catalogos .catalog-compact-toggle,#page-catalogos [data-catalog-modify],#page-catalogos .catalog-form button[type=submit],#page-registro #saveRecords,#page-registro #clearSeries,#page-registro #addSeriesGroup,#page-registro #removeSeriesGroup').forEach(b=>{
-  b.disabled=locked;b.title=locked?'Cuenta de prueba: edición bloqueada':'';
- });
- const hint=$('offlineReadOnlyWarning');if(hint)hint.hidden=!locked;
+ const hint=$('offlineReadOnlyWarning');if(hint)hint.hidden=true;
+ document.querySelectorAll('#page-catalogos [data-catalog-quick],#page-catalogos .catalog-compact-toggle,#page-catalogos [data-catalog-modify],#page-catalogos .catalog-form button[type=submit],#page-registro #saveRecords,#page-registro #clearSeries,#page-registro #addSeriesGroup,#page-registro #removeSeriesGroup').forEach(b=>{b.disabled=false;b.title='';});
 }
 async function renameProfile(){
  if(transitioning||syncController?.isBusy())throw Error('Termina la operación actual.');
@@ -174,7 +173,7 @@ async function renameProfile(){
  if(id!==activeId||epoch!==profileEpoch||transitioning)return;
  latest=profile;profiles=profiles.map(x=>x.id===profile.id?profileMeta(profile):x);
  const item=[...$('offlineProfiles').options].find(x=>x.value===profile.id);
- if(item)item.textContent=latest?.data?.readOnly?'🔒 '+name+' · prueba':name;
+ if(item)item.textContent=latest?.data?.demo?'◌ '+name+' · prueba':name;
  renderSyncStatus();renderProfileControls();
  status('Perfil renombrado sin modificar registros ni vínculos de nube.');
 }
@@ -201,7 +200,6 @@ const writeStatus=()=>{
  if(transitioning)return {code:'switching',message:'Se está cambiando de perfil. Espera a que finalice antes de guardar.'};
  if(offlineInitError&&!latest)return {code:'error',message:'El almacenamiento local no pudo iniciarse: '+offlineInitError+'. Ve a Perfil para revisar el estado. No borres los datos de la aplicación.'};
  if(!activeId||!latest)return {code:'loading',message:'El perfil local aún no termina de cargarse. Ve a Perfil y comprueba que diga «Perfil local editable».'};
- if(latest.data?.readOnly)return {code:'read_only',message:'«'+latest.name+'» es una cuenta de prueba de solo lectura. En Perfil, crea o elige otro perfil personal para guardar.'};
  return {code:'ready',message:'Perfil «'+latest.name+'» listo para guardar offline.'};
 };
 const assertEditable=()=>{
@@ -209,7 +207,7 @@ const assertEditable=()=>{
  if(state.code!=='ready')throw Error(state.message);
 };
 const api={
- canWrite:()=>!!activeId&&!latest?.data?.readOnly&&!transitioning,
+ canWrite:()=>!!activeId&&!!latest&&!transitioning,
  getWriteStatus:writeStatus,
  canRead:()=>!!activeId&&!!latest,
  getSessionStamp:stamp,
@@ -323,6 +321,9 @@ const api={
    if(!list)throw Error('Categoría inválida');
    const item=list.find(x=>x.id===id);
    if(!item)throw Error('No se encontró el elemento personal');
+   if(list.some(x=>x.id!==id&&tidy(x.nombre).toLocaleLowerCase('es')===name.toLocaleLowerCase('es')&&
+     (kind!=='site'||x.gimnasio_id===item.gimnasio_id)&&
+     (kind!=='option'||x.tipo===item.tipo)))throw Error('Ya existe otro elemento con ese nombre');
    item.nombre=name;
    data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:kind,localId:id});
   });catalogUpdate();return id;
@@ -370,13 +371,16 @@ function refreshCloudControls(){
  const linked=!!remoteSession?.user&&!transitioning;
  $('offlineRemoteUser').textContent=linked?'Conectado: '+(remoteSession.user.email||remoteSession.user.id):'Sin sesión de nube';
  const demo=cloudAccountKind==='demo';
- $('offlineLinkAccount').disabled=!linked||demo||!!syncController?.isBusy()||!!latest?.data?.cloudUserId||!!latest?.data?.readOnly;
+ $('offlineLinkAccount').disabled=!linked||demo||!!syncController?.isBusy()||!!latest?.data?.cloudUserId;
  $('offlineLinkAccount').textContent=demo?'🔒 La cuenta de prueba no puede vincularse':latest?.data?.cloudUserId?'Perfil ya vinculado a esta cuenta':'Vincular este perfil con esta cuenta';
- $('offlineCloudDownload').disabled=!linked||demo||!!latest?.data?.readOnly||!!syncController?.isBusy();
- // No publicar modificaciones: todo el trabajo de esta versión se queda offline.
- $('offlineCloudUpload').hidden=true;$('offlineCloudUpload').disabled=true;
- $('offlineDemoDownload').disabled=!linked||!demo||!!syncController?.isBusy();
- $('authLogout').hidden=!linked;
+ const personal=linked&&!demo&&latest?.data?.cloudUserId===remoteSession.user.id;
+ $('offlineCloudDownload').disabled=!linked||!!syncController?.isBusy();
+ $('offlineCloudDownload').textContent='↓ Descargar datos';
+ $('offlineCloudUpload').hidden=false;$('offlineCloudUpload').disabled=!personal||!!syncController?.isBusy();
+ $('offlineDemoDownload').hidden=true;$('offlineDemoDownload').disabled=true;
+ $('authLogout').hidden=true;
+ const state=$('offlineLinkStatus');if(state)state.textContent=personal?'✅ Vinculado':'No vinculado';
+ const mode=$('offlineSyncMode');if(mode){mode.closest('.offline-sync-mode').hidden=!personal;mode.value=latest?.data?.syncMode==='instant'?'instant':'later';}
 }
 function requireCloudIdentity(uid,ownerStamp,ownerClient=client){
  if(ownerStamp!==stamp()||ownerClient!==client||!uid||transitioning)
@@ -387,16 +391,14 @@ async function linkAccount(){
  const user=remoteSession?.user;
  if(!user)throw Error('Inicia sesión en la nube primero.');
  if(cloudAccountKind==='demo')throw Error('La cuenta de prueba no puede vincularse como una cuenta personal.');
- if(latest?.data?.readOnly)throw Error('Una cuenta de prueba no puede vincularse como personal.');
  requireCloudIdentity(user.id,stamp());
  if(latest?.data?.cloudUserId===user.id)return status('Perfil ya vinculado a esta cuenta.');
- if(!confirm('¿Vincular '+latest.name+' con esta cuenta? No se subirán ni descargarán datos automáticamente. La asociación permanecerá en este perfil.'))return;
  await flush(data=>{
   validateProfileBinding(profiles,activeId,user.id);
   data.cloudUserId=user.id;
  });
  renderSyncStatus();refreshCloudControls();
- status('Cuenta vinculada. Tus cambios permanecen offline; la subida a Supabase está deshabilitada.');
+ status('Vinculado. Tus cambios se guardan localmente; elige cuándo actualizar Supabase.');
 }
 async function provisionGymlyticsAccount(ownerStamp){
  if(!remote)throw Error('No está configurada la base de datos');
@@ -434,10 +436,10 @@ async function completeCloudLogin(session,ownerStamp,ownerClient,register=false)
   throw error;
  }
  remoteSession=session;
+ if(cloudAccountKind==='personal')await linkAccount();
  refreshCloudControls();renderSyncStatus();
- status(cloudAccountKind==='demo'?
-  'Cuenta de prueba verificada: solo descarga de consulta. Ningún dato se modificará.':
-  'Cuenta personal autenticada: puedes vincular o descargar datos, sin subir cambios locales.');
+ status(cloudAccountKind==='demo'?'Cuenta de prueba: datos descargables y editables offline, sin subirlos.':
+  '✅ Vinculado. Puedes descargar datos o elegir la sincronización de Supabase.');
 }
 async function cloudLogin(email,password,register=false){
  if(transitioning)throw Error('Espera a que termine el cambio de perfil.');
@@ -496,12 +498,10 @@ function updateFromProfile(){
 async function remoteAction(action,options={}){
  if(!remoteSession?.user||!cloudAccountKind)throw Error('Inicia sesión o crea tu cuenta de nube primero');
  if(!syncController)throw Error('La sincronización no está disponible');
- if(action==='upload')throw Error('Los cambios de esta versión se conservan únicamente offline; subida deshabilitada.');
+ if(action==='upload'&&(cloudAccountKind!=='personal'||latest?.data?.cloudUserId!==remoteSession.user.id))
+  throw Error('Actualizar requiere una cuenta personal vinculada; la cuenta de prueba solo permite descarga.');
  if(action==='download'){
-  if(cloudAccountKind==='demo'&&!options.readOnly)
-   throw Error('La cuenta de prueba únicamente puede descargarse en modo solo lectura.');
-  if(cloudAccountKind!=='demo'&&options.readOnly)
-   throw Error('La opción de prueba requiere iniciar sesión en la cuenta «prueba».');
+  options.readOnly=cloudAccountKind==='demo';
  }
  await syncController[action](remoteSession.user.id,stamp(),options);
 }
@@ -518,10 +518,10 @@ async function saveProfileBackup(){
  await queue;
  if(id!==activeId||epoch!==profileEpoch||transitioning)throw Error('El perfil cambió antes de crear el respaldo.');
  if(!latest)return;
- downloadLocal('Gymlytics_perfil_'+latest.name.replace(/[^a-z0-9-_]/gi,'_')+'_'+new Date().toISOString().slice(0,10)+'.json',
+ downloadLocal('Gymlytics_respaldo_'+latest.name.replace(/[^a-z0-9-_]/gi,'_')+'_'+new Date().toISOString().slice(0,10)+'.txt',
   {format:'gymlytics-profile-backup',version:1,name:latest.name,data:latest.data,
    exportedAt:new Date().toISOString()});
- status('Respaldo completo del perfil descargado, incluyendo eliminaciones y cambios pendientes.');
+ status('Respaldo completo guardado en archivo de texto estructurado (JSON), con cambios pendientes y relaciones.');
 }
 async function importProfileBackup(event){
  const file=event.target.files?.[0];event.target.value='';
@@ -590,6 +590,19 @@ async function init(){
  const selected=profiles.find(x=>x.id===last)?.id||profiles[0].id;
  window.GymCloud=api;
  await activate(selected,true);
+ $('offlineProfileMenuToggle')?.addEventListener('click',()=>{$('offlineProfileMenu').hidden=!$('offlineProfileMenu').hidden;});
+ document.querySelectorAll('[data-profile-action]').forEach(button=>button.addEventListener('click',()=>{
+  const action=button.dataset.profileAction;
+  $('offlineNewProfileFields').hidden=action!=='add';$('offlineRenameProfileFields').hidden=action!=='rename';
+  $('offlineProfileMenu').hidden=true;(action==='add'?$('offlineNewName'):$('offlineRenameName')).focus();
+ }));
+ $('offlineSyncMode')?.addEventListener('change',async event=>{
+  const mode=event.target.value;
+  try{if(cloudAccountKind!=='personal'||!remoteSession?.user||latest?.data?.cloudUserId!==remoteSession.user.id)throw Error('Primero vincula una cuenta personal.');
+   await flush(data=>{data.syncMode=mode==='instant'?'instant':'later'});
+   renderSyncStatus();refreshCloudControls();status(mode==='instant'?'Actualizar al momento activado.':'Actualizar después: guardado local hasta pulsar Actualizar.');
+  }catch(error){refreshCloudControls();status(error.message)}
+ });
  $('offlineProfiles').addEventListener('change',async event=>{
   const chosen=event.target.value,previous=activeId;
   try{await activate(chosen)}
