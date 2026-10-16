@@ -75,3 +75,33 @@ export function applyDownloadedPhoto(local,remote,dataUrl,uid){
  local.photoVersions[remote.photo_key]={revision:remote.revision,ownerId:uid};
  return true;
 }
+
+export function migrateLegacyPhotoJobs(data){
+ data.photoVersions??={};data.photoPayloads??={};data.photos??={};
+ if(!Array.isArray(data.pending))data.pending=[];
+ let converted=0,unresolved=0;
+ const legacy=new Map();
+ for(const job of data.pending){
+  if(job.kind!=='photo'||job.photoKey)continue;
+  const suffix=String(job.key||'');
+  const candidates=[['equipo:'+suffix,'maquina'],['ejercicio:'+suffix,'ejercicio']]
+   .filter(([key])=>/^data:image\/jpeg;base64,/.test(data.photos[key]||''));
+  if(candidates.length!==1||!UUID.test(String(job.id))){unresolved++;continue;}
+  const [photoKey,photoType]=candidates[0];
+  if(legacy.has(photoKey))legacy.get(photoKey).push(job);
+  else legacy.set(photoKey,[job]);
+ }
+ const obsolete=new Set();
+ for(const [photoKey,jobs] of legacy){
+  const newest=jobs.at(-1);
+  if(jobs.some(x=>x.submittedRequest)){unresolved+=jobs.length;continue;}
+  for(const old of jobs.slice(0,-1))obsolete.add(old.id);
+  newest.photoKey=photoKey;
+  newest.photoType=photoKey.startsWith('equipo:')?'maquina':'ejercicio';
+  newest.side=null;newest.createdAt=newest.at||new Date(0).toISOString();
+  data.photoPayloads[newest.id]=data.photos[photoKey];
+  converted++;
+ }
+ if(obsolete.size)data.pending=data.pending.filter(x=>!obsolete.has(x.id));
+ return {converted,unresolved,removed:obsolete.size};
+}
