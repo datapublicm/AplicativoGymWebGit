@@ -346,12 +346,14 @@ const api={
    if(!list)throw Error('Categoría inválida');
    const idx=list.findIndex(x=>String(x.id)===String(id));
    if(idx<0)throw Error('No se encontró el elemento personal');
+   const removed=structuredClone(list[idx]);
    if(kind==='gym'&&data.entities.sites.some(x=>x.gimnasio_id===id))
     throw Error('Este gimnasio contiene sedes');
    list.splice(idx,1);
    data.pending=data.pending.filter(x=>x.localId!==id||x.kind!=='add_catalog');
    data.pending.push({id:uuid(),kind:'delete_catalog',catalogKind:kind,localId:id});
-   data.tombstones.push({catalogKind:kind,localId:id,at:new Date().toISOString()});
+   data.tombstones.push({catalogKind:kind,localId:id,at:new Date().toISOString(),
+    cloudSnapshot:removed.cloudSnapshot||null,cloudOwnerId:removed.cloudOwnerId||null});
   });catalogUpdate();return id;
  },
  async loadAnatomy(exercise){
@@ -398,7 +400,7 @@ function scheduleAutoUpload(){
  if(autoUploadTimer)clearTimeout(autoUploadTimer);
  if(!navigator.onLine||!remoteSession?.user||cloudAccountKind!=='personal'||
     latest?.data?.cloudUserId!==remoteSession.user.id||latest?.data?.syncMode!=='instant')return;
- if(!latest?.data?.pending?.some(op=>['create_series','update_series','delete_series'].includes(op.kind)))return;
+ if(!latest?.data?.pending?.some(op=>['create_series','update_series','delete_series','add_catalog','update_catalog','delete_catalog'].includes(op.kind)))return;
  autoUploadTimer=setTimeout(async()=>{
   autoUploadTimer=null;
   if(syncController?.isBusy()){scheduleAutoUpload();return;}
