@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - cambios/gymlytics-perfil-catalogo-20261016
+      - cambios/gymlytics-01.08-preparacion
   workflow_dispatch:
 permissions:
   contents: read
