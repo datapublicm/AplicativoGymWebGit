@@ -18,6 +18,7 @@ jobs:
           test -d catalogue/exercises
       - name: Exportar ejercicio, traducciones, metadatos y licencias
         run: |
+          python - <<'PY'
           import csv, json, re, zipfile, collections
           from pathlib import Path
           from xml.sax.saxutils import escape
@@ -116,6 +117,7 @@ jobs:
               z.writestr("xl/worksheets/sheet2.xml",sheet_xml(meta,[48,95]))
           print(json.dumps({"rows":len(rows),"xlsx":str(xlsx),"xlsx_bytes":xlsx.stat().st_size,"csv_bytes":(out/"OpenGym_Catalogo_Completo.csv").stat().st_size,"provenance":provenance,"translations_es_names":sum(bool(r[1]) for r in rows),"english_instructions":sum(bool(r[11]) for r in rows)},ensure_ascii=False))
           
+          PY
       - name: Validar integridad
         run: |
           python - <<'PY'
