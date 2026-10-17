@@ -14,7 +14,7 @@ jobs:
         run: |
           git clone --depth 1 --filter=blob:none --sparse https://github.com/DuarteSantos8/openGym.git opengym
           cd opengym
-          git sparse-checkout set catalogue/exercises catalogue/i18n catalogue/README.md NOTICE.md LICENSE
+          git sparse-checkout set catalogue/exercises catalogue/i18n
           test -d catalogue/exercises
       - name: Exportar ejercicio, traducciones, metadatos y licencias
         run: |
