@@ -1,0 +1,137 @@
+name: Exportar OpenGym completo a Excel
+on:
+  push:
+    branches: [export/opengym-catalogo-completo-20261016]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exportar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Recuperar catalogo publico sin material multimedia
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/DuarteSantos8/openGym.git opengym
+          cd opengym
+          git sparse-checkout set catalogue/exercises catalogue/i18n catalogue/README.md NOTICE.md LICENSE
+          test -d catalogue/exercises
+      - name: Exportar ejercicio, traducciones, metadatos y licencias
+        run: |
+          import csv, json, re, zipfile, collections
+          from pathlib import Path
+          from xml.sax.saxutils import escape
+          base=Path("opengym/catalogue")
+          exercise_files=sorted((base/"exercises").glob("*.json"))
+          if len(exercise_files)<5000: raise SystemExit(f"INCOMPLETE: only {len(exercise_files)} JSON files")
+          translations=json.loads((base/"i18n/es.json").read_text(encoding="utf-8")) if (base/"i18n/es.json").exists() else {}
+          rows=[]; categories=collections.Counter(); provenance=collections.Counter(); keys=collections.Counter()
+          for f in exercise_files:
+              x=json.loads(f.read_text(encoding="utf-8"))
+              if not isinstance(x,dict): raise ValueError(f)
+              for k in x:keys[k]+=1
+              id=str(x.get("id") or f.stem)
+              es=translations.get(id,{}) or {}
+              def getsteps(v):
+                  if isinstance(v,list): return "\n".join(f"{i}. {str(s)}" for i,s in enumerate(v,1))
+                  return str(v or "")
+              def text(v):
+                  if isinstance(v,list):return " | ".join(map(str,v))
+                  if isinstance(v,dict):return json.dumps(v,ensure_ascii=False,separators=(",",":"))
+                  return str(v) if v is not None else ""
+              origin=str(x.get("textSource","") or "")
+              lic="MIT (texto ExerciseDB original)" if origin.lower()=="exercisedb" else "AGPL-3.0 (aportación openGym; comprobar NOTICE)"
+              provenance[lic]+=1;categories[text(x.get("bodyPart"))]+=1
+              known={"id","name","bodyPart","equipment","target","secondaryMuscles","category","description","instructions","textSource","muscleMap","femaleVariant","variantOf"}
+              extra={k:v for k,v in x.items() if k not in known}
+              rows.append([
+                  id,text(es.get("name")),text(x.get("name")),text(x.get("bodyPart")),text(x.get("equipment")),
+                  text(x.get("target")),text(x.get("secondaryMuscles")),text(x.get("category")),
+                  text(es.get("description")),getsteps(es.get("instructions")),
+                  text(x.get("description")),getsteps(x.get("instructions")),
+                  text(x.get("muscleMap")),text(x.get("femaleVariant")),text(x.get("variantOf")),
+                  origin or "No declarado",lic,
+                  f"https://github.com/DuarteSantos8/openGym/blob/main/catalogue/exercises/{f.name}",
+                  text(extra)])
+          if len(rows)!=len({x[0] for x in rows}):raise SystemExit("DUPLICATE IDS")
+          headers=["ID","Nombre (es)","Nombre (en)","Parte corporal","Equipo","Músculo objetivo","Músculos secundarios","Categoría","Descripción (es)","Instrucciones (es)","Descripción (en)","Instrucciones (en)","Mapa muscular (JSON)","Variante femenina","Variante de","Procedencia del texto","Licencia de texto","Enlace al archivo original","Otros campos (JSON)"]
+          out=Path("salida");out.mkdir(exist_ok=True)
+          with (out/"OpenGym_Catalogo_Completo.csv").open("w",newline="",encoding="utf-8-sig") as fp:
+              writer=csv.writer(fp);writer.writerow(headers);writer.writerows(rows)
+          meta=[
+           ["Concepto","Detalle"],["Fecha de extracción","2026-10-16"],["Repositorio","https://github.com/DuarteSantos8/openGym"],
+           ["Ruta de datos","catalogue/exercises/*.json"],["Registros completos",len(rows)],
+           ["Registros con traducción española de nombre",sum(bool(r[1]) for r in rows)],
+           ["Registros con descripción en español",sum(bool(r[8]) for r in rows)],
+           ["Registros con instrucciones en español",sum(bool(r[9]) for r in rows)],
+           ["Registros con descripción en inglés",sum(bool(r[10]) for r in rows)],
+           ["Registros con instrucciones en inglés",sum(bool(r[11]) for r in rows)],
+           ["Origen licencia","Las fichas originales marcadas textSource=exercisedb están bajo MIT; las aportaciones de openGym se rigen por la AGPL-3.0 del repositorio. Ver NOTICE.md y LICENSE."],
+           ["Aviso multimedia","Sin archivos gráficos, vídeos, GIF ni referencias a sus licencias restrictivas."],
+           ["Atribución","DuarteSantos8/openGym y colaboradores. Las entradas ExerciseDB conservan mención del proyecto original y MIT."],
+           ["Limitación de traducción","Los campos en español se completan solamente cuando existen traducciones es.json; no se generan traducciones automáticas."],
+           ["Repositorio y atribución","https://github.com/DuarteSantos8/openGym/blob/main/NOTICE.md"],
+           ["Licencia repositorio","https://github.com/DuarteSantos8/openGym/blob/main/LICENSE"],
+           ["Aviso de catálogo","https://github.com/DuarteSantos8/openGym/blob/main/catalogue/README.md"]
+          ]
+          for a,n in sorted(provenance.items()):meta.append(["Registros por licencia - "+a,n])
+          for a,n in sorted(categories.items()):meta.append(["Registros por parte corporal - "+a,n])
+          for a,n in sorted(keys.items()):meta.append(["Campo JSON - "+a,n])
+          ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+          def col(i):
+              s="";i+=1
+              while i:i,r=divmod(i-1,26);s=chr(65+r)+s
+              return s
+          def xmlsafe(v):
+              s=str(v) if v is not None else ""
+              s="".join(ch for ch in s if ord(ch)>=32 or ch in "\t\n\r")
+              return escape(s,{'\"':'&quot;'})
+          def sheet_xml(matrix, widths):
+              parts=['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+              '<worksheet xmlns="'+ns+'"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>',
+              '<sheetFormatPr defaultRowHeight="17"/>',
+              '<cols>'+''.join(f'<col min="{i+1}" max="{i+1}" width="{w}" customWidth="1"/>' for i,w in enumerate(widths))+'</cols>',
+              '<sheetData>']
+              for rid, row in enumerate(matrix,1):
+                  parts.append(f'<row r="{rid}"'+(' ht="27" customHeight="1"' if rid==1 else '')+'>')
+                  for i,v in enumerate(row):
+                      ref=f"{col(i)}{rid}"
+                      if isinstance(v,int):
+                          parts.append(f'<c r="{ref}" s="{1 if rid==1 else 0}"><v>{v}</v></c>')
+                      else:
+                          parts.append(f'<c r="{ref}" t="inlineStr" s="{1 if rid==1 else 0}"><is><t xml:space="preserve">{xmlsafe(v)}</t></is></c>')
+                  parts.append('</row>')
+              parts.append('</sheetData>')
+              parts.append(f'<autoFilter ref="A1:{col(len(matrix[0])-1)}{len(matrix)}"/>')
+              parts.append('</worksheet>')
+              return "".join(parts)
+          xlsx=out/"OpenGym_Catalogo_Completo_5632_ejercicios.xlsx"
+          with zipfile.ZipFile(xlsx,"w",compression=zipfile.ZIP_DEFLATED,compresslevel=6) as z:
+              z.writestr("[Content_Types].xml",'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>')
+              z.writestr("_rels/.rels",'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')
+              z.writestr("xl/workbook.xml",'<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="'+ns+'" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Ejercicios" sheetId="1" r:id="rId1"/><sheet name="Licencias y fuente" sheetId="2" r:id="rId2"/></sheets></workbook>')
+              z.writestr("xl/_rels/workbook.xml.rels",'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>')
+              z.writestr("xl/styles.xml",'<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="'+ns+'"><fonts count="2"><font><sz val="11"/><name val="Aptos"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Aptos"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF123C64"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFill="1" applyFont="1"/></cellXfs></styleSheet>')
+              z.writestr("xl/worksheets/sheet1.xml",sheet_xml([headers]+rows,[12,40,40,20,24,24,32,20,55,70,55,70,30,18,18,28,42,70,35]))
+              z.writestr("xl/worksheets/sheet2.xml",sheet_xml(meta,[48,95]))
+          print(json.dumps({"rows":len(rows),"xlsx":str(xlsx),"xlsx_bytes":xlsx.stat().st_size,"csv_bytes":(out/"OpenGym_Catalogo_Completo.csv").stat().st_size,"provenance":provenance,"translations_es_names":sum(bool(r[1]) for r in rows),"english_instructions":sum(bool(r[11]) for r in rows)},ensure_ascii=False))
+          
+      - name: Validar integridad
+        run: |
+          python - <<'PY'
+          import zipfile, re
+          p='salida/OpenGym_Catalogo_Completo_5632_ejercicios.xlsx'
+          with zipfile.ZipFile(p) as z:
+            s=z.read('xl/worksheets/sheet1.xml').decode()
+            n=len(re.findall(r'<row r="',s)) - 1
+            assert n >= 5000,(n,'exportacion incompleta')
+            assert '<autoFilter' in s
+            assert len(z.testzip() or '')==0
+            print('VERIFICADO:',n,'ejercicios completos')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OpenGym_Catalogo_Completo_Excel_y_CSV
+          path: salida/*
+          if-no-files-found: error
+          retention-days: 7
