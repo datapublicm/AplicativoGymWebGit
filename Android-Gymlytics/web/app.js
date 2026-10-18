@@ -83,7 +83,7 @@ function chosenRow(){
  const values=Object.fromEntries(FLOW.map(([key])=>[key,getValue(key)]));
  if(!values.g||!values.s||!values.i||!values.e||!values.t)return null;
  const variants=(window.GymExerciseLibrary||[]).filter(e=>e.nombre===values.e);
- const library=variants.find(e=>String(e.id)===String(window.GymSelectedExerciseId||''))||
+ const library=variants.find(e=>String(e.id)===String(globalThis.GymSelectedExerciseId||''))||
   (variants.length===1?variants[0]:null);
  if(variants.length>1&&!library)return null;
  const matched=allCatalog().find(r=>FLOW.filter(x=>x[0]!=='t').every(([key])=>r[key]===values[key]));
@@ -139,7 +139,7 @@ function snapshotExerciseRows(){return [...$('seriesRows').querySelectorAll('tr'
 function storeActiveDraft(){
  const tab=draftTabs.find(x=>x.id===activeDraftId);if(!tab)return;
  tab.values=Object.fromEntries(FLOW.map(([key])=>[key,getValue(key)]));
- tab.exerciseId=window.GymSelectedExerciseId||null;
+ tab.exerciseId=globalThis.GymSelectedExerciseId||null;
  tab.date=$('fecha').value;tab.notes=$('observaciones').value;
  tab.seriesMode=seriesMode;tab.seriesGroups=seriesGroups;tab.seriesCustomized=seriesCustomized;
  tab.rows=snapshotExerciseRows();
@@ -153,10 +153,10 @@ function openDraft(id,saveCurrent=true){
  if(saveCurrent)storeActiveDraft();
  const tab=draftTabs.find(x=>x.id===id);if(!tab)return;
  activeDraftId=tab.id;
- window.GymSelectedExerciseId=tab.exerciseId||null;
+ globalThis.GymSelectedExerciseId=tab.exerciseId||null;
  cascade(0,tab.values);
  if($('registroVariante')&&tab.exerciseId){$('registroVariante').value=tab.exerciseId;
-  window.GymSelectedExerciseId=$('registroVariante').value||null;}
+  globalThis.GymSelectedExerciseId=$('registroVariante').value||null;}
  $('fecha').value=tab.date||dateNow();$('observaciones').value=tab.notes||'';
  seriesMode=tab.seriesMode;seriesGroups=tab.seriesGroups;seriesCustomized=tab.seriesCustomized;
  renderSeries();
@@ -594,7 +594,7 @@ async function saveSeries(){
  const current=()=>requestId===window.GymSaveAttempt&&
   sessionStamp===window.GymCloud.getSessionStamp?.();
  const payload={exercise:r,date,technique:tech,notes:$('observaciones').value.trim(),entries};
- const rowSignature=()=>JSON.stringify({date:$('fecha').value,tech:getValue('t'),exercise:chosenRow()?.e,exerciseId:window.GymSelectedExerciseId||null,
+ const rowSignature=()=>JSON.stringify({date:$('fecha').value,tech:getValue('t'),exercise:chosenRow()?.e,exerciseId:globalThis.GymSelectedExerciseId||null,
    notes:$('observaciones').value.trim(),entries:getEntries().map(({el,...entry})=>entry)});
  const submittedSignature=rowSignature();
  const btn=$('saveRecords'),feedback=$('saveFeedback');feedback.hidden=true;feedback.textContent='';btn.disabled=true;btn.textContent='Guardando en este dispositivo…';
