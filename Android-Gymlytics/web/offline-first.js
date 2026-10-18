@@ -385,13 +385,33 @@ const api={
   const lon=longitude===''||longitude==null?null:Number(longitude);
   if((lat===null)!==(lon===null)||lat!==null&&(!Number.isFinite(lat)||lat < -90||lat > 90||!Number.isFinite(lon)||lon < -180||lon > 180))
    throw Error('Las coordenadas deben incluir latitud (-90 a 90) y longitud (-180 a 180).');
-  await flush(data=>{
-   const site=data.entities.sites.find(x=>String(x.id)===String(id));
-   if(!site)throw Error('Selecciona primero una sede personal.');
+  const savedId=await flush(data=>{
+   let site=data.entities.sites.find(x=>String(x.id)===String(id));
+   if(!site&&String(id).startsWith('base:')){
+    const ref=parseReferenceId(String(id));
+    if(!ref||ref.kind!=='site')throw Error('La referencia seleccionada no es una sede.');
+    const references=data.baseCatalog,overrides=data.referenceOverrides||{};
+    const visibleSite=listReferenceChoices(references,overrides,'site').find(x=>x.id===id);
+    const visibleGym=listReferenceChoices(references,overrides,'gym').find(x=>x.sourceName===ref.gym);
+    if(!visibleSite||!visibleGym)throw Error('La sede descargada ya no existe.');
+    let gym=data.entities.gyms.find(x=>tidy(x.nombre).toLocaleLowerCase('es')===tidy(visibleGym.name).toLocaleLowerCase('es'));
+    if(!gym){
+     gym={id:uuid(),nombre:visibleGym.name};data.entities.gyms.push(gym);
+     data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'gym',localId:gym.id});
+    }
+    site=data.entities.sites.find(x=>x.gimnasio_id===gym.id&&tidy(x.nombre).toLocaleLowerCase('es')===tidy(visibleSite.name).toLocaleLowerCase('es'));
+    if(!site){
+     site={id:uuid(),nombre:visibleSite.name,gimnasio_id:gym.id};
+     data.entities.sites.push(site);
+     data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'site',localId:site.id});
+    }
+   }
+   if(!site)throw Error('Selecciona primero una sede disponible.');
    site.latitud=lat;site.longitud=lon;site.modificado_en=new Date().toISOString();
-   data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:'site',localId:id});
+   data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:'site',localId:site.id});
+   return site.id;
   });
-  catalogUpdate();return id;
+  catalogUpdate();return savedId;
  },
  async updateExerciseDetails(id,values){
   assertEditable();
