@@ -4,11 +4,15 @@ import {readFileSync} from 'node:fs';
 const file=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 const html=file('../web/index.html'),css=file('../web/styles.css'),app=file('../web/app.js');
 const vite=file('../vite.config.js'),sw=file('../web/sw.js');
-test('Catálogos utiliza la cabecera GYMLYTICS y las siete categorías del modelo actualizado',()=>{
+test('Catálogos utiliza la cabecera GYMLYTICS y solo Ubicación y Ejercicio, con detalles integrados',()=>{
  assert.match(html,/id="page-catalogos"><header class="gym-mock-header gym-catalog-header"/);
  assert.match(html,/id="catalogCompactRows"/);
- for(const kind of ['gym','site','exercise','zone','machine','grip','technique'])
+ for(const kind of ['gym','site','exercise'])
   assert.match(app,new RegExp("kind:'"+kind+"'"),kind);
+ for(const kind of ['zone','machine','grip','technique'])assert.doesNotMatch(app,new RegExp("\\{kind:'"+kind+"',label:"));
+ assert.match(html,/id="addExerciseExtra"/);
+ assert.match(html,/data-profile-action="example"/);
+ assert.match(html,/catalog-detail-browser\.mjs/);
  assert.doesNotMatch(app, /\{kind:'series',label:'Número Serie'/);
  assert.doesNotMatch(app, /\{kind:'subdivision',label:'Subdivisión'/);
  for(const id of ['openSiteGPS','siteGPSDialog','siteGPSLat','siteGPSLon','getCurrentGPS','saveSiteGPS','catalogExtraDetails','registroSelectByFields'])
@@ -37,7 +41,7 @@ test('La compilación web verifica que empaquete los archivos reales del mockup'
   assert.ok(vite.includes("'"+id+"'"),id);
  assert.match(vite,/source\.equals\(output\)/);
  assert.match(vite,/throw Error\('El APK empaquetaría una versión antigua/);
- assert.match(sw,/gymlytics-sin-precarga-sch_gymlytics-20261018-v10/);
+ assert.match(sw,/gymlytics-ejemplo-opcional-detalles-20261018-v11/);
 });
 test('Se mantienen Tablas y Dashboard independientes, sin cambiar su vista',()=>{
  assert.match(html,/id="page-tablas"/);
