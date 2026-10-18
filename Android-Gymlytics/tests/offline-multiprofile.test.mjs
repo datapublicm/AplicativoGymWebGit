@@ -54,7 +54,7 @@ test('UI de Perfil permite crear, renombrar y vincular sin pedir login previo',(
  assert.match(src,/function rotateCloudClient\(/);
  assert.match(src,/await queue;/);
  assert.match(src,/validateProfileBinding\(profiles,activeId,uid\)/);
- assert.match(src,/if\(cloudAccountKind==='personal'\)await linkAccount\(\)/);
+ assert.match(src,/await linkAccount\(\); \/\/ Solo marca vinculación/);
  assert.match(bundle,/profile-policy\.js/);
 });
 test('El cambio de A a B espera guardados activos y destruye sesión previa',async()=>{

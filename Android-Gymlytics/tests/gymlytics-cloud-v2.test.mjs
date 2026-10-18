@@ -69,7 +69,7 @@ test('Reconciliación idempotente, edición real y conflicto no sobrescrito',asy
  assert.equal(edit.done,1);
  assert.equal(db.storage.tbl_series.get(row.id).peso,before+1);
  db.storage.tbl_series.get(row.id).peso=999;
- row.weight=before+2;
+ state.data.records[0].weight=before+2;
  await assert.rejects(()=>sync.upload(userId,'test'),/versiones distintas/);
  assert.equal(state.data.records[0].weight,before+2);
  assert.equal(db.storage.tbl_series.get(row.id).peso,999);

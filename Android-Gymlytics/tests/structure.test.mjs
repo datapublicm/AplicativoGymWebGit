@@ -62,7 +62,7 @@ test('01.06: cada perfil inicia sin catálogo embebido, y ofrece descarga comple
  assert.match(html,/src="\.\/offline-first\.js"/);
  const offline=read('web/offline-first.js');
  assert.match(offline,/baseCatalog:\[\]/);
- assert.match(offline,/catalogFetch:downloadAllCatalogs/);
+ assert.match(offline,/syncController=createGymlyticsCloudSync/);
  assert.match(read('vite.config.js'),/offline-catalog-download\.js/);
  assert.match(read('web/sw.js'),/offline-catalog-download\.js/);
  for(const id of ['offlineProfiles','offlineNewName','offlineCreate','offlineCloudToggle','offlineCloudDownload','offlineDemoDownload'])

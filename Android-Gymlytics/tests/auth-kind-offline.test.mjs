@@ -19,9 +19,8 @@ function authCase(row,opts={}){
   'let latest={name:'+JSON.stringify(opts.localName||'Mi perfil')+',data:{cloudUserId:null}};',
   'const client={}; const stamp=()=> "perfil-uno";',
   'const requireCloudIdentity=(uid,ownerStamp)=>{if(uid!=="uid" || ownerStamp!=="perfil-uno")throw Error("Identidad distinta")};',
-  'const remote={from:table=>{if(table!=="tbl_usuarios")throw Error("Consulta ajena");return {select(){return this},eq(){return this},maybeSingle:async()=>({data:account,error:null})}}};',
-  'async function provisionGymlyticsAccount(){provisionCalls++;account={id:"uid",usuario:"gym_nueva",activo:true}};',
-  'const refreshCloudControls=()=>updates++; const renderSyncStatus=()=>{};const linkAccount=async()=>updates++; const status=text=>notifications.push(text);const rotateCloudClient=()=>rotations++;',
+  'const syncController={ensureUser:async()=>{provisionCalls++;if(account?.tipo_cuenta==="prueba")throw Error("La cuenta remota no es personal");return {id:"uid",auth_id:"uid",tipo_cuenta:"personal"}}};',
+  'const refreshCloudControls=()=>updates++; const renderSyncStatus=()=>{};const linkAccount=async()=>updates++; const status=text=>notifications.push(text);const rotateCloudClient=()=>{rotations++;remoteSession=null;cloudAccountKind=null;};',
   complete,
   '({login:()=>completeCloudLogin({user:{id:"uid",email:"test@example.org"}},"perfil-uno",client),state:()=>({kind:cloudAccountKind,provisionCalls,updates,rotations,session:!!remoteSession,notifications})});'
  ].join('\n');
@@ -37,24 +36,23 @@ function downloadCase(kind){
  ].join('\n');
  return runInNewContext(js);
 }
-test('Cuenta prueba verificada por la BD activa únicamente el modo demo',async()=>{
- const h=authCase({id:'uid',usuario:'prueba',activo:true});
- await h.login();
- const r=h.state();
- assert.equal(r.kind,'demo');assert.equal(r.provisionCalls,0);assert.equal(r.session,true);
+test('Solo una cuenta personal puede quedar vinculada al esquema nuevo',async()=>{
+ const h=authCase({tipo_cuenta:'prueba'});
+ await assert.rejects(h.login(),/no es personal/);
+ const r=h.state();assert.equal(r.kind,null);assert.equal(r.session,false);assert.equal(r.rotations,1);
 });
-test('Un perfil local llamado prueba no convierte una cuenta normal en demo',async()=>{
- const h=authCase({id:'uid',usuario:'usuario_individual',activo:true},{localName:'prueba'});
- await h.login();assert.equal(h.state().kind,'personal');
+test('El perfil local Prueba puede vincularse con una cuenta personal',async()=>{
+ const h=authCase({tipo_cuenta:'personal'},{localName:'Prueba'});
+ await h.login();assert.equal(h.state().kind,'personal');assert.equal(h.state().session,true);
 });
-test('Primera autenticación después de confirmar el correo termina el registro en Supabase',async()=>{
+test('Primer inicio de sesión registra la identidad con las ocho tablas',async()=>{
  const h=authCase(null);await h.login();
- const r=h.state();assert.equal(r.provisionCalls,1);assert.equal(r.kind,'personal');
+ const r=h.state();assert.equal(r.provisionCalls,1);assert.equal(r.kind,'personal');assert.equal(r.updates,1);
 });
-test('Una cuenta de nube desactivada no se reactiva al iniciar sesión',async()=>{
- const h=authCase({id:'uid',usuario:'persona_inactiva',activo:false});
- await assert.rejects(h.login(),/no está habilitada/);
- const s=h.state();assert.equal(s.provisionCalls,0);assert.equal(s.session,false);
+test('Si la validación de cuenta falla se retira la sesión remota sin tocar perfil',async()=>{
+ const h=authCase({tipo_cuenta:'prueba'});
+ await assert.rejects(h.login(),/cuenta remota/);
+ assert.equal(h.state().session,false);
 });
 test('Usuario demo descarga editable offline sin permiso de escritura en nube',async()=>{
  const h=downloadCase('demo');

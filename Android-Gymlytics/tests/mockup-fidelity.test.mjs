@@ -37,7 +37,7 @@ test('La compilación web verifica que empaquete los archivos reales del mockup'
   assert.ok(vite.includes("'"+id+"'"),id);
  assert.match(vite,/source\.equals\(output\)/);
  assert.match(vite,/throw Error\('El APK empaquetaría una versión antigua/);
- assert.match(sw,/gymlytics-hojamatriz-offline-20261018-v08/);
+ assert.match(sw,/gymlytics-vinculacion-sch_gymlytics-20261018-v09/);
 });
 test('Se mantienen Tablas y Dashboard independientes, sin cambiar su vista',()=>{
  assert.match(html,/id="page-tablas"/);
