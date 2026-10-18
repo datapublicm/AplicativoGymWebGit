@@ -80,9 +80,10 @@
  el('openSiteGPS')?.addEventListener('click',()=>{
   const id=el('siteExistingSelect').value;
   const site=(window.GymEntities?.sites||[]).find(x=>String(x.id)===id);
-  if(!site){el('siteFeedback').textContent='Selecciona primero una sede personal.';return;}
-  dialog.dataset.siteId=id;el('siteGPSLabel').textContent='Sede: '+site.nombre;
-  el('siteGPSLat').value=site.latitud??'';el('siteGPSLon').value=site.longitud??'';
+  const reference=(window.GymReferenceChoices?.('site',{})||[]).find(x=>x.id===id);
+  if(!site&&!reference){el('siteFeedback').textContent='Selecciona primero una sede.';return;}
+  dialog.dataset.siteId=id;el('siteGPSLabel').textContent='Sede: '+(site?.nombre||reference.name);
+  el('siteGPSLat').value=site?.latitud??'';el('siteGPSLon').value=site?.longitud??'';
   feedback.textContent='';map();dialog.showModal();
  });
  el('closeSiteGPS')?.addEventListener('click',()=>dialog.close());
@@ -101,7 +102,9 @@
  el('saveSiteGPS')?.addEventListener('click',async event=>{
   event.currentTarget.disabled=true;
   try{
-   await window.GymCloud.updateSiteGPS(dialog.dataset.siteId,el('siteGPSLat').value,el('siteGPSLon').value);
+   const savedId=await window.GymCloud.updateSiteGPS(dialog.dataset.siteId,el('siteGPSLat').value,el('siteGPSLon').value);
+   dialog.dataset.siteId=String(savedId);
+   el('siteExistingSelect').value=String(savedId);
    feedback.textContent='Coordenadas de la sede guardadas offline ✓';
   }catch(error){feedback.textContent=String(error.message||error);}
   finally{event.currentTarget.disabled=false;}
