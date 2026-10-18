@@ -1,0 +1,41 @@
+name: "GymLytics HojaMatriz - verificaciones sin compilar"
+on:
+  push:
+    branches:
+      - cambios/gymlytics-01.08-offline-ubicacion-ejercicios-20261018
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validar-sin-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: Android-Gymlytics
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: "Sintaxis: archivos modificados"
+        run: |
+          node --check web/app.js
+          node --check web/offline-first.js
+          node --check web/gymlytics-seed-offline.mjs
+          node --check web/catalog-offline-enhancements.js
+          node --check web/sw.js
+          node --check vite.config.js
+      - name: "Semilla y pruebas estáticas"
+        run: npm run test:static
+      - name: "Integridad del paquete antes de compilar"
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const data=JSON.parse(fs.readFileSync('web/data/hojamatriz-offline-20261018.json','utf8'));
+          if(data.tables.series.length!==9424||data.tables.session.length!==446)throw Error('Conteos incorrectos');
+          for(const file of ['web/gymlytics-seed-offline.mjs','web/data/hojamatriz-offline-20261018.json']){
+            if(!fs.readFileSync('web/sw.js','utf8').includes(file.replace('web/','')))throw Error('Falta en caché '+file);
+          }
+          console.log('944? OK - semilla disponible sin APK');
+          JS
