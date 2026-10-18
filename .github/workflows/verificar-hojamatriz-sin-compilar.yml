@@ -37,5 +37,5 @@ jobs:
           for(const file of ['web/gymlytics-seed-offline.mjs','web/data/hojamatriz-offline-20261018.json']){
             if(!fs.readFileSync('web/sw.js','utf8').includes(file.replace('web/','')))throw Error('Falta en caché '+file);
           }
-          console.log('944? OK - semilla disponible sin APK');
+          console.log('OK: semilla de 9424 series disponible sin generar APK');
           JS
