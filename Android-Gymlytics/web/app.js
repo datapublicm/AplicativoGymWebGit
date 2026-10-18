@@ -153,6 +153,7 @@ function openDraft(id,saveCurrent=true){
  if(saveCurrent)storeActiveDraft();
  const tab=draftTabs.find(x=>x.id===id);if(!tab)return;
  activeDraftId=tab.id;
+ window.GymSelectedExerciseId=tab.exerciseId||null;
  cascade(0,tab.values);
  if($('registroVariante')&&tab.exerciseId){$('registroVariante').value=tab.exerciseId;
   window.GymSelectedExerciseId=$('registroVariante').value||null;}
