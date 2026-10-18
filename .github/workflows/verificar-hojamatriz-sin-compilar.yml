@@ -1,4 +1,4 @@
-name: "GymLytics 01.10 - pruebas offline sin precarga"
+name: "GymLytics 01.11 - ejemplo opcional y detalles"
 on:
   push:
     branches:
@@ -23,7 +23,9 @@ jobs:
           node --check web/app.js
           node --check web/offline-first.js
           node --check web/gymlytics-cloud-v2.mjs
-          node --check tools/verificar-inicio-vacio-chromium.mjs
+          node --check tools/verificar-ejemplo-opcional-chromium.mjs
+          node --check web/catalog-detail-browser.mjs
+          node --check web/catalog-detail-filter.mjs
           node --check web/catalog-offline-enhancements.js
           node --check web/sw.js
           node --check vite.config.js
@@ -32,7 +34,7 @@ jobs:
       - name: "Chromium real e IndexedDB offline sin compilar"
         run: |
           npm install --no-package-lock --no-audit --no-fund
-          node tools/verificar-inicio-vacio-chromium.mjs
+          node tools/verificar-ejemplo-opcional-chromium.mjs
       - name: "Integridad del paquete antes de compilar"
         run: |
           node --input-type=module <<'JS'
@@ -40,8 +42,9 @@ jobs:
           const app=fs.readFileSync('web/offline-first.js','utf8');
           const sw=fs.readFileSync('web/sw.js','utf8');
           const config=fs.readFileSync('vite.config.js','utf8');
-          if(app.includes("import {GYMLYTICS_SEED_PATH")||app.includes("installGymlyticsSeed(seed"))throw Error('Queda importación automática');
-          if(sw.includes('hojamatriz-offline-20261018.json')||sw.includes('gymlytics-seed-offline.mjs'))throw Error('Archivo histórico en caché');
-          if(config.includes("['assets','icons','data']"))throw Error('Vite copiaría archivos precargados');
-          console.log('OK: sin precarga al abrir GymLytics');
+          if(!app.includes("async function addExampleProfile()"))throw Error('No existe botón de ejemplo bajo demanda');
+          if(app.includes("installGymlyticsSeed(seed"))throw Error('Queda precarga al arranque');
+          if(!sw.includes('hojamatriz-offline-20261018.json')||!sw.includes('catalog-detail-browser.mjs'))throw Error('Faltan recursos opcionales en caché');
+          if(!config.includes("['assets','icons','data']"))throw Error('No se empaqueta ejemplo opcional');
+          console.log('OK: ejemplo solo por botón, empaquetado para modo offline');
           JS
