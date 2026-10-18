@@ -143,4 +143,58 @@
    const field=el(id);if(val&&field&&[...field.options].some(x=>x.value===val))field.value=val;
   }
  });
+
+ // Las variantes del ejercicio poseen UUID aunque compartan el mismo nombre.
+ const variant=el('registroVariante'),vwrap=el('registroVarianteWrap'),exercise=el('ejercicio'),zone=el('zona');
+ const lib=()=>window.GymExerciseLibrary||[];
+ const detail=(e,k)=>(e.detalles||[]).find(x=>x.campo===k)?.valor||'';
+ const unique=x=>[...new Set(x.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+ function options(node,vals,title){
+  const old=node.value;node.replaceChildren(new Option(vals.length?title:'Agregar ejercicio',''));
+  vals.forEach(x=>node.add(new Option(x,x)));node.disabled=!vals.length;
+  node.value=vals.includes(old)?old:(vals.length===1?vals[0]:'');
+ }
+ function variants(){
+  if(!exercise||!variant)return;
+  const matches=lib().filter(x=>x.nombre===exercise.value&&(!mode?.checked||
+   (!group?.value||detail(x,'Agrupación')===group.value)&&(!zone?.value||detail(x,'Anotación')===zone.value)));
+  const previous=window.GymSelectedExerciseId;variant.replaceChildren(new Option('Seleccionar variante…',''));
+  matches.forEach(x=>{const d=[detail(x,'Instrumento'),detail(x,'Agarre / Implemento'),
+    detail(x,'Técnica')||x.tecnica_actualizada].filter(Boolean).join(' · ');
+   variant.add(new Option((d||x.nombre)+' · '+String(x.id).slice(0,8),String(x.id)));});
+  vwrap.hidden=matches.length<=1;variant.disabled=!matches.length;
+  variant.value=matches.some(x=>String(x.id)===String(previous))?String(previous):
+   (matches.length===1?String(matches[0].id):'');
+  window.GymSelectedExerciseId=variant.value||null;
+ }
+ function applyVariant(){
+  const e=lib().find(x=>String(x.id)===String(window.GymSelectedExerciseId||''));if(!e)return;
+  for(const [id,val] of [['zona',detail(e,'Anotación')||e.zona_entrenamiento],
+   ['instrumento',detail(e,'Instrumento')],['implemento',detail(e,'Agarre / Implemento')],
+   ['tecnica',detail(e,'Técnica')||e.tecnica_actualizada]]){
+   const node=el(id);if(node&&val&&[...node.options].some(o=>o.value===val))node.value=val;
+  }
+ }
+ function refresh(){
+  if(!mode?.checked){variants();return;}
+  const filtered=lib().filter(e=>group?.value&&detail(e,'Agrupación')===group.value);
+  const annotations=unique(filtered.map(e=>detail(e,'Anotación'))),old=zone.value;
+  zone.replaceChildren(new Option('Seleccionar anotación…',''));
+  annotations.forEach(x=>zone.add(new Option(x,x)));
+  zone.value=annotations.includes(old)?old:(annotations.length===1?annotations[0]:'');
+  options(exercise,unique(filtered.filter(e=>zone.value&&detail(e,'Anotación')===zone.value).map(e=>e.nombre)),'Seleccionar ejercicio…');
+  variants();
+ }
+ function order(){
+  const a=exercise?.closest('.field'),b=zone?.closest('.field');
+  if(a&&b&&a.parentElement===b.parentElement)
+   a.parentElement.insertBefore(mode?.checked?b:a,mode?.checked?a:b);
+ }
+ window.GymOfflineRefreshSelectors=refresh;
+ mode?.addEventListener('change',()=>{order();refresh();applyVariant();});
+ group?.addEventListener('change',()=>{refresh();applyVariant();});
+ zone?.addEventListener('change',()=>{if(mode?.checked){refresh();applyVariant();}});
+ exercise?.addEventListener('change',()=>{variants();applyVariant();});
+ variant?.addEventListener('change',()=>{window.GymSelectedExerciseId=variant.value||null;applyVariant();});
+ order();refresh();
 })();

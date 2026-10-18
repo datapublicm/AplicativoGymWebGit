@@ -77,18 +77,22 @@ function cascade(start=0,preferred={}){
   related=related.filter(r=>key==='t'?(r.t||[]).includes(chosen):r[key]===chosen);
  }
  updateDetailState();
+ window.GymOfflineRefreshSelectors?.();
 }
 function chosenRow(){
  const values=Object.fromEntries(FLOW.map(([key])=>[key,getValue(key)]));
  if(!values.g||!values.s||!values.i||!values.e||!values.t)return null;
+ const variants=(window.GymExerciseLibrary||[]).filter(e=>e.nombre===values.e);
+ const library=variants.find(e=>String(e.id)===String(window.GymSelectedExerciseId||''))||
+  (variants.length===1?variants[0]:null);
+ if(variants.length>1&&!library)return null;
  const matched=allCatalog().find(r=>FLOW.filter(x=>x[0]!=='t').every(([key])=>r[key]===values[key]));
- if(matched)return matched;
- const library=(window.GymExerciseLibrary||[]).find(e=>e.nombre===values.e);
+ if(matched)return library?{...matched,exerciseId:library.id}:matched;
  const sample=allCatalog().find(r=>r.e===values.e);
  return {
   g:values.g,s:values.s,z:values.z||'Sin clasificar',kind:values.kind||'Otro',
   i:values.i,a:values.a||'No especificado',gr:values.gr||'No especificado',e:values.e,
-  t:[values.t],m:sample?.m||library?.musculos_principales?.join(', ')||'Pendiente de asignación',
+  exerciseId:library?.id||null,t:[values.t],m:sample?.m||library?.musculos_principales?.join(', ')||'Pendiente de asignación',
   ms:sample?.ms||library?.musculos_secundarios?.join(', ')||'Pendiente de asignación',
   n:0,last:null
  };
@@ -135,6 +139,7 @@ function snapshotExerciseRows(){return [...$('seriesRows').querySelectorAll('tr'
 function storeActiveDraft(){
  const tab=draftTabs.find(x=>x.id===activeDraftId);if(!tab)return;
  tab.values=Object.fromEntries(FLOW.map(([key])=>[key,getValue(key)]));
+ tab.exerciseId=window.GymSelectedExerciseId||null;
  tab.date=$('fecha').value;tab.notes=$('observaciones').value;
  tab.seriesMode=seriesMode;tab.seriesGroups=seriesGroups;tab.seriesCustomized=seriesCustomized;
  tab.rows=snapshotExerciseRows();
@@ -149,6 +154,8 @@ function openDraft(id,saveCurrent=true){
  const tab=draftTabs.find(x=>x.id===id);if(!tab)return;
  activeDraftId=tab.id;
  cascade(0,tab.values);
+ if($('registroVariante')&&tab.exerciseId){$('registroVariante').value=tab.exerciseId;
+  window.GymSelectedExerciseId=$('registroVariante').value||null;}
  $('fecha').value=tab.date||dateNow();$('observaciones').value=tab.notes||'';
  seriesMode=tab.seriesMode;seriesGroups=tab.seriesGroups;seriesCustomized=tab.seriesCustomized;
  renderSeries();
@@ -164,7 +171,7 @@ function openDraft(id,saveCurrent=true){
 function newDraft(saveCurrent=true){
  if(saveCurrent)storeActiveDraft();
  const first=allCatalog()[0], values=first?{g:first.g,s:first.s,z:first.z,kind:first.kind,i:first.i,a:first.a,gr:first.gr,e:first.e,t:first.t?.[0]}:{...INITIAL};
- const tab={id:'e'+(++draftSeq),title:'Ejercicio '+draftSeq,values,date:$('fecha').value||dateNow(),notes:'',seriesMode:'normal',seriesGroups:4,seriesCustomized:false,rows:[],stage:'context'};
+ const tab={id:'e'+(++draftSeq),title:'Ejercicio '+draftSeq,values,exerciseId:null,date:$('fecha').value||dateNow(),notes:'',seriesMode:'normal',seriesGroups:4,seriesCustomized:false,rows:[],stage:'context'};
  draftTabs.push(tab);openDraft(tab.id,false);
 }
 function closeDraft(id){
@@ -586,7 +593,7 @@ async function saveSeries(){
  const current=()=>requestId===window.GymSaveAttempt&&
   sessionStamp===window.GymCloud.getSessionStamp?.();
  const payload={exercise:r,date,technique:tech,notes:$('observaciones').value.trim(),entries};
- const rowSignature=()=>JSON.stringify({date:$('fecha').value,tech:getValue('t'),exercise:chosenRow()?.e,
+ const rowSignature=()=>JSON.stringify({date:$('fecha').value,tech:getValue('t'),exercise:chosenRow()?.e,exerciseId:window.GymSelectedExerciseId||null,
    notes:$('observaciones').value.trim(),entries:getEntries().map(({el,...entry})=>entry)});
  const submittedSignature=rowSignature();
  const btn=$('saveRecords'),feedback=$('saveFeedback');feedback.hidden=true;feedback.textContent='';btn.disabled=true;btn.textContent='Guardando en este dispositivo…';

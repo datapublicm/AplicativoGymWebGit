@@ -1069,3 +1069,6 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 .gps-fields input{width:100%;min-width:0;border:1px solid #3b6f86;background:#0c2637;color:#fff;padding:9px;border-radius:8px}
 .gps-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:11px}
 @media(max-width:420px){.catalog-extra-row{grid-template-columns:1fr 1fr auto;gap:4px}.gps-fields{grid-template-columns:1fr 1fr}.gps-actions>button{flex:1 1 100%}}
+
+/* ID de variante: mostrar únicamente cuando el nombre no sea inequívoco. */
+#registroVarianteWrap[hidden]{display:none!important}
