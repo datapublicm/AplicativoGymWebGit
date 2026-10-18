@@ -92,9 +92,9 @@ try{
  await evaluate("(()=>{window.confirm=()=>true;document.querySelector('[data-profile-action=example]').click();return true})()");
  await until('document.querySelector("#offlineProfiles").options.length===3','ejemplo solicitado');
  p=await profiles();
- const imported=p.find(x=>x.name==='Ejemplo');
- assert(imported,'El perfil Ejemplo debe existir solo tras pulsar Agregar ejemplo');
- assert.deepEqual([imported.records,imported.gyms,imported.sites,imported.exercises,imported.sessions,imported.demo],
+ const sampleProfile=p.find(x=>x.name==='Ejemplo');
+ assert(sampleProfile,'El perfil Ejemplo debe existir solo tras pulsar Agregar ejemplo');
+ assert.deepEqual([sampleProfile.records,sampleProfile.gyms,sampleProfile.sites,sampleProfile.exercises,sampleProfile.sessions,sampleProfile.demo],
   [9424,3,16,146,446,true]);
  assert.equal(p.find(x=>x.name==='Mi perfil').records,1);
  console.log('PASS 8: Agregar ejemplo crea 9424 series, 3 gimnasios y 146 ejercicios aparte');
