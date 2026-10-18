@@ -8,7 +8,6 @@ import {profileMeta,validateProfileName,validateProfileBinding,verifyRestoreBack
 import {prepareDownloadedCatalog} from './offline-catalog-download.js';
 import {materializeReferenceCatalog,parseReferenceId,setReferenceOverride,listReferenceChoices} from './reference-overrides.js';
 import {photoLocalKey,migrateLegacyPhotoJobs} from './photo-sync-engine.js';
-import {GYMLYTICS_SEED_PATH,GYMLYTICS_SEED_MARKER,installGymlyticsSeed} from './gymlytics-seed-offline.mjs';
 import {createGymlyticsCloudSync} from './gymlytics-cloud-v2.mjs';
 const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
@@ -823,23 +822,8 @@ async function downloadAllCatalogs(uid,ownerStamp){
 
 async function init(){
  db=await openDB();
- // Importar solo una vez a un perfil autónomo de prueba: jamás mezclar con otro usuario.
- // Si el usuario eliminó el perfil importado, no recrearlo en cada arranque.
- let seedWarning='';
- if(localStorage.getItem(GYMLYTICS_SEED_MARKER)!=='done'){
-  try{
-   const existing=await get('090ea9af-0c09-5a12-88bf-7bf1b9ade9f2');
-   if(existing)localStorage.setItem(GYMLYTICS_SEED_MARKER,'done');
-   else{
-    const response=await fetch(GYMLYTICS_SEED_PATH,{cache:'no-store'});
-    if(!response.ok)throw Error('No se encontró el archivo HojaMatriz incluido en la aplicación.');
-    const seed=await response.json();
-    await installGymlyticsSeed(seed,{get,put,emptyFactory:EMPTY,
-     alreadyImported:()=>localStorage.getItem(GYMLYTICS_SEED_MARKER)==='done',
-     mark:()=>localStorage.setItem(GYMLYTICS_SEED_MARKER,'done')});
-   }
-  }catch(error){seedWarning=String(error.message||error);}
- }
+ // Primer inicio: exclusivamente un perfil local vacío. No precargar HojaMatriz,
+ // no borrar ni reescribir perfiles existentes, y no acceder a Supabase sin solicitud.
  profiles=(await all()).map(profileMeta);
  syncController=createGymlyticsCloudSync({
   remote:remoteGateway,getState:()=>({data:latest?.data||EMPTY(),profileName:latest?.name||'Perfil',profileId:activeId}),
@@ -856,7 +840,6 @@ async function init(){
  const selected=profiles.find(x=>x.id===last)?.id||profiles[0].id;
  window.GymCloud=api;
  await activate(selected,true);
- if(seedWarning)status('No se cargó el historial HojaMatriz offline: '+seedWarning+'. Los perfiles anteriores se conservan.');
  $('offlineProfileMenuToggle')?.addEventListener('click',()=>{$('offlineProfileMenu').hidden=!$('offlineProfileMenu').hidden;});
  document.querySelectorAll('[data-profile-action]').forEach(button=>button.addEventListener('click',()=>{
   const action=button.dataset.profileAction;

@@ -4,15 +4,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 const here=fileURLToPath(new URL('.',import.meta.url));
 function copyPreviewAssets(){return {name:'copy-gymlytics-assets',closeBundle(){
- const required=['app.js','dashboard.js','offline-first.js','gymlytics-seed-offline.mjs','gymlytics-cloud-v2.mjs','offline-catalog-download.js','catalog-sync-engine.js','reference-overrides.js','photo-sync-engine.js','profile-policy.js','cloud-sync.js','sync-engine.js','legacy-compat.js','sw.js','manifest.webmanifest','styles.css'];
+ const required=['app.js','dashboard.js','offline-first.js','gymlytics-cloud-v2.mjs','offline-catalog-download.js','catalog-sync-engine.js','reference-overrides.js','photo-sync-engine.js','profile-policy.js','cloud-sync.js','sync-engine.js','legacy-compat.js','sw.js','manifest.webmanifest','styles.css'];
  for(const name of required)fs.copyFileSync(path.join(here,'web',name),path.join(here,'dist',name));
- for(const directory of ['assets','icons','data']){
+ for(const directory of ['assets','icons']){
   const from=path.join(here,'web',directory),to=path.join(here,'dist',directory);
   fs.cpSync(from,to,{recursive:true,force:true});
  }
- const seed=JSON.parse(fs.readFileSync(path.join(here,'dist','data','hojamatriz-offline-20261018.json'),'utf8'));
- if(seed?.tables?.series?.length!==9424||seed?.tables?.session?.length!==446)
-  throw Error('La importación HojaMatriz no coincide con los 9424 registros aprobados');
+ // Los datos HojaMatriz se conservan en el repositorio para pruebas, pero
+ // NO se copian ni empaquetan en dist ni en la APK de inicio vacío.
  // Incluir en la caché inicial los bundles con hash generados por Vite.
  // De otro modo, tras instalar y perder Internet antes del segundo arranque
  // IndexedDB seguiría intacta, pero no se podría ejecutar la interfaz.

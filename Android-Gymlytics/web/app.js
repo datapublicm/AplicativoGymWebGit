@@ -2,7 +2,7 @@
 const KEY='gymlog_cloud_migracion';
 let seriesMode='normal', seriesGroups=4, seriesCustomized=false;
 const FLOW=[['g','gimnasio'],['s','sede'],['z','zona'],['kind','tipo'],['i','instrumento'],['a','implemento'],['gr','agarre'],['e','ejercicio'],['t','tecnica']];
-const INITIAL={g:'Smart Fit',s:'La Rambla Brasil',z:'Espalda lateral',kind:'Máquina',i:'Máquina de polea alta',a:'Cable Pulldown',gr:'No especificado',e:'Jalón al pecho',t:'01 - Ejecución base'};
+const INITIAL={g:'',s:'',z:'',kind:'',i:'',a:'',gr:'',e:'',t:''};
 let model={records:[],photos:{}},toastTimer;
 let historyReady=false;
 const $=id=>document.getElementById(id);
@@ -47,6 +47,13 @@ function fillTypes(choices,preferred){const valid=new Set(choices);const old=get
 function allCatalog(){return [...(window.GymBaseCatalog||[]),...(window.GymCustomCatalog||[])].filter(r=>r.g&&r.s&&r.e)}
 function cascade(start=0,preferred={}){
  const all=allCatalog(),ent=window.GymEntities||{gyms:[],sites:[],machines:[],options:[]},lib=window.GymExerciseLibrary||[];
+ // Sin catálogos, no ofrecer valores ficticios como alternativas seleccionables.
+ if(!all.length&&!ent.gyms.length&&!ent.sites.length&&!ent.machines.length&&!ent.options.length&&!lib.length){
+  for(const [key,id] of FLOW)if(key==='kind'){
+   document.querySelectorAll('input[name="tipo"]').forEach(input=>{input.checked=false;input.disabled=true});
+  }else fillSelect(id,[]);
+  updateDetailState();window.GymOfflineRefreshSelectors?.();return;
+ }
  const extras=type=>(ent.options||[]).filter(x=>x.tipo===type).map(x=>x.nombre);
  let related=all;
  for(let n=0;n<FLOW.length;n++){
