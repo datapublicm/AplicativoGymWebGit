@@ -33,7 +33,16 @@ function readStorage(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&A
 function persist(){return true} // Fotos: vista previa en memoria; no se almacenan como datos de entrenamiento.
 function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3400)}
 function getValue(key){if(key==='kind')return document.querySelector('input[name="tipo"]:checked')?.value||'';return $(FLOW.find(x=>x[0]===key)[1]).value}
-function fillSelect(id,choices,preferred){const el=$(id),old=el.value,selection=[preferred,old,choices[0]].find(v=>choices.includes(v))||'';el.replaceChildren();if(!choices.length){el.add(new Option('Sin opciones para esta selección',''));el.disabled=true;return}el.disabled=false;for(const value of choices)el.add(new Option(value,value));el.value=selection}
+function fillSelect(id,choices,preferred){
+ const el=$(id),old=el.value;
+ const selection=[preferred,old,choices.length===1?choices[0]:null].find(v=>choices.includes(v))||'';
+ el.replaceChildren();
+ if(!choices.length){el.add(new Option(id==='ejercicio'?'Agregar ejercicio':'Sin opciones para esta selección',''));el.disabled=true;return;}
+ el.disabled=false;
+ el.add(new Option(choices.length===1?'Seleccionar…':'Seleccionar…',''));
+ for(const value of choices)el.add(new Option(value,value));
+ el.value=selection;
+}
 function fillTypes(choices,preferred){const valid=new Set(choices);const old=getValue('kind');const chosen=[preferred,old,'Máquina',...choices].find(v=>valid.has(v));document.querySelectorAll('input[name="tipo"]').forEach(r=>{r.disabled=!valid.has(r.value);r.checked=r.value===chosen})}
 function allCatalog(){return [...(window.GymBaseCatalog||[]),...(window.GymCustomCatalog||[])].filter(r=>r.g&&r.s&&r.e)}
 function cascade(start=0,preferred={}){
@@ -48,7 +57,7 @@ function cascade(start=0,preferred={}){
   else if(key==='s'){
    const ownGym=ent.gyms.find(g=>g.nombre===getValue('g'));
    const ownSites=ent.sites.filter(site=>site.gimnasio_id===ownGym?.id).map(s=>s.nombre);
-   choices=uniq([...related.map(r=>r.s),...ownSites,'No registrado']);
+   choices=uniq([...related.map(r=>r.s),...ownSites]);if(!choices.length)choices=['No registrado'];
   }else if(key==='z')choices=uniq([...related.map(r=>r.z),...all.map(r=>r.z),...lib.map(r=>r.zona_entrenamiento),...extras('zona'),'Sin clasificar']);
   else if(key==='kind')choices=uniq([...related.map(r=>r.kind),...all.map(r=>r.kind),...ent.machines.map(m=>m.tipo_equipo)]);
   else if(key==='i')choices=uniq([...related.map(r=>r.i),
@@ -197,7 +206,8 @@ function catalogChoices(kind){
 function catalogFillSelect(select,choices,placeholder){
  if(!select)return;
  const before=select.value;
- select.replaceChildren(new Option(choices.length?placeholder||'Seleccionar…':select.id==='exerciseExistingSelect'?'Agregar ejercicio':placeholder||'Agregar elemento',''));
+ const emptyLabel={gymExistingSelect:'Agregar gimnasio',siteExistingSelect:'Agregar sede',exerciseExistingSelect:'Agregar ejercicio'}[select.id]||'Agregar elemento';
+ select.replaceChildren(new Option(choices.length?placeholder||'Seleccionar…':emptyLabel,''));
  choices.forEach(x=>select.add(new Option(x.name,x.id)));
  select.value=choices.some(x=>x.id===before)?before:(choices.length===1?choices[0].id:'');
  select.disabled=false;
