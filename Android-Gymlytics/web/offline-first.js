@@ -82,12 +82,9 @@ function renderSyncStatus(){
   'Solo en este dispositivo. Puedes crear una cuenta más adelante sin perder tus registros.';
 }
 function catalogInit(){
- // Nunca precargar datos de otro usuario: los perfiles nuevos empiezan vacíos.
- const source=Array.isArray(latest?.data?.baseCatalog)?latest.data.baseCatalog:[];
- return source.map(x=>({
-  g:x.g,s:x.s,z:x.z,kind:x.kind,i:x.i,a:x.a,gr:x.gr,e:x.e,
-  t:[...(x.t||[])],m:x.m,ms:x.ms,n:0,last:null
- }));
+ // No mostrar plantillas compartidas ni referencias de otros orígenes:
+ // el catálogo visible procede solo del perfil activo.
+ return [];
 }
 async function activate(id,initial=false){
  if(transitioning)throw Error('Hay un cambio de perfil en curso.');
@@ -213,7 +210,7 @@ const api={
  getWriteStatus:writeStatus,
  canRead:()=>!!activeId&&!!latest,
  getSessionStamp:stamp,
- async refreshCatalog(){window.GymBaseCatalog=catalogInit();if(typeof cascade==='function')cascade(0);return window.GymBaseCatalog.length},
+ async refreshCatalog(){window.GymBaseCatalog=catalogInit();catalogUpdate();return presentCatalog('exercise').length},
  async loadInitialCatalog(){return catalogInit()},
  async loadOwnCatalog(){return structuredClone(latest.data.custom)},
  async loadIndependentCatalog(){catalogUpdate();return structuredClone(latest.data.entities)},
@@ -544,8 +541,9 @@ async function importProfileBackup(event){
 
 // Leer todas las categorías y comprobar recuentos ANTES de escribir en IndexedDB.
 async function downloadAllCatalogs(uid,ownerStamp){
- const fetchTable=async(table,{shared=false}={})=>{
-  const scope=q=>shared?q.eq('activo',true):q.eq('user_id',uid);
+ const fetchTable=async(table)=>{
+  // La lectura de datos siempre queda limitada a la cuenta autenticada.
+  const scope=q=>q.eq('user_id',uid);
   const count=await scope(remote.from(table).select('id',{count:'exact',head:true}));
   if(count.error||!Number.isSafeInteger(count.count)||count.count<0)
    throw Error('No se pudo comprobar el total de '+table);
@@ -557,19 +555,19 @@ async function downloadAllCatalogs(uid,ownerStamp){
    if(error||!Array.isArray(data)||data.length!==Math.min(500,count.count-offset))
     throw Error('Descarga incompleta de '+table+'; no se guardó nada.');
    for(const row of data){
-    if(!row?.id||seen.has(row.id)||!shared&&row.user_id!==uid)throw Error('Se recibió una fila repetida o ajena de '+table);
+    if(!row?.id||seen.has(row.id)||row.user_id!==uid)throw Error('Se recibió una fila repetida o ajena de '+table);
     seen.add(row.id);result.push(row);
    }
   }
   return result;
  };
- const [base,exercises,gyms,sites,machines,options,muscles]=await Promise.all([
-  fetchTable('tbl_catalogo_predeterminado',{shared:true}),fetchTable('tbl_ejercicios'),
-  fetchTable('tbl_gimnasios'),fetchTable('tbl_sedes'),fetchTable('tbl_maquinas'),
-  fetchTable('tbl_opciones_personales'),fetchTable('tbl_musculos',{shared:true})
+ const [exercises,gyms,sites,machines,options]=await Promise.all([
+  fetchTable('tbl_ejercicios'),fetchTable('tbl_gimnasios'),
+  fetchTable('tbl_sedes'),fetchTable('tbl_maquinas'),fetchTable('tbl_opciones_personales')
  ]);
  if(ownerStamp!==stamp()||remoteSession?.user?.id!==uid)throw Error('Se cambió de cuenta durante la descarga.');
- return prepareDownloadedCatalog({base,exercises,gyms,sites,machines,muscles,options:options.filter(x=>x.activo!==false)});
+ // Los datos comunes siguen guardados en Supabase, sin mezclarse con perfiles de prueba o personales.
+ return prepareDownloadedCatalog({exercises,gyms,sites,machines,options:options.filter(x=>x.activo!==false)});
 }
 
 async function init(){
