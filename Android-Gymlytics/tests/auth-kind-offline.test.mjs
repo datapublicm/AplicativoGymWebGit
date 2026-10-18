@@ -47,7 +47,7 @@ test('El perfil local Prueba puede vincularse con una cuenta personal',async()=>
 });
 test('Primer inicio de sesión registra la identidad con las ocho tablas',async()=>{
  const h=authCase(null);await h.login();
- const r=h.state();assert.equal(r.provisionCalls,1);assert.equal(r.kind,'personal');assert.equal(r.updates,1);
+ const r=h.state();assert.equal(r.provisionCalls,1);assert.equal(r.kind,'personal');assert.equal(r.updates,2); // Vincular actualiza estado y controles
 });
 test('Si la validación de cuenta falla se retira la sesión remota sin tocar perfil',async()=>{
  const h=authCase({tipo_cuenta:'prueba'});
