@@ -631,7 +631,7 @@ async function saveSeries(){
  }
  finally{if(current()){btn.disabled=false;btn.textContent='Guardar series'}}
 }
-function recordHtml(r){return `<div class="record-item"><div><strong>${esc(r.exercise)}</strong><p>${esc(fmtDate(r.date))} · ${esc(r.gym)} · ${esc(r.sede)}<br>${esc(r.series)}${r.subdivision!=='-'?' · '+esc(r.subdivision):''} · ${esc(r.technique)}${r.assistance!==null&&r.assistance!==undefined?' · Asist.: '+esc(r.assistance):''}</p></div><aside><strong>${esc(r.weight)} ${esc(r.unit)} × ${esc(r.reps)}</strong><small>repeticiones</small><div class="record-actions"><button type="button" data-edit="${esc(r.id)}" title="Modificar serie">Modificar</button><button type="button" data-delete="${esc(r.id)}" title="Eliminar serie">Eliminar</button><button type="button" data-progress="${esc(r.exercise)}" title="Mostrar evolución de este ejercicio">Ver progreso</button></div></aside></div>`}
+function recordHtml(r){return `<div class="record-item"><div><strong>${esc(r.exercise)}</strong><p>${esc(fmtDate(r.date))} · ${esc(r.gym)} · ${esc(r.sede)}<br>${esc(r.series)}${r.subdivision!=='-'?' · '+esc(r.subdivision):''} · ${esc(r.technique)}${r.assistance!==null&&r.assistance!==undefined?' · Asist.: '+esc(r.assistance):''}</p></div><aside><strong>${esc(r.weight)} ${esc(r.unit||'u. s/e')} × ${esc(r.reps)}</strong><small>repeticiones</small><div class="record-actions"><button type="button" data-edit="${esc(r.id)}" title="Modificar serie">Modificar</button><button type="button" data-delete="${esc(r.id)}" title="Eliminar serie">Eliminar</button><button type="button" data-progress="${esc(r.exercise)}" title="Mostrar evolución de este ejercicio">Ver progreso</button></div></aside></div>`}
 function orderedRecords(){return [...model.records].sort((a,b)=>b.date.localeCompare(a.date)||(b.createdAt||'').localeCompare(a.createdAt||''))}
 function drawRecent(){const list=orderedRecords().slice(0,3);$('recentRecords').innerHTML=list.length?list.map(recordHtml).join(''):'<div class="empty">Aún no hay registros nuevos. Completa una fila y guárdala.</div>'}
 const HISTORY_FIELDS=[
@@ -650,7 +650,7 @@ function historyFieldValue(record,key){
 }
 function historyColumnValue(record,key){
  if(key==='date')return fmtDate(record.date);
- if(key==='weight')return String(record.weight??'')+' '+String(record.unit||'kg');
+ if(key==='weight')return String(record.weight??'')+' '+String(record.unit||'u. s/e');
  if(key==='reps')return String(record.reps??'');
  return historyFieldValue(record,key);
 }
