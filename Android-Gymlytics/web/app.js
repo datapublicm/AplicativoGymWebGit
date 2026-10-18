@@ -185,7 +185,6 @@ const catalogNorm=v=>String(v??'').trim().normalize('NFD').replace(/[\u0300-\u03
 const catalogOwnOptions=()=>window.GymEntities?.options||[];
 const catalogBaseOptions=kind=>{
  const selected=$('gymExistingSelect')?.value||'';
- if(kind==='site'&&!selected)return [];
  const gymName=kind==='site'?catalogChoices('gym').find(x=>x.id===selected)?.name||'':'';
  return window.GymReferenceChoices?.(kind,{gymId:selected,gymName})||[];
 };
@@ -201,14 +200,16 @@ function catalogChoices(kind){
  if(kind==='zone')own=catalogOwnOptions().filter(x=>x.tipo==='zona').map(x=>({id:String(x.id),name:x.nombre,own:true,type:x.tipo}));
  if(kind==='grip')own=catalogOwnOptions().filter(x=>['agarre','accesorio'].includes(x.tipo)).map(x=>({id:String(x.id),name:x.nombre,own:true,type:x.tipo}));
  if(kind==='technique')own=catalogOwnOptions().filter(x=>x.tipo==='tecnica').map(x=>({id:String(x.id),name:x.nombre,own:true,type:x.tipo}));
- return own.sort((a,b)=>a.name.localeCompare(b.name,'es',{numeric:true}));
+ const refs=catalogBaseOptions(kind);
+ // Conservar también las referencias ya descargadas, sin acceder a la red.
+ return [...own,...refs].sort((a,b)=>a.name.localeCompare(b.name,'es',{numeric:true})||Number(b.own)-Number(a.own));
 }
 function catalogFillSelect(select,choices,placeholder){
  if(!select)return;
  const before=select.value;
  const emptyLabel={gymExistingSelect:'Agregar gimnasio',siteExistingSelect:'Agregar sede',exerciseExistingSelect:'Agregar ejercicio'}[select.id]||'Agregar elemento';
  select.replaceChildren(new Option(choices.length?placeholder||'Seleccionar…':emptyLabel,''));
- choices.forEach(x=>select.add(new Option(x.name,x.id)));
+ choices.forEach(x=>select.add(new Option(x.name+(x.own?'':' · referencia'),x.id)));
  select.value=choices.some(x=>x.id===before)?before:(choices.length===1?choices[0].id:'');
  select.disabled=false;
  // Mostrar el nombre completo al consultar cada categoría, incluso si el
@@ -379,13 +380,21 @@ function setupCatalogCompact(){
     renderIndependentCatalog();
    }
    if(item.kind==='site'&&select.value){
-    const sites=window.GymEntities?.sites||[],chosen=sites.find(x=>String(x.id)===select.value);
-    const matches=sites.filter(x=>x.nombre===chosen?.nombre);
-    if(chosen&&matches.length===1){
-     $('gymExistingSelect').value=String(chosen.gimnasio_id);
-     if($('siteGymSelect'))$('siteGymSelect').value=String(chosen.gimnasio_id);
-     renderIndependentCatalog();$('siteExistingSelect').value=String(chosen.id);
-    }else if(matches.length>1)$('gymExistingSelect').value='';
+    const chosen=catalogChoices('site').find(x=>x.id===select.value);
+    const sameName=catalogChoices('site').filter(x=>catalogNorm(x.name)===catalogNorm(chosen?.name));
+    const gymChoices=catalogChoices('gym'),sites=window.GymEntities?.sites||[];
+    const siteOwn=sites.find(x=>String(x.id)===select.value);
+    const associated=siteOwn
+     ?gymChoices.find(x=>x.id===String(siteOwn.gimnasio_id))
+     :gymChoices.find(x=>catalogNorm(x.name)===catalogNorm(chosen?.sourceGym));
+    if(chosen&&associated&&sameName.length===1){
+     $('gymExistingSelect').value=associated.id;
+     if($('siteGymSelect'))$('siteGymSelect').value=associated.id;
+     renderIndependentCatalog();$('siteExistingSelect').value=chosen.id;
+    }else if(sameName.length>1){
+     $('gymExistingSelect').value='';
+     // No escoger automáticamente un gimnasio si varios comparten esta sede.
+    }
    }
    if(['gym','site','machine'].includes(item.kind)){
     const entry=existingCatalogItems(item.kind).find(x=>String(x.id)===select.value);
