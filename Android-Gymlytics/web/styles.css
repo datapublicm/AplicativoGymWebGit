@@ -1046,3 +1046,26 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 .offline-backup-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .offline-backup-actions>.outline-btn,.offline-backup-actions>.primary-btn{min-width:0;min-height:43px;width:100%;font-size:13px;padding:8px 5px}
 @media(max-width:420px){.offline-backup-actions{gap:5px}.offline-backup-actions>.outline-btn,.offline-backup-actions>.primary-btn{font-size:12px;padding:8px 2px}.offline-profile-compact>button{padding:8px;font-size:13px}}
+
+/* Ajustes visuales offline 01.08 (sin compilación ni conexión a Supabase). */
+.catalog-visual-group{padding:12px;border-radius:14px;border:1px solid #235674;background:rgba(13,43,69,.35);display:grid;gap:9px}
+.catalog-visual-group>h3,.catalog-group-title{margin:5px 0 2px;color:#d2f7ff;font-size:1.05rem}
+.catalog-visual-group>p{margin:0 0 6px;color:#b0cada;font-size:.84rem}
+.catalog-gps-control{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.catalog-gps-control>small{font-size:.79rem;color:#acc9da;flex:1;min-width:170px}
+.catalog-extra-details{display:grid;gap:9px;grid-column:1/-1}
+.catalog-extra-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center}
+.catalog-extra-row>input{min-width:0}
+.catalog-exercise-selector>#editExerciseDetails{margin:8px 0}
+.registro-select-mode>label{display:flex;align-items:center;gap:8px;padding:8px 0}
+.registro-select-mode input{width:19px;height:19px}
+.gps-modal{max-width:min(650px,calc(100vw - 22px));width:100%;max-height:90vh;overflow:auto;background:#081827;color:#f1f9fc;border:1px solid #3b6f86;border-radius:14px}
+.gps-dialog-content{padding:13px 18px 18px}
+.gps-map-fallback,#siteGPSMap{width:100%;height:235px;border-radius:9px;border:1px solid #31647a;background:#142b3a}
+.gps-map-fallback{display:grid;place-items:center;padding:20px;text-align:center;color:#adc6d9}
+.gps-map-fallback[hidden],#siteGPSMap[hidden]{display:none}
+.gps-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.gps-fields label{display:flex;flex-direction:column;gap:5px}
+.gps-fields input{width:100%;min-width:0;border:1px solid #3b6f86;background:#0c2637;color:#fff;padding:9px;border-radius:8px}
+.gps-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:11px}
+@media(max-width:420px){.catalog-extra-row{grid-template-columns:1fr 1fr auto;gap:4px}.gps-fields{grid-template-columns:1fr 1fr}.gps-actions>button{flex:1 1 100%}}
