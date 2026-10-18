@@ -474,8 +474,9 @@ function renderIndependentCatalog(){
  if(!gyms.length){el.add(new Option('Primero registra un gimnasio',''));el.disabled=true;}
  else{
   el.disabled=false;
+  el.add(new Option(gyms.length===1?'Gimnasio único':'Seleccionar gimnasio…',''));
   for(const gym of gyms)el.add(new Option(gym.name,gym.id));
-  el.value=gyms.some(g=>g.id===chosen)?chosen:(gyms.some(g=>g.id===previous)?previous:gyms[0].id);
+  el.value=gyms.some(g=>g.id===chosen)?chosen:(gyms.some(g=>g.id===previous)?previous:(gyms.length===1?gyms[0].id:''));
  }
  const gymById=new Map((ent.gyms||[]).map(x=>[x.id,x.nombre]));
  populateCatalogSelect('gymExistingSelect',ent.gyms||[],x=>x.nombre);
