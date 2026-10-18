@@ -3,7 +3,7 @@
 (() => {
  'use strict';
  const el=id=>document.getElementById(id);
- const details=['Agrupación','Anotación','Instrumento','Agarre / Implemento','Técnica'];
+ const details=['Agrupación','Anotación','Máquina','Agarre / Implemento','Técnica'];
  const detailKeys=['agrupacion','anotacion','instrumento','agarre_implemento','tecnica'];
  const normalize=value=>String(value??'').trim();
  function makeExtra(name='',value=''){
@@ -33,18 +33,22 @@
   for(let i=0;i<details.length;i++){
    const field=el('catalogForm').querySelector('[name="'+detailKeys[i]+'"]');
    if(!field)continue;
-   field.value=(exercise.detalles||[]).find(x=>x.campo===details[i])?.valor||
+   field.value=(exercise.detalles||[]).find(x=>x.campo===details[i]||(details[i]==='Máquina'&&x.campo==='Instrumento'))?.valor||
     (detailKeys[i]==='anotacion'?exercise.zona_entrenamiento:
      detailKeys[i]==='tecnica'?exercise.tecnica_actualizada:'')||'';
   }
-  const extras=(exercise.detalles||[]).filter(d=>!details.includes(d.campo));
+  const extras=(exercise.detalles||[]).filter(d=>!details.includes(d.campo)&&d.campo!=='Instrumento');
   el('catalogExtraDetails').replaceChildren(...extras.map(x=>makeExtra(x.campo,x.valor)));
   collect();
  }
  const extra=el('catalogExtraDetails');
- el('addExerciseExtra')?.addEventListener('click',()=>{
+ el('addExerciseExtra')?.addEventListener('click',event=>{
+  event.preventDefault();
   if(extra.children.length>=30){el('catalogFeedback').textContent='Máximo 30 detalles adicionales.';return;}
-  extra.append(makeExtra());collect();
+  const added=makeExtra();extra.append(added);collect();
+  added.querySelector('.extra-campo').focus();
+  added.scrollIntoView?.({block:'nearest'});
+  el('catalogFeedback').textContent='Característica añadida: completa nombre y valor y guarda el ejercicio.';
  });
  extra?.addEventListener('click',event=>{
   const remove=event.target.closest('.extra-remove');

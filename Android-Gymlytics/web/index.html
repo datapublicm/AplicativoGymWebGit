@@ -10,7 +10,7 @@ Almacenamiento local · Nube opcional</div></aside>
   <label class="field"><span>Perfil local</span><select id="offlineProfiles" aria-label="Perfil local activo"></select></label>
   <button class="outline-btn" id="offlineProfileMenuToggle" type="button" aria-controls="offlineProfileMenu">Opciones ▾</button>
 </div>
-<div id="offlineProfileMenu" class="offline-profile-menu" hidden><button type="button" data-profile-action="add">＋ Agregar perfil</button><button type="button" data-profile-action="rename">✎ Modificar nombre</button><button type="button" data-profile-action="delete">🗑 Eliminar perfil</button></div>
+<div id="offlineProfileMenu" class="offline-profile-menu" hidden><button type="button" data-profile-action="add">＋ Agregar perfil</button><button type="button" data-profile-action="rename">✎ Modificar nombre</button><button type="button" data-profile-action="example">📋 Agregar ejemplo</button><button type="button" data-profile-action="delete">🗑 Eliminar perfil</button></div>
 <div class="offline-profile-fields" id="offlineNewProfileFields" hidden><label class="field"><span>Nuevo perfil</span><input id="offlineNewName" maxlength="60" placeholder="Nombre del perfil"></label><button class="outline-btn" type="button" id="offlineCreate">Agregar</button></div>
 <div class="offline-profile-fields" id="offlineRenameProfileFields" hidden><label class="field"><span>Nuevo nombre</span><input id="offlineRenameName" maxlength="60" placeholder="Nombre del perfil"></label><button class="outline-btn" type="button" id="offlineRename">Guardar cambio</button></div>
 <p class="offline-note" id="offlineProfileCount" role="status">Perfiles disponibles…</p><p class="offline-note" id="offlineProfileInfo" role="status">Preparando el almacenamiento local…</p><p id="offlineReadOnlyWarning" class="offline-readonly-warning" hidden>Cuenta de prueba: edición local permitida; no es posible actualizar su nube.</p><p class="offline-note" id="offlinePending"></p><p class="offline-note" id="offlineSyncState"></p><div class="offline-cloud-link-row"><button class="outline-btn" type="button" id="offlineCloudToggle">Vincular cuenta</button><strong id="offlineLinkStatus" role="status">No vinculado</strong></div>
@@ -52,7 +52,7 @@ Almacenamiento local · Nube opcional</div></aside>
 <label>Nombre del ejercicio<input name="e" required maxlength="160" placeholder="Por ejemplo: Curl martillo" /></label>
 <label>Agrupación<input name="agrupacion" placeholder="Ej.: Tren superior 1" /></label>
 <label>Anotación<input name="anotacion" placeholder="Ej.: Espalda lateral" /></label>
-<label>Instrumento<input name="instrumento" placeholder="Ej.: Máquina de polea alta" /></label>
+<label>Máquina<input name="instrumento" placeholder="Ej.: Máquina de polea alta" /></label>
 <label>Agarre / Implemento<input name="agarre_implemento" placeholder="Ej.: Cable Pulldown" /></label>
 <label class="full">Técnica<input name="tecnica" placeholder="Ej.: 01 - Ejecución base" /></label>
 <div class="full catalog-extra-details"><strong>Más detalles (opcional)</strong><div id="catalogExtraDetails"></div>
@@ -217,4 +217,4 @@ Almacenamiento local · Nube opcional</div></aside>
 <button type="button" class="primary-btn" id="saveSiteGPS">Guardar coordenadas offline</button></div>
 </div></dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
-<script src="./app.js"></script><script src="./catalog-offline-enhancements.js"></script><script src="./dashboard.js"></script><script src="./offline-first.js" type="module"></script></body></html>
+<script src="./app.js"></script><script src="./catalog-offline-enhancements.js"></script><script src="./dashboard.js"></script><script src="./offline-first.js" type="module"></script><script src="./catalog-detail-browser.mjs" type="module"></script></body></html>

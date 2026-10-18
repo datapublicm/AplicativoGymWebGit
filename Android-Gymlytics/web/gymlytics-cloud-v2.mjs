@@ -68,7 +68,7 @@ export async function prepareGymlyticsTables(data,profileId,profileName,userId){
    if(!exercise){
     exercise={id:eid,perfil_id:profileId,nombre:clean(record.exercise)||'Ejercicio'};
     exercises.set(eid,exercise);
-    const values=[['Anotación',record.zone],['Instrumento',record.equipment],
+    const values=[['Anotación',record.zone],['Máquina',record.equipment],
      ['Agarre / Implemento',record.accessory],['Técnica',record.technique]];
     for(let i=0;i<values.length;i++){
      const [campo,valor]=values[i];if(!clean(valor)||clean(valor)==='No especificado')continue;
@@ -251,7 +251,7 @@ export function createGymlyticsCloudSync({remote,getState,mutate,refresh,isCurre
     const ds=detailMap.get(ex.id)||[],get=k=>ds.find(x=>x.campo===k)?.valor||'No especificado';
     return {id:r.id,origin:'cloud-v2',date:ses.fecha_hora.slice(0,10),createdAt:dateTime(ses.fecha_hora).replace(' ','T')+':00',
      gym:gym?.nombre||'Sin gimnasio',sede:sit?.nombre||'Única',gymId:gym?.id||null,siteId:sit?.id||null,
-     exerciseId:ex.id,sessionId:ses.id,exercise:ex.nombre,zone:get('Anotación'),equipment:get('Instrumento'),
+     exerciseId:ex.id,sessionId:ses.id,exercise:ex.nombre,zone:get('Anotación'),equipment:get('Máquina')||get('Instrumento'),
      accessory:get('Agarre / Implemento'),technique:get('Técnica'),type:'Otro',grip:'No especificado',
      series:'Serie '+r.numero_serie,subdivision:r.subdivision||'-',weight:r.peso===null?null:Number(r.peso),
      unit:r.unidad,reps:Number(r.repeticiones),assistance:r.asistencia_pausa??null,notes:r.otros_detalles||''};

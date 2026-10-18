@@ -9,6 +9,7 @@ import {prepareDownloadedCatalog} from './offline-catalog-download.js';
 import {materializeReferenceCatalog,parseReferenceId,setReferenceOverride,listReferenceChoices} from './reference-overrides.js';
 import {photoLocalKey,migrateLegacyPhotoJobs} from './photo-sync-engine.js';
 import {createGymlyticsCloudSync} from './gymlytics-cloud-v2.mjs';
+import {GYMLYTICS_SEED_PATH,createGymlyticsSeedProfile} from './gymlytics-seed-offline.mjs';
 const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
  records:[],photos:{},photoVersions:{},photoPayloads:{},baseCatalog:[],referenceOverrides:{},muscles:[],custom:[],library:[],readOnly:false,demo:false,
@@ -178,6 +179,23 @@ async function createProfile(){
  await activate(p.id);
  status('Perfil local creado. Los registros de los demás perfiles se mantienen separados.');
 }
+async function addExampleProfile(){
+ if(transitioning||syncController?.isBusy())throw Error('Termina la operación actual.');
+ if((await all()).some(p=>p.data?.importInfo?.importedTag==='hojamatriz-20261018'))
+  throw Error('Ya tienes el ejemplo en tus perfiles. Puedes modificar su nombre.');
+ if(!confirm('¿Agregar Ejemplo con las 9.424 series de HojaMatriz? Se guardará solo en este dispositivo, sin subir nada a Supabase.'))return;
+ status('Importando el perfil de ejemplo solo en el dispositivo…');
+ const response=await fetch(GYMLYTICS_SEED_PATH);
+ if(!response.ok)throw Error('El ejemplo no está disponible en esta instalación.');
+ const sample=createGymlyticsSeedProfile(await response.json(),EMPTY);
+ sample.id=uuid();sample.name='Ejemplo';sample.modifiedAt=new Date().toISOString();
+ sample.data.demo=true;sample.data.cloudUserId=null;sample.data.syncMode='later';
+ sample.data.pending=[];sample.data.cloudV2=null;
+ if(transitioning||syncController?.isBusy())throw Error('La operación cambió durante la importación.');
+ await put(sample);profiles.push(profileMeta(sample));
+ await activate(sample.id);
+ status('Ejemplo incorporado con 9.424 series offline; puedes modificar su nombre.');
+}
 function renderProfileControls(){
  const control=$('offlineRenameName');if(control)control.value=latest?.name||'';
  const count=$('offlineProfileCount');
@@ -238,7 +256,7 @@ function catalogUpdate(){
  if(count)count.textContent=String((latest.data.muscles||[]).length);
 }
 function normalizarDetallesEjercicio(values){
- const keys=[['agrupacion','Agrupación'],['anotacion','Anotación'],['instrumento','Instrumento'],
+ const keys=[['agrupacion','Agrupación'],['anotacion','Anotación'],['instrumento','Máquina'],
   ['agarre_implemento','Agarre / Implemento'],['tecnica','Técnica']];
  const result=keys.map(([key,campo])=>({campo,valor:tidy(values[key]).slice(0,500)})).filter(x=>x.valor);
  let extras=[];
@@ -843,6 +861,11 @@ async function init(){
  $('offlineProfileMenuToggle')?.addEventListener('click',()=>{$('offlineProfileMenu').hidden=!$('offlineProfileMenu').hidden;});
  document.querySelectorAll('[data-profile-action]').forEach(button=>button.addEventListener('click',()=>{
   const action=button.dataset.profileAction;
+  if(action==='example'){
+   $('offlineProfileMenu').hidden=true;
+   addExampleProfile().catch(error=>status('No se agregó el ejemplo: '+error.message));
+   return;
+  }
   if(action==='delete'){
    $('offlineProfileMenu').hidden=true;
    deleteActiveProfile().catch(error=>status('No se pudo eliminar el perfil: '+error.message));
