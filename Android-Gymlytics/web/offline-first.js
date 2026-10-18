@@ -236,6 +236,20 @@ function catalogUpdate(){
   for(const row of latest.data.muscles||[])muscle.add(new Option(row.nombre,row.id));}
  if(count)count.textContent=String((latest.data.muscles||[]).length);
 }
+function normalizarDetallesEjercicio(values){
+ const keys=[['agrupacion','Agrupación'],['anotacion','Anotación'],['instrumento','Instrumento'],
+  ['agarre_implemento','Agarre / Implemento'],['tecnica','Técnica']];
+ const result=keys.map(([key,campo])=>({campo,valor:tidy(values[key]).slice(0,500)})).filter(x=>x.valor);
+ let extras=[];
+ try{extras=typeof values.detalles_extra==='string'?JSON.parse(values.detalles_extra):values.detalles_extra||[]}
+ catch{throw Error('Los detalles adicionales no tienen formato válido');}
+ if(!Array.isArray(extras)||extras.length>30)throw Error('Máximo 30 detalles adicionales por ejercicio');
+ for(const x of extras){
+  const campo=tidy(x.campo).slice(0,120),valor=tidy(x.valor).slice(0,500);
+  if(campo&&valor)result.push({campo,valor});
+ }
+ return result;
+}
 const groups={gym:'gyms',site:'sites',machine:'machines',option:'options',exercise:'library'};
 function presentCatalog(kind){
  return kind==='exercise'?[...latest.data.library,...latest.data.custom.map(x=>({id:x.cloud_id,nombre:x.e}))]:
@@ -355,19 +369,51 @@ const api={
     ...kind==='machine'?{tipo_equipo:values.tipo_equipo||'Otro'}:{},
     ...kind==='option'?{tipo:values.tipo||'zona'}:{}};
    target.push(item);data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:kind,localId:item.id});
+   // Cada nuevo gimnasio comienza con una sede «Única», renombrable.
+   if(kind==='gym'){
+    const site={id:uuid(),nombre:'Única',gimnasio_id:item.id,latitud:null,longitud:null};
+    data.entities.sites.push(site);
+    data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'site',localId:site.id});
+   }
    return item.id;
   }).then(result=>{catalogUpdate();return result;});
+ },
+ async updateSiteGPS(id,latitude,longitude){
+  assertEditable();
+  // No requiere conexión ni permisos de Supabase.
+  const lat=latitude===''||latitude==null?null:Number(latitude);
+  const lon=longitude===''||longitude==null?null:Number(longitude);
+  if((lat===null)!==(lon===null)||lat!==null&&(!Number.isFinite(lat)||lat < -90||lat > 90||!Number.isFinite(lon)||lon < -180||lon > 180))
+   throw Error('Las coordenadas deben incluir latitud (-90 a 90) y longitud (-180 a 180).');
+  await flush(data=>{
+   const site=data.entities.sites.find(x=>String(x.id)===String(id));
+   if(!site)throw Error('Selecciona primero una sede personal.');
+   site.latitud=lat;site.longitud=lon;site.modificado_en=new Date().toISOString();
+   data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:'site',localId:id});
+  });
+  catalogUpdate();return id;
+ },
+ async updateExerciseDetails(id,values){
+  assertEditable();
+  await flush(data=>{
+   const row=data.library.find(x=>String(x.id)===String(id));
+   if(!row)throw Error('Selecciona un ejercicio de tu perfil local.');
+   row.detalles=normalizarDetallesEjercicio(values);
+   row.zona_entrenamiento=tidy(values.anotacion||values.z)||'Sin clasificar';
+   row.tecnica_actualizada=tidy(values.tecnica)||'Ejecución base';
+   data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:'exercise',localId:id});
+  });
+  catalogUpdate();return id;
  },
  async saveCustomExercise(values){
   assertEditable();
   const nombre=tidy(values.e);
   if(!nombre)throw Error('Escribe un nombre de ejercicio');
   await flush(data=>{
-   if(data.library.some(x=>x.nombre.toLocaleLowerCase('es')===nombre.toLocaleLowerCase('es')))
-    throw Error('El ejercicio ya existe en este perfil');
-   const id=uuid();
-   data.library.push({id,nombre,origen:'usuario',zona_entrenamiento:tidy(values.z)||'Sin clasificar',
-    tecnica_actualizada:tidy(values.tecnica)||'Ejecución base'});
+   // Los ejercicios pueden compartir nombre: cada variante conserva su UUID.
+   const id=uuid(),detalles=normalizarDetallesEjercicio(values);
+   data.library.push({id,nombre,origen:'usuario',zona_entrenamiento:tidy(values.anotacion||values.z)||'Sin clasificar',
+    tecnica_actualizada:tidy(values.tecnica)||'Ejecución base',detalles});
    data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'exercise',localId:id});
   });catalogUpdate();return structuredClone(latest.data.custom);
  },
@@ -392,7 +438,7 @@ const api={
    if(!list)throw Error('Categoría inválida');
    const item=list.find(x=>String(x.id||x.cloud_id)===String(id));
    if(!item)throw Error('No se encontró el elemento personal');
-   if(list.some(x=>x.id!==id&&tidy(x.nombre).toLocaleLowerCase('es')===name.toLocaleLowerCase('es')&&
+   if(kind!=='exercise'&&list.some(x=>x.id!==id&&tidy(x.nombre).toLocaleLowerCase('es')===name.toLocaleLowerCase('es')&&
      (kind!=='site'||x.gimnasio_id===item.gimnasio_id)&&
      (kind!=='option'||x.tipo===item.tipo)))throw Error('Ya existe otro elemento con ese nombre');
    item.nombre=name;
