@@ -1,4 +1,4 @@
-name: "GymLytics HojaMatriz - verificaciones sin compilar"
+name: "GymLytics 01.10 - pruebas offline sin precarga"
 on:
   push:
     branches:
@@ -22,7 +22,8 @@ jobs:
         run: |
           node --check web/app.js
           node --check web/offline-first.js
-          node --check web/gymlytics-seed-offline.mjs
+          node --check web/gymlytics-cloud-v2.mjs
+          node --check tools/verificar-inicio-vacio-chromium.mjs
           node --check web/catalog-offline-enhancements.js
           node --check web/sw.js
           node --check vite.config.js
@@ -31,15 +32,16 @@ jobs:
       - name: "Chromium real e IndexedDB offline sin compilar"
         run: |
           npm install --no-package-lock --no-audit --no-fund
-          node tools/verificar-hojamatriz-chromium.mjs
+          node tools/verificar-inicio-vacio-chromium.mjs
       - name: "Integridad del paquete antes de compilar"
         run: |
           node --input-type=module <<'JS'
           import fs from 'node:fs';
-          const data=JSON.parse(fs.readFileSync('web/data/hojamatriz-offline-20261018.json','utf8'));
-          if(data.tables.series.length!==9424||data.tables.session.length!==446)throw Error('Conteos incorrectos');
-          for(const file of ['web/gymlytics-seed-offline.mjs','web/data/hojamatriz-offline-20261018.json']){
-            if(!fs.readFileSync('web/sw.js','utf8').includes(file.replace('web/','')))throw Error('Falta en caché '+file);
-          }
-          console.log('OK: semilla de 9424 series disponible sin generar APK');
+          const app=fs.readFileSync('web/offline-first.js','utf8');
+          const sw=fs.readFileSync('web/sw.js','utf8');
+          const config=fs.readFileSync('vite.config.js','utf8');
+          if(app.includes("import {GYMLYTICS_SEED_PATH")||app.includes("installGymlyticsSeed(seed"))throw Error('Queda importación automática');
+          if(sw.includes('hojamatriz-offline-20261018.json')||sw.includes('gymlytics-seed-offline.mjs'))throw Error('Archivo histórico en caché');
+          if(config.includes("['assets','icons','data']"))throw Error('Vite copiaría archivos precargados');
+          console.log('OK: sin precarga al abrir GymLytics');
           JS
