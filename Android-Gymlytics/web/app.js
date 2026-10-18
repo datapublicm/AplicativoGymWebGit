@@ -238,6 +238,7 @@ function catalogUpdateCounters(){
 }
 function catalogActiveCard(kind){
  catalogActiveKind=kind;
+ refreshCatalogEmptyActions();
  document.querySelectorAll('#catalogCompactRows .catalog-compact-card').forEach(row=>row.classList.toggle('catalog-chosen',row.dataset.catalogKind===kind));
  const quick=$('catalogQuickFeedback');
  if(quick){
@@ -260,7 +261,7 @@ function catalogOpenCard(kind,action='add'){
  }
  if(action==='edit'){
   const selected=row.querySelector('.catalog-compact-picker select')?.value||'';
-  if(!selected){toast('Selecciona primero un elemento para modificar.');return;}
+  if(!catalogChoices(kind).length||!selected){toast('No hay elementos para modificar. Primero agrega uno.');return;}
  }
  const detail=row.querySelector('.catalog-compact-detail'),btn=row.querySelector('.catalog-compact-toggle');
  if(!detail){toast('Este catálogo es de referencia y solo permite consultar.');return;}
@@ -357,11 +358,9 @@ function setupCatalogCompact(){
  const items=[
   {kind:'gym',label:'Gimnasio',icon:'▦',select:$('gymExistingSelect'),count:$('gymCount'),parts:[forms.gym]},
   {kind:'site',label:'Sede',icon:'●',select:$('siteExistingSelect'),count:$('siteCount'),parts:[forms.site]},
-  {kind:'zone',label:'Anotación',icon:'▤',select:null,count:null,parts:[forms.option]},
-  {kind:'exercise',label:'Ejercicio',icon:'♧',select:$('exerciseExistingSelect'),count:$('exerciseCount'),parts:[originalExercise,forms.exercise,entries]},
-  {kind:'machine',label:'Instrumento',icon:'⚙',select:$('machineExistingSelect'),count:$('machineCount'),parts:[forms.machine]},
-  {kind:'grip',label:'Agarre / Implemento',icon:'✋',select:null,count:null,parts:[]},
-  {kind:'technique',label:'Técnica',icon:'◈',select:null,count:null,parts:[]},
+  // Anotación, Máquina, Agarre/Implemento y Técnica son DETALLES del ejercicio,
+  // no catálogos independientes: se consultan en «Detalle de ejercicio».
+  {kind:'exercise',label:'Ejercicio',icon:'♧',select:$('exerciseExistingSelect'),count:$('exerciseCount'),parts:[originalExercise,forms.exercise,entries]}
  ];
  holder.replaceChildren();
  for(const item of items){
@@ -416,6 +415,7 @@ function setupCatalogCompact(){
     const input=$(item.kind+'EditName');if(input)input.value=entry?.nombre||catalogChoices(item.kind).find(x=>x.id===select.value)?.name||'';
    }
    catalogActiveCard(item.kind);
+   refreshCatalogEmptyActions();
    // Las referencias compartidas también permiten una modificación local.
    if(['zone','grip','technique'].includes(item.kind)&&select.value)
     catalogOpenCard(item.kind,'edit');
@@ -428,6 +428,7 @@ function setupCatalogCompact(){
  const quick=$('catalogQuickPanel');if(quick)quick.querySelectorAll('[data-catalog-quick]').forEach(button=>button.addEventListener('click',async()=>{
   const action=button.dataset.catalogQuick,kind=catalogActiveKind,card=document.querySelector('[data-catalog-kind="'+kind+'"]');
   const id=card?.querySelector('.catalog-compact-picker select')?.value||'';
+  if(action!=='add'&&!catalogChoices(kind).length){toast('Primero agrega un registro.');return;}
   if(action==='list'){
    const rows=catalogChoices(kind),list=$('catalogQuickList');
    if(['series','subdivision','muscle'].includes(kind)){
@@ -457,7 +458,29 @@ function setupCatalogCompact(){
  holder.prepend(group);
  const heading=document.createElement('h3');heading.className='catalog-group-title';heading.textContent='🏋️ Ejercicio';
  const first=holder.querySelector('[data-catalog-kind="exercise"]');if(first)holder.insertBefore(heading,first);
- catalogActiveCard('gym');renderCatalogShortcuts();
+ catalogActiveCard('gym');renderCatalogShortcuts();refreshCatalogEmptyActions();
+}
+function refreshCatalogEmptyActions(){
+ // No hay nada que modificar o eliminar hasta que exista un elemento.
+ const kind=catalogActiveKind,has=!!catalogChoices(kind).length;
+ document.querySelectorAll('#catalogQuickPanel [data-catalog-quick]').forEach(button=>{
+  const action=button.dataset.catalogQuick;
+  button.hidden=action!=='add'&&!has;
+ });
+ for(const card of document.querySelectorAll('#catalogCompactRows .catalog-compact-card')){
+  const type=card.dataset.catalogKind,exists=!!catalogChoices(type).length;
+  const picker=card.querySelector('.catalog-compact-picker');
+  if(picker)picker.hidden=!exists;
+  const detail=card.querySelector('.catalog-compact-detail');
+  if(detail){
+   for(const control of detail.querySelectorAll('[data-catalog-existing]')){
+    const parent=control.closest('label');if(parent)parent.hidden=!exists;
+   }
+   for(const edit of detail.querySelectorAll('.catalog-edit-row'))edit.hidden=!exists;
+   const save=detail.querySelector('#editExerciseDetails');if(save)save.hidden=!exists;
+   const gps=detail.querySelector('#openSiteGPS');if(gps)gps.hidden=!exists;
+  }
+ }
 }
 function renderCatalogShortcuts(){
  for(const [kind,id] of [['zone','catalogShortcutzone'],['grip','catalogShortcutgrip'],['technique','catalogShortcuttechnique']]){
@@ -514,7 +537,7 @@ function renderIndependentCatalog(){
   if($(id))$(id).textContent=String(count);
  if($('optionCount'))$('optionCount').textContent=values.length+' / '+ent.options.length+' total';
  if($('customCatalogItems'))$('customCatalogItems').innerHTML='';
- renderCatalogShortcuts();
+ renderCatalogShortcuts();refreshCatalogEmptyActions();
  if(window.GymBaseCatalog?.length||window.GymCustomCatalog?.length)cascade(0);
 }
 function renderOwnCatalog(){
@@ -522,6 +545,8 @@ function renderOwnCatalog(){
  populateCatalogSelect('exerciseExistingSelect',records,x=>x.nombre);
  const entries=$('catalogEntries');
  if(entries)entries.innerHTML=records.length?'':'<div class="empty">Aún no hay ejercicios propios. Puedes agregar el primero aquí.</div>';
+ refreshCatalogEmptyActions();
+ window.GymCatalogDetailRefresh?.();
 }
 
 function changeSeriesMode(mode){if(!['normal','sub','lateral'].includes(mode))return;if(mode!==seriesMode&&hasSeriesData()&&!confirm('Cambiar el tipo de subdivisión borrará los valores aún no guardados. ¿Continuar?'))return;seriesMode=mode;if(!seriesCustomized)seriesGroups=mode==='normal'?4:3;renderSeries();$('splitOptions').hidden=true;$('toggleSubdivisions').setAttribute('aria-expanded','false');$('resetSubdivisions').hidden=mode==='normal'}

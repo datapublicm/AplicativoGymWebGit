@@ -20,7 +20,7 @@ export function availableFields(exercises){
 }
 export function filterVariants(exercises,filters={}){
  return (exercises||[]).filter(ex=>Object.entries(filters).every(([field,val])=>
-  !val||field==='Identificador'?ex.id===val:exerciseValue(ex,field)===val));
+  !val||(field==='Identificador'?ex.id===val:exerciseValue(ex,field)===val)));
 }
 export function cascadeVariants(exercises,values={}){
  const fields=availableFields(exercises),current={...values},selectors=[];
@@ -38,6 +38,6 @@ export function cascadeVariants(exercises,values={}){
  if(current.Identificador&&!ids.some(x=>x.value===current.Identificador))delete current.Identificador;
  if(current.Identificador)matches=matches.filter(x=>x.id===current.Identificador);
  // UUID permite distinguir incluso variantes con todos los detalles iguales.
- if(matches.length>1||current.Identificador)selectors.push({field:'Identificador',options:ids,selected:current.Identificador||''});
+ if((current['Nombre del ejercicio']||current.Identificador)&& (matches.length>1||current.Identificador))selectors.push({field:'Identificador',options:ids,selected:current.Identificador||''});
  return {selectors,matches,selected:current,unique:matches.length===1?matches[0]:null};
 }

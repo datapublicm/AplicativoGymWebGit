@@ -1072,3 +1072,25 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 
 /* ID de variante: mostrar únicamente cuando el nombre no sea inequívoco. */
 #registroVarianteWrap[hidden]{display:none!important}
+
+
+/* GymLytics 01.11 · Catálogos: únicamente ubicación y ejercicios; otros datos son detalles. */
+#page-catalogos .catalog-compact-picker[hidden],
+#page-catalogos .catalog-edit-row[hidden],
+#page-catalogos .catalog-compact-detail label[hidden],
+#page-catalogos #editExerciseDetails[hidden],
+#page-catalogos [data-catalog-quick][hidden]{display:none!important}
+#page-catalogos .catalog-detail-disambiguator{border:1px solid rgba(40,196,230,.43);background:#09223a;border-radius:15px;margin:12px 0;padding:11px 13px;color:#e5f5ff}
+#page-catalogos .catalog-detail-disambiguator>details>summary{cursor:pointer;font-weight:700;font-size:16px;min-height:32px;display:flex;align-items:center;gap:10px;list-style:none}
+#page-catalogos .catalog-detail-disambiguator>details>summary::-webkit-details-marker{display:none}
+#page-catalogos .catalog-detail-hint{font-size:11px;font-weight:400;color:#88a9c6;margin-left:auto}
+#page-catalogos .catalog-detail-info{font-size:12px;color:#b5cade;line-height:1.5;margin:8px 0}
+#page-catalogos .catalog-detail-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:10px;margin:10px 0}
+#page-catalogos .catalog-detail-filter{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px;font-weight:600}
+#page-catalogos .catalog-detail-filter select{width:100%;min-width:0;height:43px;padding:7px;border:1px solid #456886;border-radius:8px;color:#ecfaff;background:#0b1d31;font-size:13px}
+#page-catalogos .catalog-detail-results{color:#9bc9e5;font-size:12px;line-height:1.5;margin:6px 0 11px}
+#page-catalogos #catalogDetailCandidates{margin:9px 0;font-size:12px;color:#bfd6e8}
+#page-catalogos #catalogDetailCandidates>summary{cursor:pointer}
+#page-catalogos #catalogDetailCandidates ul{max-height:190px;overflow-y:auto;padding-left:18px;line-height:1.6}
+#page-catalogos #catalogDetailView{width:100%;min-height:43px}
+#page-catalogos #catalogDetailView:disabled{opacity:.48;cursor:not-allowed}
