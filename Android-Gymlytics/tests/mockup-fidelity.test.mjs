@@ -37,7 +37,7 @@ test('La compilación web verifica que empaquete los archivos reales del mockup'
   assert.ok(vite.includes("'"+id+"'"),id);
  assert.match(vite,/source\.equals\(output\)/);
  assert.match(vite,/throw Error\('El APK empaquetaría una versión antigua/);
- assert.match(sw,/gymlytics-offline-catalogos-gps-20261018-v07/);
+ assert.match(sw,/gymlytics-hojamatriz-offline-20261018-v08/);
 });
 test('Se mantienen Tablas y Dashboard independientes, sin cambiar su vista',()=>{
  assert.match(html,/id="page-tablas"/);
@@ -45,10 +45,10 @@ test('Se mantienen Tablas y Dashboard independientes, sin cambiar su vista',()=>
  assert.match(html,/id="dash-resumen"/);
 });
 
-test('Catálogo personal no intercala valores compartidos de referencia',()=>{
+test('Catálogo identifica valores propios y referencias descargadas',()=>{
  assert.match(app,/select\.title=select\.selectedOptions\?\.\[0\]\?\.textContent/);
- assert.match(app,/return own\.sort\(/);
- assert.match(app,/choices\.forEach\(x=>select\.add\(new Option\(x\.name,x\.id\)\)\)/);
+ assert.match(app,/return \[\.\.\.own,\.\.\.refs\]\.sort\(/);
+ assert.match(app,/choices\.forEach\(x=>select\.add\(new Option\(/);
 });
 test('Pestañas múltiples mantienen borradores independientes sin tocar tablas históricas',()=>{
  assert.match(app,/function storeActiveDraft\(/);
