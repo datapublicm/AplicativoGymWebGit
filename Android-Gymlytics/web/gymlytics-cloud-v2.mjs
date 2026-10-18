@@ -11,7 +11,13 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 const clean=x=>String(x??'').trim(), arr=x=>Array.isArray(x)?x:[], plain=o=>JSON.stringify(o);
 const requireUuid=(id,name)=>{if(!UUID.test(String(id)))throw Error('UUID inválido en '+name);return id;};
 const byId=rows=>new Map(rows.map(row=>[row.id,row]));
-const dateTime=d=>{const str=clean(d);return /^\d{4}-\d\d-\d\d \d\d:\d\d/.test(str)?str.slice(0,16):str.slice(0,10)+' 12:00';};
+const dateTime=d=>{const str=clean(d).replace('T',' ');return /^\d{4}-\d\d-\d\d \d\d:\d\d/.test(str)?str.slice(0,16):str.slice(0,10)+' 12:00';};
+const normalized=(key,v)=>key==='fecha_hora'?dateTime(v):['peso','latitud','longitud'].includes(key)&&v!==null&&v!==undefined?Number(v):v??null;
+const equalRow=(server,local)=>!!server&&Object.keys(local).every(k=>plain(normalized(k,server[k]))===plain(normalized(k,local[k])));
+const equalsSnapshot=(server,snapshot)=>{
+ if(!snapshot)return false;
+ const expected=JSON.parse(snapshot);return equalRow(server,expected);
+};
 export async function deterministicUuid(...parts){
  const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(parts.map(clean).join('|'))));
  bytes[6]=bytes[6]&15|80;bytes[8]=bytes[8]&63|128;
@@ -109,14 +115,14 @@ export function detectCloudConflicts(local,remote,baseline={}){
   const put=[];
   for(const row of l.values()){
    const other=r.get(row.id),prior=snap[row.id];
-   if(other&&plain(other)!==plain(row)&&(!prior||plain(other)!==prior))
+   if(other&&!equalRow(other,row)&&(!prior||!equalsSnapshot(other,prior)))
     conflicts.push(table+': '+row.id);
-   else if(!other||plain(other)!==plain(row))put.push(row);
+   else if(!other||!equalRow(other,row))put.push(row);
   }
   const del=[];
   for(const id of Object.keys(snap)){
    if(!l.has(id)&&r.has(id)){
-    if(plain(r.get(id))!==snap[id])conflicts.push(table+': eliminación remota modificada '+id);
+    if(!equalsSnapshot(r.get(id),snap[id]))conflicts.push(table+': eliminación remota modificada '+id);
     else{del.push(id);deletions++;}
    }
   }
@@ -161,9 +167,21 @@ export function createGymlyticsCloudSync({remote,getState,mutate,refresh,isCurre
   }
   return result;
  }
- async function readTables(uid,stamp){
-  const ret={};for(const name of CLOUD_TABLES.slice(1)){ret[name]=await readAll(name,stamp,uid);}
-  // RLS solo debe entregar tablas correspondientes a la cuenta.
+ async function readTables(uid,stamp,profileId){
+  // El usuario puede tener varios perfiles REMOTOS; descargar solo el activo.
+  const all={};for(const name of CLOUD_TABLES.slice(1))all[name]=await readAll(name,stamp,uid);
+  const one=(table,filter)=>all[table].filter(filter);
+  const ret={tbl_perfiles:one('tbl_perfiles',x=>x.id===profileId)};
+  const ids=rows=>new Set(rows.map(x=>x.id));
+  const gymIds=ids(ret.tbl_gimnasios=one('tbl_gimnasios',x=>x.perfil_id===profileId));
+  const siteIds=ids(ret.tbl_sedes=one('tbl_sedes',x=>gymIds.has(x.gimnasio_id)));
+  const exerciseIds=ids(ret.tbl_ejercicios=one('tbl_ejercicios',x=>x.perfil_id===profileId));
+  ret.tbl_ejercicio_detalles=one('tbl_ejercicio_detalles',x=>exerciseIds.has(x.ejercicio_id));
+  const sessionIds=ids(ret.tbl_sesiones=one('tbl_sesiones',x=>x.perfil_id===profileId));
+  ret.tbl_series=one('tbl_series',x=>sessionIds.has(x.sesion_id));
+  // Validar que ninguna fila importada remita a un objeto ajeno.
+  for(const s of ret.tbl_sesiones)if(s.sede_id&&!siteIds.has(s.sede_id))throw Error('Sesión vinculada a otra sede');
+  for(const r of ret.tbl_series)if(!exerciseIds.has(r.ejercicio_id))throw Error('Serie vinculada a otro ejercicio');
   return ret;
  }
  async function upload(uid,stamp,{automatic=false}={}){
@@ -175,7 +193,7 @@ export function createGymlyticsCloudSync({remote,getState,mutate,refresh,isCurre
   busy=true;refresh();
   try{
    await ensureUser(uid,stamp);
-   const remoteRows=await readTables(uid,stamp);
+   const remoteRows=await readTables(uid,stamp,profileId);
    check(uid,stamp);
    const snapshot=state.data.cloudV2?.baseline||{};
    const diff=detectCloudConflicts(local,remoteRows,snapshot);
@@ -217,7 +235,8 @@ export function createGymlyticsCloudSync({remote,getState,mutate,refresh,isCurre
   busy=true;refresh();
   try{
    await ensureUser(uid,stamp);
-   const tables=await readTables(uid,stamp);check(uid,stamp);
+   const profileId=getState().profileId;
+   const tables=await readTables(uid,stamp,profileId);check(uid,stamp);
    const state=getState(),local=await prepareGymlyticsTables(state.data,state.profileId,state.profileName,uid);
    const conflicts=detectCloudConflicts(local,tables,state.data.cloudV2?.baseline).conflicts;
    if(conflicts.length)throw Error('Descarga detenida: '+conflicts.length+' identificadores tienen cambios distintos. Ejemplo: '+conflicts[0]);
@@ -230,7 +249,7 @@ export function createGymlyticsCloudSync({remote,getState,mutate,refresh,isCurre
     const ses=se.get(r.sesion_id),sit=ss.get(ses?.sede_id),gym=gs.get(sit?.gimnasio_id),ex=es.get(r.ejercicio_id);
     if(!ses||!ex)throw Error('La nube contiene una serie sin sesión o ejercicio: '+r.id);
     const ds=detailMap.get(ex.id)||[],get=k=>ds.find(x=>x.campo===k)?.valor||'No especificado';
-    return {id:r.id,origin:'cloud-v2',date:ses.fecha_hora.slice(0,10),createdAt:ses.fecha_hora.replace(' ','T')+':00',
+    return {id:r.id,origin:'cloud-v2',date:ses.fecha_hora.slice(0,10),createdAt:dateTime(ses.fecha_hora).replace(' ','T')+':00',
      gym:gym?.nombre||'Sin gimnasio',sede:sit?.nombre||'Única',gymId:gym?.id||null,siteId:sit?.id||null,
      exerciseId:ex.id,sessionId:ses.id,exercise:ex.nombre,zone:get('Anotación'),equipment:get('Instrumento'),
      accessory:get('Agarre / Implemento'),technique:get('Técnica'),type:'Otro',grip:'No especificado',

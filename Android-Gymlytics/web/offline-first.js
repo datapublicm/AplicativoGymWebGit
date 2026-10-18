@@ -9,6 +9,7 @@ import {prepareDownloadedCatalog} from './offline-catalog-download.js';
 import {materializeReferenceCatalog,parseReferenceId,setReferenceOverride,listReferenceChoices} from './reference-overrides.js';
 import {photoLocalKey,migrateLegacyPhotoJobs} from './photo-sync-engine.js';
 import {GYMLYTICS_SEED_PATH,GYMLYTICS_SEED_MARKER,installGymlyticsSeed} from './gymlytics-seed-offline.mjs';
+import {createGymlyticsCloudSync} from './gymlytics-cloud-v2.mjs';
 const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
  records:[],photos:{},photoVersions:{},photoPayloads:{},baseCatalog:[],referenceOverrides:{},muscles:[],custom:[],library:[],readOnly:false,demo:false,
@@ -19,7 +20,7 @@ const uuid=()=>crypto.randomUUID();
 const tidy=v=>String(v??'').trim();
 let db,profiles=[],activeId=null,profileEpoch=0,latest=null,queue=Promise.resolve(),remoteSession=null,cloudAccountKind=null,syncController=null,transitioning=false,offlineInitError=null;
 const config={url:import.meta.env.VITE_SUPABASE_URL,key:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
- schema:import.meta.env.VITE_SUPABASE_SCHEMA||'sch_android_gymlytics'};
+ schema:import.meta.env.VITE_SUPABASE_SCHEMA||'sch_gymlytics'};
 const newClient=()=>config.url&&config.key?createClient(config.url,config.key,{
  auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,
   storageKey:'gymlytics-profile-memory-'+crypto.randomUUID()}
@@ -555,6 +556,8 @@ function refreshCloudControls(){
  const linked=!!remoteSession?.user&&!transitioning;
  $('offlineRemoteUser').textContent=linked?'Conectado: '+(remoteSession.user.email||remoteSession.user.id):'Sin sesión de nube';
  const demo=cloudAccountKind==='demo';
+ $('offlineLinkAccount').hidden=!linked||latest?.data?.cloudUserId===remoteSession?.user?.id;
+ $('authLogout').hidden=!linked;
  $('offlineLinkAccount').disabled=!linked||demo||!!syncController?.isBusy()||!!latest?.data?.cloudUserId;
  $('offlineLinkAccount').textContent=demo?'🔒 La cuenta de prueba no puede vincularse':latest?.data?.cloudUserId?'Perfil ya vinculado a esta cuenta':'Vincular este perfil con esta cuenta';
  const personal=linked&&!demo&&latest?.data?.cloudUserId===remoteSession.user.id;
@@ -562,7 +565,6 @@ function refreshCloudControls(){
  $('offlineCloudDownload').textContent='↓ Descargar datos';
  $('offlineCloudUpload').hidden=false;$('offlineCloudUpload').disabled=!personal||!!syncController?.isBusy();
  $('offlineDemoDownload').hidden=true;$('offlineDemoDownload').disabled=true;
- $('authLogout').hidden=true;
  const state=$('offlineLinkStatus');if(state)state.textContent=personal?'✅ Vinculado':latest?.data?.cloudUserId?'✅ Vinculado · inicia sesión para actualizar':'No vinculado';
  const mode=$('offlineSyncMode');if(mode){mode.closest('.offline-sync-mode').hidden=!personal;mode.value=latest?.data?.syncMode==='instant'?'instant':'later';}
 }
@@ -603,46 +605,21 @@ async function linkAccount(){
  renderSyncStatus();refreshCloudControls();
  status('Vinculado. Tus cambios se guardan localmente; elige cuándo actualizar Supabase.');
 }
-async function provisionGymlyticsAccount(ownerStamp){
- if(!remote)throw Error('No está configurada la base de datos');
- const {data,error}=await remote.rpc('asegurar_perfil_gymlytics');
- if(ownerStamp!==stamp())throw Error('El perfil cambió durante el registro de la cuenta');
- if(error)throw Error('No se pudo habilitar la cuenta: '+error.message);
- if(!data?.activo)throw Error('La cuenta Gymlytics está desactivada; no se reactivó automáticamente.');
-}
-async function completeCloudLogin(session,ownerStamp,ownerClient,register=false){
+async function completeCloudLogin(session,ownerStamp,ownerClient){
  requireCloudIdentity(session?.user?.id,ownerStamp,ownerClient);
  try{
-  if(register)await provisionGymlyticsAccount(ownerStamp);
-  // Consultar la identidad autorizada por el servidor: NUNCA inferir la cuenta
-  // de prueba del nombre de perfil ni del botón que pulsó el usuario.
-  let result=await remote.from('tbl_usuarios')
-   .select('id,usuario,activo').eq('id',session.user.id).maybeSingle();
-  if(result.error)throw Error('No se pudo verificar la cuenta Gymlytics: '+result.error.message);
-  // Con confirmación por correo, signUp carece de sesión. La primera
-  // autenticación provisiona únicamente si la fila de usuario falta.
-  // Una cuenta existente deshabilitada NUNCA se reactiva.
-  if(!result.data){
-   await provisionGymlyticsAccount(ownerStamp);
-   result=await remote.from('tbl_usuarios')
-    .select('id,usuario,activo').eq('id',session.user.id).maybeSingle();
-  }
-  const {data,error}=result;
-  if(error||!data?.activo)throw Error('La cuenta todavía no está habilitada en Gymlytics.');
-  const kind=String(data.usuario||'').trim().toLocaleLowerCase('es')==='prueba'?'demo':'personal';
+  // El esquema nuevo no utiliza asegurar_perfil_gymlytics ni la tabla antigua.
+  await syncController.ensureUser(session.user.id,ownerStamp);
   requireCloudIdentity(session.user.id,ownerStamp,ownerClient);
-  if(kind==='demo'&&latest?.data?.cloudUserId&&latest.data.cloudUserId!==session.user.id)
-   throw Error('Esta cuenta de prueba no puede abrirse sobre un perfil vinculado a otra cuenta.');
-  cloudAccountKind=kind;
+  cloudAccountKind='personal';
  }catch(error){
   if(ownerStamp===stamp()&&ownerClient===client)rotateCloudClient();
   throw error;
  }
  remoteSession=session;
- if(cloudAccountKind==='personal')await linkAccount();
+ await linkAccount(); // Solo marca vinculación; jamás sube datos sin permiso.
  refreshCloudControls();renderSyncStatus();
- status(cloudAccountKind==='demo'?'Cuenta de prueba: datos descargables y editables offline, sin subirlos.':
-  '✅ Vinculado. Puedes descargar datos o elegir la sincronización de Supabase.');
+ status('✅ Vinculado con sch_gymlytics. Elige «Actualizar» para subir el perfil local.');
 }
 async function cloudLogin(email,password,register=false){
  if(transitioning)throw Error('Espera a que termine el cambio de perfil.');
@@ -650,15 +627,7 @@ async function cloudLogin(email,password,register=false){
  const ownerStamp=stamp(),ownerClient=client;
  if(!client)throw Error('No hay conexión de Supabase configurada');
  if(!navigator.onLine)throw Error('Sin conexión a Internet. Tus registros locales siguen disponibles');
- if(!register&&!email.includes('@')){
-  const {data,error}=await ownerClient.functions.invoke('gymlytics-login-usuario',{body:{username:email,password}});
-  if(error)throw error;
-  if(!data?.access_token||!data?.refresh_token)throw Error(data?.error||'Nombre de usuario o contraseña inválidos');
-  const set=await ownerClient.auth.setSession({access_token:data.access_token,refresh_token:data.refresh_token});
-  if(set.error)throw set.error;
-  await completeCloudLogin(set.data.session,ownerStamp,ownerClient);
-  return;
- }
+ if(!email.includes('@'))throw Error('Ingresa el correo electrónico de tu cuenta personal.');
  if(register&&(!email.includes('@')||password.length<6))throw Error('Para registrarte, introduce un correo válido y contraseña de al menos 6 caracteres.');
  const result=register?await ownerClient.auth.signUp({email,password}):await ownerClient.auth.signInWithPassword({email,password});
  if(result.error)throw result.error;
@@ -666,7 +635,7 @@ async function cloudLogin(email,password,register=false){
   status('Revisa tu correo para confirmar la cuenta. Tu perfil local no se modificó.');
   return;
  }
- await completeCloudLogin(result.data.session,ownerStamp,ownerClient,register);
+ await completeCloudLogin(result.data.session,ownerStamp,ownerClient);
 }
 function renderConflictButtons(){
  const holder=$('offlineConflicts');if(!holder)return;
@@ -870,9 +839,8 @@ async function init(){
   }catch(error){seedWarning=String(error.message||error);}
  }
  profiles=(await all()).map(profileMeta);
- syncController=createCloudSync({
-  remote:remoteGateway,getState:()=>({data:latest?.data||EMPTY(),profileName:latest?.name||'Perfil'}),
-  catalogFetch:downloadAllCatalogs,
+ syncController=createGymlyticsCloudSync({
+  remote:remoteGateway,getState:()=>({data:latest?.data||EMPTY(),profileName:latest?.name||'Perfil',profileId:activeId}),
   mutate:update=>flush(update),refresh:updateFromProfile,
   isCurrent:(uid,token)=>stamp()===token&&remoteSession?.user?.id===uid,
   isLinkedElsewhere:uid=>profiles.some(p=>p.id!==activeId&&p.cloudUserId===uid),
