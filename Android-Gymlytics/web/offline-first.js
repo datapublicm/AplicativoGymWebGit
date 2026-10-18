@@ -573,7 +573,7 @@ function scheduleAutoUpload(){
  if(autoUploadTimer)clearTimeout(autoUploadTimer);
  if(!navigator.onLine||!remoteSession?.user||cloudAccountKind!=='personal'||
     latest?.data?.cloudUserId!==remoteSession.user.id||latest?.data?.syncMode!=='instant')return;
- if(!latest?.data?.pending?.some(op=>['create_series','update_series','delete_series','add_catalog','update_catalog','delete_catalog','photo'].includes(op.kind)))return;
+ if(!latest?.data?.pending?.some(op=>['create_series','update_series','delete_series','add_catalog','update_catalog','delete_catalog'].includes(op.kind)))return;
  autoUploadTimer=setTimeout(async()=>{
   autoUploadTimer=null;
   if(syncController?.isBusy()){scheduleAutoUpload();return;}
@@ -608,7 +608,9 @@ async function linkAccount(){
 async function completeCloudLogin(session,ownerStamp,ownerClient){
  requireCloudIdentity(session?.user?.id,ownerStamp,ownerClient);
  try{
-  // El esquema nuevo no utiliza asegurar_perfil_gymlytics ni la tabla antigua.
+  // Publicar temporalmente la sesión para autorizar la verificación RLS
+  // y retirarla si falla. Los datos locales no se alteran.
+  remoteSession=session;cloudAccountKind='personal';
   await syncController.ensureUser(session.user.id,ownerStamp);
   requireCloudIdentity(session.user.id,ownerStamp,ownerClient);
   cloudAccountKind='personal';
