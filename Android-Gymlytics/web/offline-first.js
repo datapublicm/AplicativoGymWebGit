@@ -253,7 +253,7 @@ function catalogUpdate(){
  if(typeof renderOwnCatalog==='function')renderOwnCatalog();
  if(typeof cascade==='function')cascade(0);
  if(typeof catalogUpdateCounters==='function')catalogUpdateCounters();
- window.GymCatalogFieldRefresh?.();
+ window.GymCatalogFieldRefresh?.();window.GymSiteGpsRefresh?.();
  const muscle=$('muscleExistingSelect'),count=$('muscleCount');
  if(muscle){muscle.replaceChildren(new Option('Selecciona un músculo…',''));
   for(const row of latest.data.muscles||[])muscle.add(new Option(row.nombre,row.id));}

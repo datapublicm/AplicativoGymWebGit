@@ -24,6 +24,7 @@
   el('catalogExtraPayload').value=JSON.stringify(values.detalles_extra);
   return values;
  }
+ window.GymCatalogCollectExerciseValues=collect;
  function readExercise(){
   const id=window.GymCatalogSelectedExerciseId||el('exerciseExistingSelect')?.value;
   return (window.GymExerciseLibrary||[]).find(x=>String(x.id)===String(id));
@@ -60,17 +61,19 @@
  el('catalogForm')?.addEventListener('submit',collect,true);
  el('exerciseExistingSelect')?.addEventListener('change',loadDetails);
  window.GymCatalogExerciseChanged=loadDetails;
- el('editExerciseDetails')?.addEventListener('click',async event=>{
-  const id=window.GymCatalogSelectedExerciseId||el('exerciseExistingSelect').value,feedback=el('exerciseEditFeedback');
-  if(!id){feedback.textContent='Selecciona primero un ejercicio de este perfil.';return;}
-  event.currentTarget.disabled=true;
-  try{
-   await window.GymCloud.updateExerciseDetails(id,collect());
-   feedback.textContent='Detalles del ejercicio modificados offline, conservando su identificador.';
-  }catch(error){feedback.textContent='No se guardaron los detalles: '+String(error.message||error);}
-  finally{event.currentTarget.disabled=false;}
- });
+ // «Modificar» guarda nombre y detalles en una única transacción IndexedDB.
  const dialog=el('siteGPSDialog'),feedback=el('siteGPSFeedback');
+ function gpsBadge(){
+  const id=el('siteExistingSelect')?.value;
+  const site=(window.GymEntities?.sites||[]).find(x=>String(x.id)===String(id));
+  const saved=site?.latitud!=null&&site?.longitud!=null;
+  const label=el('siteGPSStatus');
+  if(label){label.textContent=saved?'✓ Ubicación registrada':'Sin ubicación';label.dataset.registered=saved?'true':'false';}
+  return saved;
+ }
+ window.GymSiteGpsRefresh=gpsBadge;
+ el('siteExistingSelect')?.addEventListener('change',gpsBadge);
+
  function map(){
   const latitude=Number(el('siteGPSLat').value),longitude=Number(el('siteGPSLon').value);
   const valid=el('siteGPSLat').value!==''&&el('siteGPSLon').value!==''&&
@@ -90,7 +93,7 @@
   const site=(window.GymEntities?.sites||[]).find(x=>String(x.id)===id);
   const reference=(window.GymReferenceChoices?.('site',{})||[]).find(x=>x.id===id);
   if(!site&&!reference){el('siteFeedback').textContent='Selecciona primero una sede.';return;}
-  dialog.dataset.siteId=id;el('siteGPSLabel').textContent='Sede: '+(site?.nombre||reference.name);
+  dialog.dataset.siteId=id;el('siteGPSLabel').textContent='Sede: '+(site?.nombre||reference.name)+' · '+(site?.latitud!=null&&site?.longitud!=null?'Ubicación registrada':'Sin ubicación');
   el('siteGPSLat').value=site?.latitud??'';el('siteGPSLon').value=site?.longitud??'';
   feedback.textContent='';map();
   if(!dialog.open)dialog.showModal();
@@ -115,7 +118,9 @@
    const savedId=await window.GymCloud.updateSiteGPS(dialog.dataset.siteId,el('siteGPSLat').value,el('siteGPSLon').value);
    dialog.dataset.siteId=String(savedId);
    el('siteExistingSelect').value=String(savedId);
-   feedback.textContent='Coordenadas de la sede guardadas offline ✓';
+   map();gpsBadge();const savedSite=(window.GymEntities?.sites||[]).find(s=>String(s.id)===String(savedId));
+   el('siteGPSLabel').textContent='✓ Ubicación registrada · '+(savedSite?.nombre||'Sede');
+   feedback.textContent='✓ Ubicación registrada. Marcador guardado offline.';
   }catch(error){feedback.textContent=String(error.message||error);}
   finally{event.currentTarget.disabled=false;}
  });
@@ -206,5 +211,5 @@
  zone?.addEventListener('change',()=>{if(mode?.checked){refresh();applyVariant();}});
  exercise?.addEventListener('change',()=>{variants();applyVariant();});
  variant?.addEventListener('change',()=>{window.GymSelectedExerciseId=variant.value||null;applyVariant();});
- order();refresh();
+ order();refresh();gpsBadge();
 })();
