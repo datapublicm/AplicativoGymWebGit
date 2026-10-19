@@ -258,6 +258,8 @@ try{
  const newName='Prueba 001005 '+Date.now();
  await evaluate("(()=>{const form=document.querySelector('#catalogForm');form.elements.namedItem('e').value="+JSON.stringify(newName)+";form.elements.namedItem('anotacion').value='Brazo';document.querySelector('#catalogSubmit').click();return true})()");
  await until("window.GymExerciseLibrary.some(e=>e.nombre==="+JSON.stringify(newName)+")",'ejercicio nuevo guardado');
+ await wait(450);
+ console.log('DEBUG 30',JSON.stringify(await evaluate("({panelHidden:document.querySelector('[data-catalog-kind=exercise] .catalog-compact-detail').hidden,feedback:document.querySelector('#catalogFeedback').textContent,toast:document.querySelector('#toast').textContent,buttonDisabled:document.querySelector('#catalogSubmit').disabled,name:document.querySelector('#catalogForm [name=e]').value,extra:document.querySelector('#catalogExtraDetails').childElementCount})")));
  await until("document.querySelector('[data-catalog-kind=exercise] .catalog-compact-detail').hidden",'cerrar formulario al guardar');
  assert.equal(await evaluate("document.querySelector('#catalogForm [name=e]').value"),'');
  assert.equal(await evaluate("document.querySelector('#catalogExtraDetails').children.length"),0);
