@@ -1072,7 +1072,9 @@ async function init(){
   const button=$('catalogSubmit');button.disabled=true;
   try{await api.saveCustomExercise(values);event.currentTarget.reset();
    $('catalogFeedback').textContent='Ejercicio guardado en el perfil local.';}
-  catch(e){$('catalogFeedback').textContent=e.message}finally{button.disabled=false}
+  catch(e){$('catalogFeedback').textContent=e.message;
+   if(/Ya existe un ejercicio/.test(e.message||'')&&typeof toast==='function')toast('⚠️ Ya existe: ejercicio y características idénticos.');
+  }finally{button.disabled=false}
  });
  $('authRecovery').addEventListener('click',()=>status('La recuperación de contraseña se habilitará cuando se configure una URL HTTPS segura. El perfil offline no se ve afectado.'));
 }
