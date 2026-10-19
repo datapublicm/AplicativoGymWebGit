@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 const here=fileURLToPath(new URL('.',import.meta.url));
 function copyPreviewAssets(){return {name:'copy-gymlytics-assets',closeBundle(){
- const required=['app.js','dashboard.js','offline-first.js','gymlytics-cloud-v2.mjs','gymlytics-seed-offline.mjs','catalog-detail-browser.mjs','catalog-detail-filter.mjs','offline-catalog-download.js','catalog-sync-engine.js','reference-overrides.js','photo-sync-engine.js','profile-policy.js','cloud-sync.js','sync-engine.js','legacy-compat.js','sw.js','manifest.webmanifest','styles.css'];
+ const required=['app.js','dashboard.js','offline-first.js','gymlytics-cloud-v2.mjs','gymlytics-seed-offline.mjs','catalog-detail-browser.mjs','catalog-detail-filter.mjs','catalog-field-admin.mjs','offline-catalog-download.js','catalog-sync-engine.js','reference-overrides.js','photo-sync-engine.js','profile-policy.js','cloud-sync.js','sync-engine.js','legacy-compat.js','sw.js','manifest.webmanifest','styles.css'];
  for(const name of required)fs.copyFileSync(path.join(here,'web',name),path.join(here,'dist',name));
  for(const directory of ['assets','icons','data']){
   const from=path.join(here,'web',directory),to=path.join(here,'dist',directory);

@@ -1094,3 +1094,22 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 #page-catalogos #catalogDetailCandidates ul{max-height:190px;overflow-y:auto;padding-left:18px;line-height:1.6}
 #page-catalogos #catalogDetailView{width:100%;min-height:43px}
 #page-catalogos #catalogDetailView:disabled{opacity:.48;cursor:not-allowed}
+
+/* 01.12 · Navegación entre variantes y administración de detalles. */
+#page-catalogos .exercise-variant-nav{display:flex;gap:3px;align-items:center;justify-content:center;flex-wrap:nowrap;order:7;width:100%;margin-top:4px}
+#page-catalogos .exercise-variant-nav[hidden]{display:none!important}
+#page-catalogos .exercise-variant-nav button{border:1px solid #27699a;border-radius:7px;min-height:33px;min-width:34px;background:#0b3c5f;color:#edfaff;font-weight:700;font-size:19px}
+#page-catalogos .exercise-variant-nav button:disabled{opacity:.35}
+#page-catalogos .exercise-variant-nav span{font-size:12px;color:#cee9fc;margin:0 6px;white-space:nowrap}
+#page-catalogos .catalog-compact-card[data-catalog-kind="exercise"] .catalog-compact-bar{flex-wrap:wrap}
+.gym-extra-field-panel{margin:10px 0;background:#081f37;border:1px solid #2b6588;border-radius:13px;color:#e8f5fc;padding:10px 13px}
+.gym-extra-field-panel summary{cursor:pointer;font-weight:700;font-size:14px}
+.gym-extra-help{font-size:12px;color:#a5bfd8;line-height:1.5}
+.gym-extra-field-panel label,.registro-attribute-values label{display:flex;flex-direction:column;gap:5px;margin-top:9px;font-size:12px;color:#c8dceb}
+.gym-extra-field-panel input,.gym-extra-field-panel select,.registro-attribute-values input{width:100%;max-width:100%;height:42px;border-radius:8px;background:#09273f;border:1px solid #386784;color:#f2faff;padding:8px 10px;font-size:14px}
+.gym-extra-field-panel button{min-height:38px;margin-top:8px}
+.gym-extra-field-panel .gym-extra-actions{display:flex;flex-wrap:wrap;gap:8px}
+.gym-extra-field-panel .gym-danger{border-color:#ef7687!important;color:#ffb9bd!important}
+.gym-extra-field-panel [data-field-status]{color:#9fdbe6;font-size:12px;margin-top:9px}
+.registro-nuevos-detalles{margin:10px 0;padding:0 3px}
+.registro-attribute-values{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px}

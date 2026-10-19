@@ -274,7 +274,7 @@ function normalizarDetallesEjercicio(values){
  return result;
 }
 const fixedDetails=new Set(['Agrupación','Anotación','Máquina','Instrumento','Agarre / Implemento','Técnica','Nombre del ejercicio']);
-const fieldNormalize=x=>tidy(x).replace(/\\s+/g,' ').slice(0,120);
+const fieldNormalize=x=>tidy(x).replace(/\s+/g,' ').slice(0,120);
 const fieldKey=x=>fieldNormalize(x).toLocaleLowerCase('es');
 function detailFields(data){
  const names=[...(data.exerciseDetailFields||[]),...(data.library||[]).flatMap(e=>(e.detalles||[]).map(d=>d.campo))];

@@ -698,7 +698,7 @@ async function saveSeries(){
  const sessionStamp=window.GymCloud.getSessionStamp?.();
  const current=()=>requestId===window.GymSaveAttempt&&
   sessionStamp===window.GymCloud.getSessionStamp?.();
- const payload={exercise:r,date,technique:tech,notes:$('observaciones').value.trim(),entries};
+ const payload={exercise:{...r,detailValues:window.GymRegistroNewDetails?.()||{}},date,technique:tech,notes:$('observaciones').value.trim(),entries};
  const rowSignature=()=>JSON.stringify({date:$('fecha').value,tech:getValue('t'),exercise:chosenRow()?.e,exerciseId:globalThis.GymSelectedExerciseId||null,
    notes:$('observaciones').value.trim(),entries:getEntries().map(({el,...entry})=>entry)});
  const submittedSignature=rowSignature();
