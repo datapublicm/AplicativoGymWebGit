@@ -25,6 +25,66 @@
   return values;
  }
  window.GymCatalogCollectExerciseValues=collect;
+ // Editor contextual: cada nombre tiene su propio botón Modificar a la derecha.
+ // Solo se permite editar un campo por vez, manteniendo el UUID de la variante.
+ const editing=new Map();
+ const form=el('catalogForm'),addButton=el('catalogSubmit');
+ const activeInputs=new Map();
+ const editorFields=[
+  ['e','Nombre del ejercicio'],['agrupacion','Agrupación'],['anotacion','Anotación'],
+  ['instrumento','Máquina'],['agarre_implemento','Agarre / Implemento'],['tecnica','Técnica']
+ ];
+ function cancelFieldEdits(keep=false){
+  for(const [name,state] of editing){
+   if(!keep)state.input.value=state.original;
+   state.label.classList.remove('is-modifying');
+   state.panel.hidden=true;
+   state.button.setAttribute('aria-expanded','false');
+  }
+  editing.clear();
+  if(addButton)addButton.disabled=false;
+ }
+ window.GymCatalogCancelFieldEdits=cancelFieldEdits;
+ window.GymCatalogPrepareFieldEdits=()=>{
+  for(const state of editing.values())state.input.value=state.next.value.trim();
+ };
+ for(const [name,title] of editorFields){
+  const input=form?.elements.namedItem(name),label=input?.closest('label');
+  if(!input||!label)continue;
+  const heading=document.createElement('span');heading.className='catalog-field-title';
+  const caption=document.createElement('span');caption.textContent=title;
+  const modify=document.createElement('button');modify.className='catalog-field-modify';
+  modify.textContent='Modificar';modify.type='button';modify.setAttribute('aria-label','Modificar '+title);
+  modify.setAttribute('aria-expanded','false');heading.append(caption,modify);
+  // Retener exactamente el mismo input[name]: los datos se guardan sobre la variante ya seleccionada.
+  label.firstChild?.nodeType===Node.TEXT_NODE&&label.firstChild.remove();
+  label.prepend(heading);
+  label.classList.add('catalog-editable-field');
+  const panel=document.createElement('div');panel.className='catalog-field-inline-editor';panel.hidden=true;
+  panel.innerHTML='<input data-original readonly aria-label="Valor actual de '+title+'">'+
+   '<span aria-hidden="true">→</span>'+
+   '<input data-new maxlength="'+(name==='e'?160:500)+'" aria-label="Nuevo valor de '+title+'">';
+  label.append(panel);
+  const state={name,input,label,panel,button:modify,next:panel.querySelector('[data-new]'),original:''};
+  activeInputs.set(name,state);
+  modify.addEventListener('click',event=>{
+   event.preventDefault();event.stopPropagation();
+   if(editing.has(name)){cancelFieldEdits();return;}
+   const id=window.GymCatalogSelectedExerciseId;
+   if(!id||(window.GymExerciseLibrary||[]).every(e=>String(e.id)!==String(id))){
+    el('catalogFeedback').textContent='Selecciona primero la variante del ejercicio que vas a modificar.';
+    return;
+   }
+   cancelFieldEdits();
+   state.original=input.value;panel.querySelector('[data-original]').value=input.value;
+   state.next.value=input.value;panel.hidden=false;label.classList.add('is-modifying');
+   modify.setAttribute('aria-expanded','true');
+   editing.set(name,state);addButton.disabled=true;
+   state.next.focus();
+   el('catalogFeedback').textContent='Modifica el valor de la derecha (→) y pulsa «Modificar» al final para guardar.';
+  });
+ }
+ window.GymCatalogFieldEditActive=()=>editing.size>0;
  function readExercise(){
   const id=window.GymCatalogSelectedExerciseId||el('exerciseExistingSelect')?.value;
   return (window.GymExerciseLibrary||[]).find(x=>String(x.id)===String(id));
