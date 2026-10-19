@@ -131,9 +131,10 @@ try{
  // 13. Los botones Modificar deben guardar cambios en el MISMO UUID.
  const siteId=await evaluate("window.GymEntities.sites[0].id");
  await evaluate("(()=>{const site=window.GymEntities.sites[0];const gym=document.querySelector('#gymExistingSelect');gym.value=site.gimnasio_id;gym.dispatchEvent(new Event('change'));const s=document.querySelector('#siteExistingSelect');s.value=site.id;s.dispatchEvent(new Event('change'));catalogOpenCard('site','edit');return true})()");
+ console.log('DEBUG PRE',JSON.stringify(await evaluate("({buttonDisabled:document.querySelector('[data-catalog-modify=site]').disabled,canWrite:window.GymCloud.canWrite(),selection:document.querySelector('#siteExistingSelect').value,stamp:window.GymCloud.getSessionStamp(),buttons:document.querySelectorAll('[data-catalog-modify=site]').length})")));
  await evaluate("(()=>{document.querySelector('#siteEditName').value='VES CORREGIDA';document.querySelector('[data-catalog-modify=site]').click();return true})()");
  await wait(400);
- console.log('DEBUG SEDE',JSON.stringify(await evaluate("({wanted:"+JSON.stringify(siteId)+",selector:document.querySelector('#siteExistingSelect').value,editor:document.querySelector('#siteEditName').value,feedback:document.querySelector('#siteFeedback').textContent,chosen:window.GymEntities.sites[0],options:Array.from(document.querySelector('#siteExistingSelect').options).map(x=>x.value).slice(0,3)})")));
+ console.log('DEBUG SEDE',JSON.stringify(await evaluate("({wanted:"+JSON.stringify(siteId)+",selector:document.querySelector('#siteExistingSelect').value,editor:document.querySelector('#siteEditName').value,feedback:document.querySelector('#siteFeedback').textContent,buttonDisabled:document.querySelector('[data-catalog-modify=site]').disabled,chosen:window.GymEntities.sites[0],options:Array.from(document.querySelector('#siteExistingSelect').options).map(x=>x.value).slice(0,3)})")));
  await until("window.GymEntities.sites.some(x=>x.id==="+JSON.stringify(siteId)+"&&x.nombre==='VES CORREGIDA')",'renombrar sede en mismo UUID');
  assert.equal(await evaluate("window.GymEntities.sites.length"),16);
  console.log('PASS 13: Modificar sede persiste Única → VES CORREGIDA sin duplicar registros');
