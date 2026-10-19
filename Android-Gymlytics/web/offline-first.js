@@ -339,7 +339,7 @@ const api={
    if(!Number.isFinite(weight)||weight<0||!Number.isFinite(reps)||reps<=0||!Number.isFinite(assistance)||assistance<0||!['kg','lb'].includes(entry.unit))
     throw Error('Peso, repeticiones o asistencias inválidos');
    return {id:uuid(),origin:'offline',date,gym:exercise.g,sede:exercise.s,
-    detailValues:structuredClone(exercise.detailValues||{}),
+    detailValues:{...(exercise.detailValues||{})},
     exerciseId:exercise.exerciseId||null,
     zone:exercise.z,type:exercise.kind,equipment:exercise.i,accessory:exercise.a,
     grip:exercise.gr,exercise:exercise.e,technique,notes,series:entry.series,
