@@ -125,79 +125,64 @@
   finally{event.currentTarget.disabled=false;}
  });
  const mode=el('registroSelectByFields'),group=el('registroAgrupacion'),wrap=el('registroAgrupacionWrap');
- const agrupacion=exercise=>(exercise.detalles||[]).find(x=>x.campo==='Agrupación')?.valor||'';
- mode?.addEventListener('change',()=>{
-  wrap.hidden=!mode.checked;
-  const current=group.value,values=[...new Set((window.GymExerciseLibrary||[]).map(agrupacion).filter(Boolean))].sort();
-  group.replaceChildren(new Option('Seleccionar agrupación…',''));
-  values.forEach(x=>group.add(new Option(x,x)));
-  group.value=values.includes(current)?current:(values.length===1?values[0]:'');
-  if(mode.checked)group.dispatchEvent(new Event('change'));
- });
- group?.addEventListener('change',()=>{
-  if(!mode.checked)return;
-  const selected=group.value;
-  const names=[...new Set((window.GymExerciseLibrary||[])
-   .filter(ex=>!selected||agrupacion(ex)===selected).map(ex=>ex.nombre))].sort();
-  const exercise=el('ejercicio'),current=exercise.value;
-  exercise.replaceChildren(new Option(names.length?'Seleccionar ejercicio…':'Agregar ejercicio',''));
-  names.forEach(x=>exercise.add(new Option(x,x)));
-  exercise.value=names.includes(current)?current:(names.length===1?names[0]:'');
- });
- // Prioridad al ejercicio, y solo después a sus otros campos.
- const exerciseField=el('ejercicio')?.closest('.field'),zoneField=el('zona')?.closest('.field');
- if(exerciseField&&zoneField&&zoneField.parentElement===exerciseField.parentElement)
-  exerciseField.parentElement.insertBefore(exerciseField,zoneField);
- el('ejercicio')?.addEventListener('change',()=>{
-  const exercise=(window.GymExerciseLibrary||[]).find(x=>x.nombre===el('ejercicio').value);
-  if(!exercise)return;
-  const get=label=>(exercise.detalles||[]).find(x=>x.campo===label)?.valor||'';
-  for(const [id,val] of [['zona',get('Anotación')||exercise.zona_entrenamiento],
-   ['instrumento',get('Instrumento')],['implemento',get('Agarre / Implemento')],
-   ['tecnica',get('Técnica')||exercise.tecnica_actualizada]]){
-   const field=el(id);if(val&&field&&[...field.options].some(x=>x.value===val))field.value=val;
-  }
- });
-
- // Las variantes del ejercicio poseen UUID aunque compartan el mismo nombre.
  const variant=el('registroVariante'),vwrap=el('registroVarianteWrap'),exercise=el('ejercicio'),zone=el('zona');
  const lib=()=>window.GymExerciseLibrary||[];
- const detail=(e,k)=>(e.detalles||[]).find(x=>x.campo===k)?.valor||'';
- const unique=x=>[...new Set(x.filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
- function options(node,vals,title){
-  const old=node.value;node.replaceChildren(new Option(vals.length?title:'Agregar ejercicio',''));
-  vals.forEach(x=>node.add(new Option(x,x)));node.disabled=!vals.length;
-  node.value=vals.includes(old)?old:(vals.length===1?vals[0]:'');
+ const detail=(e,k)=>(e.detalles||[]).find(x=>x.campo===k||(k==='Máquina'&&x.campo==='Instrumento'))?.valor||'';
+ const norm=x=>String(x||'').trim();
+ const filters=[
+  {node:group,label:'Agrupación',get:e=>detail(e,'Agrupación')},
+  {node:zone,label:'Anotación',get:e=>detail(e,'Anotación')||e.zona_entrenamiento||''},
+  {node:exercise,label:'Ejercicio',get:e=>e.nombre||''},
+  {node:el('instrumento'),label:'Máquina',get:e=>detail(e,'Máquina')},
+  {node:el('implemento'),label:'Agarre / Implemento',get:e=>detail(e,'Agarre / Implemento')},
+  {node:el('tecnica'),label:'Técnica',get:e=>detail(e,'Técnica')||e.tecnica_actualizada||''}
+ ];
+ const unique=values=>[...new Set(values.map(norm).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+ function setChoices(node,values,label){
+  if(!node)return;
+  const old=node.value,options=unique(values);
+  node.replaceChildren(new Option(options.length?'Seleccionar '+label+'…':'Sin opciones',''));
+  options.forEach(v=>node.add(new Option(v,v)));
+  node.value=options.includes(old)?old:'';
+  node.disabled=!options.length;
  }
  function variants(){
   if(!exercise||!variant)return;
-  const matches=lib().filter(x=>x.nombre===exercise.value&&(!mode?.checked||
-   (!group?.value||detail(x,'Agrupación')===group.value)&&(!zone?.value||detail(x,'Anotación')===zone.value)));
-  const previous=window.GymSelectedExerciseId;variant.replaceChildren(new Option('Seleccionar variante…',''));
-  matches.forEach(x=>{const d=[detail(x,'Instrumento'),detail(x,'Agarre / Implemento'),
-    detail(x,'Técnica')||x.tecnica_actualizada].filter(Boolean).join(' · ');
-   variant.add(new Option((d||x.nombre)+' · '+String(x.id).slice(0,8),String(x.id)));});
-  vwrap.hidden=matches.length<=1;variant.disabled=!matches.length;
-  variant.value=matches.some(x=>String(x.id)===String(previous))?String(previous):
-   (matches.length===1?String(matches[0].id):'');
+  const choices=lib().filter(e=>norm(e.nombre)===norm(exercise.value)&&
+   (!mode?.checked||filters.every(({node,get})=>!node?.value||norm(get(e))===norm(node.value))));
+  const prior=window.GymSelectedExerciseId;
+  variant.replaceChildren(new Option('Seleccionar variante…',''));
+  for(const e of choices){
+   const caption=[detail(e,'Máquina'),detail(e,'Agarre / Implemento'),detail(e,'Técnica')||e.tecnica_actualizada]
+    .filter(Boolean).join(' · ');
+   variant.add(new Option((caption||e.nombre)+' · '+String(e.id).slice(0,8),String(e.id)));
+  }
+  vwrap.hidden=choices.length<=1;variant.disabled=choices.length<=1;
+  variant.value=choices.some(e=>String(e.id)===String(prior))?String(prior):
+   choices.length===1?String(choices[0].id):'';
   window.GymSelectedExerciseId=variant.value||null;
+  window.GymRegistroRefresh?.();
  }
  function applyVariant(){
   const e=lib().find(x=>String(x.id)===String(window.GymSelectedExerciseId||''));if(!e)return;
-  for(const [id,val] of [['zona',detail(e,'Anotación')||e.zona_entrenamiento],
-   ['instrumento',detail(e,'Instrumento')],['implemento',detail(e,'Agarre / Implemento')],
-   ['tecnica',detail(e,'Técnica')||e.tecnica_actualizada]]){
-   const node=el(id);if(node&&val&&[...node.options].some(o=>o.value===val))node.value=val;
+  for(const [id,value] of [
+   ['zona',detail(e,'Anotación')||e.zona_entrenamiento],
+   ['instrumento',detail(e,'Máquina')],['implemento',detail(e,'Agarre / Implemento')],
+   ['tecnica',detail(e,'Técnica')||e.tecnica_actualizada]
+  ]){
+   const node=el(id);if(value&&node&&[...node.options].some(o=>o.value===value))node.value=value;
   }
+  window.GymRegistroRefresh?.();
  }
  function refresh(){
+  wrap.hidden=!mode?.checked;
   if(!mode?.checked){variants();return;}
-  const filtered=lib().filter(e=>group?.value&&detail(e,'Agrupación')===group.value);
-  const annotations=unique(filtered.map(e=>detail(e,'Anotación'))),old=zone.value;
-  zone.replaceChildren(new Option('Seleccionar anotación…',''));
-  annotations.forEach(x=>zone.add(new Option(x,x)));
-  zone.value=annotations.includes(old)?old:(annotations.length===1?annotations[0]:'');
-  options(exercise,unique(filtered.filter(e=>zone.value&&detail(e,'Anotación')===zone.value).map(e=>e.nombre)),'Seleccionar ejercicio…');
+  let possible=lib().slice();
+  for(const {node,label,get} of filters){
+   if(!node)continue;
+   setChoices(node,possible.map(get),label.toLowerCase());
+   if(node.value)possible=possible.filter(e=>norm(get(e))===norm(node.value));
+  }
   variants();
  }
  function order(){
@@ -207,9 +192,14 @@
  }
  window.GymOfflineRefreshSelectors=refresh;
  mode?.addEventListener('change',()=>{order();refresh();applyVariant();});
- group?.addEventListener('change',()=>{refresh();applyVariant();});
- zone?.addEventListener('change',()=>{if(mode?.checked){refresh();applyVariant();}});
- exercise?.addEventListener('change',()=>{variants();applyVariant();});
+ for(const {node} of filters){
+  node?.addEventListener('change',()=>{
+   if(mode?.checked)refresh();
+   else variants();
+   applyVariant();
+  });
+ }
  variant?.addEventListener('change',()=>{window.GymSelectedExerciseId=variant.value||null;applyVariant();});
+ el('addExerciseExtra')?.addEventListener('click',()=>window.GymCatalogFieldRefresh?.());
  order();refresh();gpsBadge();
 })();
