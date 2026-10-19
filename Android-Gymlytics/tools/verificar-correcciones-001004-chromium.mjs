@@ -154,7 +154,7 @@ try{
  assert.equal(await evaluate("window.GymCatalogSelectedExerciseId"),firstVariant);
  assert.equal(await evaluate("document.querySelector('#catalogForm [name=e]').value"),'Press inclinado');
  console.log('PASS 15: lista única Press inclinado (20), flechas << < > >> y datos según UUID');
- await evaluate("(()=>{document.querySelector('#exerciseEditName').value='Press corregido';document.querySelector('[data-catalog-modify=exercise]').click();return true})()");
+ await evaluate("(()=>{document.querySelector('#catalogForm [name=e]').value='Press corregido';document.querySelector('[data-catalog-modify=exercise]').click();return true})()");
  await until("window.GymExerciseLibrary.find(x=>x.id==="+JSON.stringify(firstVariant)+")?.nombre==='Press corregido'",'renombrar ejercicio');
  assert.equal(await evaluate("window.GymExerciseLibrary.filter(x=>x.nombre==='Press corregido').length"),1);
  console.log('PASS 16: Modificar ejercicio actualiza la variante elegida, sin cambiar las otras 19');
