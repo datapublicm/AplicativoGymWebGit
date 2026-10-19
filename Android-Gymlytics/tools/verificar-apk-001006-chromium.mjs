@@ -231,11 +231,11 @@ try{
  // 26. Guardar sin peso o ejercicio indica qué falta.
  await evaluate("document.querySelector('#saveRecords').click()");
  assert.match(await evaluate("document.querySelector('#saveFeedback').textContent"),/Falta completar:/);
- console.log('PASS 26: guardado informa campos faltantes' // 27. No debe existir Modificar en la fila junto a expandir.
+ console.log('PASS 26: guardado informa campos faltantes');
+ // 27. No debe existir Modificar en la fila junto a expandir.
  assert.equal(await evaluate("document.querySelectorAll('.catalog-inline-modify').length"),0);
  assert.equal(await evaluate("document.querySelector('.catalog-exercise-selector').hidden"),true);
  console.log('PASS 27: un Modificar inferior, sin botones pequeños junto a expandir');
-');
  // 28: Agregar/Modificar juntos, gestión de subdivisiones arriba y botones series juntos.
  assert.equal(await evaluate("document.querySelector('#catalogSubmit').parentElement.contains(document.querySelector('#catalogModifyAdjacent'))"),true);
  assert.equal(await evaluate("(()=>{const i=document.querySelector('#implemento').closest('.field'),m=document.querySelector('#toggleSubdivisions').closest('.field'),t=document.querySelector('#tecnica').closest('.field');return Boolean(i.compareDocumentPosition(m)&Node.DOCUMENT_POSITION_FOLLOWING)&&Boolean(m.compareDocumentPosition(t)&Node.DOCUMENT_POSITION_FOLLOWING)})()"),true);
