@@ -1,4 +1,4 @@
-# Compilación verificada 01.14: copia controladores faltantes y prueba el DIST real antes de producir APK. No modifica main ni Supabase.
+# Compilación GymLytics 01.16 Word 001.006: validación de 36 escenarios sobre DIST, GPS nativo y APK separada.
 name: "GymLytics 01.16 - APK Word 001.006"
 on:
   push:
