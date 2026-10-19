@@ -1035,7 +1035,7 @@ document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEve
    else if(select.querySelector('option[value="'+CSS.escape(targetId)+'"]'))select.value=targetId;
    feedback.textContent=kind==='exercise'?'✅ Ejercicio modificado en la misma variante.':'✅ Nombre actualizado: '+name+'.';
    if(kind==='exercise'){
-    window.GymCatalogCancelFieldEdits?.();
+    window.GymCatalogCancelFieldEdits?.(true);
     const section=$('catalogDetailexercise');
     if(section){section.hidden=true;const toggle=section.closest('.catalog-compact-card')?.querySelector('.catalog-compact-toggle');if(toggle){toggle.textContent='+';toggle.setAttribute('aria-expanded','false');}}
     toast('✓ Ejercicio modificado correctamente');
