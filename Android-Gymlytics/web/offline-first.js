@@ -1073,6 +1073,7 @@ async function init(){
   try{await api.saveCustomExercise(values);form.reset();
    $('catalogExtraDetails')?.replaceChildren();
    $('catalogExtraPayload').value='[]';
+   window.GymCatalogCancelFieldEdits?.(true);
    const section=document.querySelector('[data-catalog-kind="exercise"] .catalog-compact-detail');
    if(section){
     section.hidden=true;
