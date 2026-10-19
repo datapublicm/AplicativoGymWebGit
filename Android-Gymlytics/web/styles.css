@@ -1113,3 +1113,28 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 .gym-extra-field-panel [data-field-status]{color:#9fdbe6;font-size:12px;margin-top:9px}
 .registro-nuevos-detalles{margin:10px 0;padding:0 3px}
 .registro-attribute-values{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px}
+
+/* GymLytics 01.13 — documento 001.004: navegación visible solo al expandir el ejercicio repetido. */
+#page-catalogos #exerciseVariantNav{display:flex;align-items:center;justify-content:center;gap:4px;
+ margin:7px 0 13px;padding:8px 4px;max-width:100%;width:100%;background:#0b2e4a;
+ border:1px solid #386a89;border-radius:11px}
+#page-catalogos #exerciseVariantNav[hidden],
+#page-catalogos .catalog-compact-detail[hidden] #exerciseVariantNav,
+.gym-extra-field-panel[hidden],#registroNuevosDetalles[hidden]{display:none!important}
+#page-catalogos #exerciseVariantNav button{flex:0 0 37px;min-width:37px;min-height:36px;
+ background:#0b3b61;border:1px solid #3481aa;border-radius:7px;color:#e1f8ff;font-size:22px}
+#page-catalogos #exerciseVariantNav button:disabled{opacity:.33}
+#page-catalogos #exerciseVariantNav span{flex:0 0 auto;color:#d7f1ff;white-space:nowrap;font-size:13px}
+#page-catalogos .gym-extra-field-panel{background:#0a2842;border:1px solid #367496;
+ border-radius:15px;margin:12px 0;padding:13px 15px;box-shadow:none}
+#page-catalogos .gym-extra-field-panel summary{color:#c9eeff;font-size:15px;font-weight:700}
+#page-catalogos .gym-extra-field-panel .gym-extra-actions button{flex:1 1 135px}
+#page-catalogos #siteGPSStatus{display:inline-flex;align-items:center;margin:4px 0 0;
+ padding:5px 10px;border:1px solid #456780;border-radius:15px;color:#c3d8e8;font-size:12px}
+#page-catalogos #siteGPSStatus[data-registered="true"]{border-color:#228f8b;color:#9ef0e1}
+#page-registro .registro-series-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+ gap:8px;align-items:center}
+#page-registro .registro-series-actions button{width:100%;min-width:0;min-height:43px;margin:0;font-size:13px}
+#page-registro .registro-series-actions #seriesGroupCount{grid-column:1/-1;text-align:center;font-size:12px}
+#page-registro .registro-subdiv-button{grid-column:1/-1}
+#page-registro .registro-subdiv-button button{width:100%;min-height:42px}
