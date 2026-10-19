@@ -305,6 +305,19 @@ function addImplicitFields(data,values){
   }
  }
 }
+
+function fingerprintExercise(name,details){
+ const nm=tidy(name).normalize('NFKC').toLocaleLowerCase('es');
+ const signature=(details||[]).filter(d=>tidy(d.campo)&&tidy(d.valor))
+  .map(d=>[tidy(d.campo)==='Instrumento'?'Máquina':tidy(d.campo),tidy(d.valor)]
+   .map(x=>x.normalize('NFKC').toLocaleLowerCase('es'))).sort((a,b)=>a.join('|').localeCompare(b.join('|'),'es'));
+ return JSON.stringify([nm,signature]);
+}
+function assertNewExerciseVariant(data,name,details,exceptId=null){
+ const token=fingerprintExercise(name,details);
+ if((data.library||[]).some(e=>String(e.id)!==String(exceptId)&&fingerprintExercise(e.nombre,e.detalles)===token))
+  throw Error('Ya existe un ejercicio con el mismo nombre y todos los mismos detalles.');
+}
 const groups={gym:'gyms',site:'sites',machine:'machines',option:'options',exercise:'library'};
 function presentCatalog(kind){
  return kind==='exercise'?[...latest.data.library,...latest.data.custom.map(x=>({id:x.cloud_id,nombre:x.e}))]:
@@ -470,6 +483,24 @@ const api={
   });
   catalogUpdate();return savedId;
  },
+ async saveExerciseChanges(id,values){
+  assertEditable();
+  const name=tidy(values.e||values.nombre);
+  if(!name||name.length>160)throw Error('Escribe el nombre del ejercicio.');
+  const details=normalizarDetallesEjercicio(values);
+  const changed=await flush(data=>{
+   const row=(data.library||[]).find(x=>String(x.id)===String(id));
+   if(!row)throw Error('La variante seleccionada ya no pertenece a este perfil.');
+   assertNewExerciseVariant(data,name,details,id);
+   addImplicitFields(data,values);
+   row.nombre=name;row.detalles=details;
+   row.zona_entrenamiento=tidy(values.anotacion||values.z)||'Sin clasificar';
+   row.tecnica_actualizada=tidy(values.tecnica)||'Ejecución base';
+   data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:'exercise',localId:id});
+   return id;
+  });
+  catalogUpdate();return changed;
+ },
  async updateExerciseDetails(id,values){
   assertEditable();
   await flush(data=>{
@@ -489,8 +520,9 @@ const api={
   if(!nombre)throw Error('Escribe un nombre de ejercicio');
   await flush(data=>{
    // Los ejercicios pueden compartir nombre: cada variante conserva su UUID.
-   addImplicitFields(data,values);
    const id=uuid(),detalles=normalizarDetallesEjercicio(values);
+   assertNewExerciseVariant(data,nombre,detalles);
+   addImplicitFields(data,values);
    data.library.push({id,nombre,origen:'usuario',zona_entrenamiento:tidy(values.anotacion||values.z)||'Sin clasificar',
     tecnica_actualizada:tidy(values.tecnica)||'Ejecución base',detalles});
    data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'exercise',localId:id});
