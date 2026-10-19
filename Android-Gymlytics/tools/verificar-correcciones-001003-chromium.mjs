@@ -165,7 +165,10 @@ try{
  await until("!!window.GymCatalogFieldRefresh",'administrador de campos');
  await evaluate("(()=>{const p=document.querySelector('[data-field-panel=catalog]');p.querySelector('details').open=true;p.querySelector('[data-field-new]').value='Rango de movimiento';p.querySelector('[data-field-action=add]').click();return true})()");
  await until("window.GymCloud.detailFieldList().includes('Rango de movimiento')",'añadir campo');
+ await until("Array.from(document.querySelector('[data-field-panel=catalog] [data-field-existing]').options).some(x=>x.value==='Rango de movimiento')",'actualizar selector de campos');
  await evaluate("(()=>{const p=document.querySelector('[data-field-panel=catalog]');p.querySelector('[data-field-existing]').value='Rango de movimiento';p.querySelector('[data-field-existing]').dispatchEvent(new Event('change'));p.querySelector('[data-field-name]').value='Recorrido';p.querySelector('[data-field-action=rename]').click();return true})()");
+ await wait(400);
+ console.log('DEBUG CAMPO',JSON.stringify(await evaluate("({list:window.GymCloud.detailFieldList(),status:document.querySelector('[data-field-panel=catalog] [data-field-status]').textContent,value:document.querySelector('[data-field-panel=catalog] [data-field-existing]').value,newName:document.querySelector('[data-field-panel=catalog] [data-field-name]').value})")));
  await until("window.GymCloud.detailFieldList().includes('Recorrido')",'renombrar campo');
  console.log('PASS 17: campo creado y renombrado desde Catálogos');
  await evaluate("(()=>{const p=document.querySelector('[data-field-panel=catalog]');p.querySelector('[data-field-existing]').value='Recorrido';p.querySelector('[data-field-existing]').dispatchEvent(new Event('change'));window.confirm=m=>{window.warningCaptured=m;return false};p.querySelector('[data-field-action=delete]').click();return true})()");
