@@ -259,7 +259,7 @@ function refreshExerciseNavigation(){
  const node=$('exerciseVariantNav'),choice=catalogChoices('exercise').find(x=>x.id===$('exerciseExistingSelect')?.value);
  if(!node)return;
  const ids=choice?.variantIds||[];
- node.hidden=ids.length===0;
+ node.hidden=ids.length<=1||!!node.closest('.catalog-compact-detail')?.hidden;
  if(!ids.length)return;
  if(!ids.includes(String(catalogSelectedExerciseId)))catalogSelectExerciseVariant(ids[0]);
  const index=ids.indexOf(String(catalogSelectedExerciseId));
@@ -326,6 +326,7 @@ function catalogOpenCard(kind,action='add'){
  });
  detail.hidden=!open;
  if(btn){btn.textContent=open?'−':'+';btn.setAttribute('aria-expanded',String(open));}
+ if(kind==='exercise')refreshExerciseNavigation();
  if(!open)return;
  if(['zone','grip','technique'].includes(kind)){
   const form=$('addOptionForm'),type=form.querySelector('[name="tipo"]');
@@ -447,7 +448,7 @@ function setupCatalogCompact(){
     button.addEventListener('click',()=>catalogNavigateExercise(action));nav.append(button);
    }
    const position=document.createElement('span');position.dataset.variantPosition='';position.textContent='0 / 0';
-   nav.insertBefore(position,nav.children[2]);bar.append(nav);
+   nav.insertBefore(position,nav.children[2]);detail.prepend(nav);
   }
   bar.append(count,add);row.append(bar,detail);holder.append(row);
   select.addEventListener('focus',()=>catalogActiveCard(item.kind));
@@ -681,9 +682,27 @@ function invalidatePendingSave(){
 }
 async function saveSeries(){
  const r=chosenRow(),date=$('fecha').value,tech=getValue('t'),entries=getEntries();
- if(!r||!tech||!date||!entries.length){toast('Completa ejercicio, fecha y al menos una serie.');return}
- if(entries.some(x=>!validSeriesEntry(x))){
-  toast('Revisa peso, repeticiones y asistencias.');return;
+ const missing=[];
+ if(!getValue('g'))missing.push('gimnasio');
+ if(!getValue('s'))missing.push('sede');
+ if(!getValue('e'))missing.push('ejercicio');
+ if(!getValue('i'))missing.push('máquina/instrumento');
+ if(!getValue('t'))missing.push('técnica');
+ if(!date)missing.push('fecha');
+ if(!r&&getValue('e')&&(window.GymExerciseLibrary||[]).filter(x=>x.nombre===getValue('e')).length>1&&!window.GymSelectedExerciseId)
+  missing.push('variante del ejercicio');
+ if(!entries.length)missing.push('una serie con peso y repeticiones');
+ const fail=message=>{const feedback=$('saveFeedback');feedback.textContent=message;feedback.hidden=false;toast(message)};
+ if(missing.length){fail('Falta completar: '+[...new Set(missing)].join(', ')+'.');return}
+ if(!r){fail('La selección del ejercicio no es válida. Revisa los campos y elige su variante.');return}
+ const bad=entries.find(x=>!validSeriesEntry(x));
+ if(bad){
+  const incomplete=[];
+  if(!validSeriesDecimal(bad.weight,1e10))incomplete.push('peso');
+  if(!validSeriesDecimal(bad.reps,1e8)||Number(bad.reps)<=0)incomplete.push('repeticiones');
+  if(!validSeriesDecimal(bad.assistance||'0',1e8))incomplete.push('asistencias');
+  fail(bad.series+(bad.sub==='-'?'':' · '+bad.sub)+': revisa '+incomplete.join(', ')+'. Deben ser números válidos.');
+  return;
  }
  if(!window.GymCloud?.canWrite?.()){
   const message=window.GymCloud?.getWriteStatus?.()?.message||
@@ -1000,15 +1019,21 @@ document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEve
  const stamp=window.GymCloud.getSessionStamp?.(),current=()=>stamp===window.GymCloud.getSessionStamp?.()&&window.GymCloud.canWrite();
  button.disabled=true;
  try{
-  await window.GymCloud.updateCatalogItem(kind,targetId,name);
+  if(kind==='exercise'){
+   const values=window.GymCatalogCollectExerciseValues?.()||
+    Object.fromEntries(new FormData($('catalogForm')).entries());
+   values.e=name;
+   await window.GymCloud.saveExerciseChanges(targetId,values);
+  }else await window.GymCloud.updateCatalogItem(kind,targetId,name);
   if(current()){
    if(kind==='exercise')catalogSelectExerciseVariant(targetId);
    else if(select.querySelector('option[value="'+CSS.escape(targetId)+'"]'))select.value=targetId;
-   feedback.textContent='✅ Nombre actualizado: '+name+'.';
+   feedback.textContent=kind==='exercise'?'✅ Nombre y detalles guardados en la misma variante.':'✅ Nombre actualizado: '+name+'.';
    refreshExerciseNavigation();
   }
  }
- catch(error){if(current())feedback.textContent='No se pudo modificar: '+error.message;}
+ catch(error){if(current()){feedback.textContent='No se pudo modificar: '+error.message;
+    if(/Ya existe un ejercicio/.test(error.message||''))toast('⚠️ Ya existe: nombre y características idénticos.');}}
  finally{button.disabled=false;}
 }));
 document.addEventListener('click',e=>{const detail=e.target.closest('[data-history-detail]');if(detail){expandedHistoryId=expandedHistoryId===detail.dataset.historyDetail?null:detail.dataset.historyDetail;drawHistory();return;}const edit=e.target.closest('[data-edit]');if(edit){editRecord(edit.dataset.edit);return;}const b=e.target.closest('[data-delete]');if(b){deleteRecord(b.dataset.delete);return;}const progress=e.target.closest('[data-progress]');if(progress){const exercise=progress.dataset.progress;showPage('dashboard');if(model.records.some(r=>r.exercise===exercise)){$('progressExercise').value=exercise;drawProgressChart(model.records);}}})}
