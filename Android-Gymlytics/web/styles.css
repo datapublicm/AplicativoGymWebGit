@@ -1288,10 +1288,10 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 }
 
 
-/* GymLytics 01.18 · Tablas: dos acciones de exportación; tres herramientas homogéneas. */
+/* GymLytics · Tablas: filtros mitad/mitad y exportaciones debajo de los resultados. */
 #page-tablas .history-export-actions{
  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
- gap:9px!important;align-items:stretch;margin:0 0 13px;min-width:0;
+ gap:9px!important;align-items:stretch;margin:17px 0 0;min-width:0;
 }
 #page-tablas .history-export-actions .outline-btn{
  display:flex!important;align-items:center;justify-content:center;box-sizing:border-box;
@@ -1312,14 +1312,14 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
  margin:0!important;color:#adc9df;font-size:12px;font-weight:700;
 }
 #page-tablas .history-filters>label.history-subdivision{
- grid-column:1/-1!important;
+ grid-column:auto!important; /* 50 % del bloque: mismo ancho que Desde + Hasta */
 }
 #page-tablas .history-filters>label select{
  box-sizing:border-box;width:100%!important;min-width:0!important;
  min-height:46px!important;max-width:100%!important;
 }
 #page-tablas .history-dates{
- grid-column:1/-1!important;display:grid!important;
+ grid-column:auto!important;display:grid!important;
  grid-template-columns:repeat(2,minmax(0,1fr))!important;
  gap:10px!important;width:100%!important;min-width:0!important;align-items:end;
 }
