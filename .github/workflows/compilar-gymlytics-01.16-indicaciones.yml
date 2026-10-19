@@ -8,6 +8,7 @@ on:
       - .github/workflows/compilar-gymlytics-01.16-indicaciones.yml
       - Android-Gymlytics/web/offline-first.js
       - Android-Gymlytics/tools/verificar-apk-001006-chromium.mjs
+      - Android-Gymlytics/tools/verificar-correcciones-001004-chromium.mjs
   workflow_dispatch:
 permissions:
   contents: read
