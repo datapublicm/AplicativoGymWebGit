@@ -22,6 +22,18 @@ if(root&&exerciseCard){
   if(stamp!==token){selected={};stamp=token;}
   const result=cascadeVariants(library,selected);
   selected=result.selected;
+  // Sincronizar el recuento del ejercicio de la fila superior con los filtros.
+  const main=by('exerciseExistingSelect');
+  if(main){
+   for(const option of main.options){
+    if(!option.dataset.originalLabel)option.dataset.originalLabel=option.textContent;
+    option.textContent=option.dataset.originalLabel;
+   }
+   const group=typeof catalogChoices==='function'?catalogChoices('exercise').find(g=>g.rawName===selected['Nombre del ejercicio']):null;
+   const selectedOption=[...main.options].find(o=>o.value===group?.id);
+   if(selectedOption&&main.value===group.id)
+    selectedOption.textContent=group.rawName+' ('+result.matches.length+')';
+  }
   filters.replaceChildren();
   for(let i=0;i<result.selectors.length;i++){
    const group=result.selectors[i],label=document.createElement('label');
@@ -31,7 +43,7 @@ if(root&&exerciseCard){
    select.dataset.detailField=group.field;
    select.setAttribute('aria-label','Filtrar por '+group.field);
    const prompt=group.field==='Nombre del ejercicio'?'Selecciona un ejercicio…':'Cualquier valor';
-   select.add(new Option(group.options.length?prompt:'Sin valores', ''));
+   select.add(new Option((group.options.length?prompt:'Sin valores')+' ('+result.matches.length+')', ''));
    for(const option of group.options)select.add(new Option(option.label,option.value));
    select.value=group.selected;
    select.disabled=!group.options.length;

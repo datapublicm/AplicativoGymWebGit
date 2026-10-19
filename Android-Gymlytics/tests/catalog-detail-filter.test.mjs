@@ -30,3 +30,38 @@ test('Campos adicionales aparecen dinámicamente para buscar variantes',()=>{
 test('Instrumento histórico es tratado como Máquina sin perder datos',()=>{
  assert.equal(cascadeVariants([a,b],{Máquina:'Smith'}).unique.id,a.id);
 });
+
+test('recuento vivo 8 → 7 → 3: TODOS los filtros elegidos muestran el total restante',()=>{
+ const data=[
+  ...Array.from({length:3},(_,i)=>make('m-'+i,'Curl martillo',{Agrupación:'Tren superior 1',Máquina:'Mancuerna',Técnica:'Neutra'})),
+  ...Array.from({length:4},(_,i)=>make('b-'+i,'Curl martillo',{Agrupación:'Tren superior 1',Máquina:'Barra',Técnica:'Neutra'})),
+  make('o-1','Curl martillo',{Agrupación:'Tren superior 2',Máquina:'Polea',Técnica:'Neutra'})
+ ];
+ const counts=r=>Object.fromEntries(r.selectors.filter(x=>x.selected)
+  .map(x=>[x.field,x.options.find(o=>o.value===x.selected)?.count]));
+ const one=cascadeVariants(data,{'Nombre del ejercicio':'Curl martillo'});
+ assert.equal(one.matches.length,8);
+ assert.deepEqual(counts(one),{'Nombre del ejercicio':8});
+ const two=cascadeVariants(data,{'Nombre del ejercicio':'Curl martillo',Agrupación:'Tren superior 1'});
+ assert.equal(two.matches.length,7);
+ assert.deepEqual(counts(two),{'Nombre del ejercicio':7,Agrupación:7});
+ const three=cascadeVariants(data,{'Nombre del ejercicio':'Curl martillo',Agrupación:'Tren superior 1',Máquina:'Mancuerna'});
+ assert.equal(three.matches.length,3);
+ assert.deepEqual(counts(three),{'Nombre del ejercicio':3,Agrupación:3,Máquina:3});
+ const machine=three.selectors.find(x=>x.field==='Máquina');
+ assert.deepEqual(machine.options.map(o=>[o.value,o.count]),[['Barra',4],['Mancuerna',3]]);
+});
+test('después de filtrar 3, elegir una técnica reduce a 1 y actualiza los demás contadores',()=>{
+ const data=[
+ make('1','Curl martillo',{Agrupación:'Tren superior 1',Máquina:'Mancuerna',Técnica:'Prono'}),
+ make('2','Curl martillo',{Agrupación:'Tren superior 1',Máquina:'Mancuerna',Técnica:'Neutro'}),
+ make('3','Curl martillo',{Agrupación:'Tren superior 1',Máquina:'Mancuerna',Técnica:'Neutro'})
+ ];
+ const result=cascadeVariants(data,{'Nombre del ejercicio':'Curl martillo',Agrupación:'Tren superior 1',Máquina:'Mancuerna',Técnica:'Prono'});
+ assert.equal(result.matches.length,1);
+ assert.equal(result.unique.id,'1');
+ for(const f of ['Nombre del ejercicio','Agrupación','Máquina','Técnica']){
+  const sel=result.selectors.find(x=>x.field===f);
+  assert.equal(sel.options.find(x=>x.value===sel.selected)?.label.endsWith('(1)'),true,f);
+ }
+});

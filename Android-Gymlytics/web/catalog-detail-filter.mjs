@@ -22,22 +22,45 @@ export function filterVariants(exercises,filters={}){
  return (exercises||[]).filter(ex=>Object.entries(filters).every(([field,val])=>
   !val||(field==='Identificador'?ex.id===val:exerciseValue(ex,field)===val)));
 }
+// Los recuentos son FACETAS VIVAS, no acumulados fijos por posición.
+// Con Curl martillo (8), Agrupación (7) y Máquina (3) seleccionados,
+// las tres opciones elegidas deben mostrar (3), igual que el resultado final.
+// Las opciones alternativas muestran cuántas variantes quedarían al elegirlas.
 export function cascadeVariants(exercises,values={}){
- const fields=availableFields(exercises),current={...values},selectors=[];
- let matches=(exercises||[]).slice();
- for(const field of fields){
+ const all=(exercises||[]).filter(e=>e&&e.id);
+ const fields=availableFields(all),current={};
+ for(const field of [...fields,'Identificador'])if(values[field])current[field]=values[field];
+ const order=[...fields,'Identificador'];
+ let matches=filterVariants(all,current);
+ // Cuando un perfil cambia o un filtro queda obsoleto, eliminar primero
+ // la selección más específica, sin perder otras selecciones válidas.
+ if(!matches.length&&Object.keys(current).length){
+  for(const field of order.slice().reverse()){
+   if(!current[field])continue;
+   delete current[field];matches=filterVariants(all,current);
+   if(matches.length)break;
+  }
+ }
+ const selectors=fields.map(field=>{
+  const other={...current};delete other[field];
+  const population=filterVariants(all,other);
   const counts=new Map();
-  for(const ex of matches){const value=exerciseValue(ex,field);if(value)counts.set(value,(counts.get(value)||0)+1);}
+  for(const ex of population){
+   const value=exerciseValue(ex,field);
+   if(value)counts.set(value,(counts.get(value)||0)+1);
+  }
   const options=[...counts].sort((a,b)=>a[0].localeCompare(b[0],'es',{numeric:true}))
    .map(([value,count])=>({value,count,label:value+' ('+count+')'}));
-  if(current[field]&&!counts.has(current[field]))delete current[field];
-  selectors.push({field,options,selected:current[field]||''});
-  if(current[field])matches=matches.filter(ex=>exerciseValue(ex,field)===current[field]);
+  return {field,options,selected:current[field]||'',matches:matches.length};
+ });
+ // Mantener el identificador interno para distinguir variantes idénticas,
+ // pero no mostrar sus códigos técnicos a quien usa el selector.
+ const idsPopulation=filterVariants(all,{...current,Identificador:undefined})
+  .sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+ if((current['Nombre del ejercicio']||current.Identificador)&&(idsPopulation.length>1||current.Identificador)){
+  selectors.push({field:'Identificador',
+   options:idsPopulation.map((ex,i)=>({value:ex.id,count:1,label:'Variante '+(i+1)})),
+   selected:current.Identificador||'',matches:matches.length});
  }
- const ids=matches.map(ex=>({value:ex.id,count:1,label:(ex.nombre||'Ejercicio')+' · '+ex.id.slice(-8)}));
- if(current.Identificador&&!ids.some(x=>x.value===current.Identificador))delete current.Identificador;
- if(current.Identificador)matches=matches.filter(x=>x.id===current.Identificador);
- // UUID permite distinguir incluso variantes con todos los detalles iguales.
- if((current['Nombre del ejercicio']||current.Identificador)&& (matches.length>1||current.Identificador))selectors.push({field:'Identificador',options:ids,selected:current.Identificador||''});
  return {selectors,matches,selected:current,unique:matches.length===1?matches[0]:null};
 }
