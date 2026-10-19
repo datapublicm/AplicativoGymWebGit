@@ -22,12 +22,12 @@ test('Catálogos utiliza la cabecera GYMLYTICS y solo Ubicación y Ejercicio, co
 });
 test('Registro incluye fecha, pestañas paralelas y tabla en el mismo flujo visual',()=>{
  assert.match(html,/id="page-registro"><header class="gym-mock-header gym-reg-header"/);
- for(const id of ['recordDateDisplay','fecha','exerciseTabs','addExerciseTab','registroModoSubdivision',
-  'registroNumeroSerie','seriesRows','addSeriesGroup','clearSeries','saveRecords'])
+ for(const id of ['recordDateDisplay','fecha','exerciseTabs','addExerciseTab','seriesRows','addSeriesGroup','clearSeries','saveRecords'])
   assert.ok(html.includes('id="'+id+'"'),id);
  assert.match(app,/function resetExerciseTabs/);
  assert.match(app,/function openDraft/);
  assert.match(app,/function saveSeries/);
+ assert.doesNotMatch(html,/id="registroNumeroSerie"|id="registroModoSubdivision"/);
 });
 test('La tipografía de los controles móviles no queda reducida a 8 píxeles',()=>{
  assert.match(css,/#page-registro \.registro-field-grid label>span\{font-size:12px!important/);
