@@ -1138,3 +1138,6 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 #page-registro .registro-series-actions #seriesGroupCount{grid-column:1/-1;text-align:center;font-size:12px}
 #page-registro .registro-subdiv-button{grid-column:1/-1}
 #page-registro .registro-subdiv-button button{width:100%;min-height:42px}
+
+/* Distintivo verificable de instalación 01.14; discreto y legible en Android. */
+.gym-mock-titles>strong{letter-spacing:.025em}
