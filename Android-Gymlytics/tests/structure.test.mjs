@@ -62,7 +62,7 @@ test('01.06: cada perfil inicia sin catálogo embebido, y ofrece descarga comple
  assert.match(html,/src="\.\/offline-first\.js"/);
  const offline=read('web/offline-first.js');
  assert.match(offline,/baseCatalog:\[\]/);
- assert.match(offline,/catalogFetch:downloadAllCatalogs/);
+ assert.match(offline,/syncController=createGymlyticsCloudSync/);
  assert.match(read('vite.config.js'),/offline-catalog-download\.js/);
  assert.match(read('web/sw.js'),/offline-catalog-download\.js/);
  for(const id of ['offlineProfiles','offlineNewName','offlineCreate','offlineCloudToggle','offlineCloudDownload','offlineDemoDownload'])
@@ -95,6 +95,6 @@ test('01.04 revisión 03: historial completo paginado y catálogo ampliable',()=
 test('Marca Gymlytics en la aplicación, manifest y Capacitor',()=>{
  const manifest=JSON.parse(read('web/manifest.webmanifest'));
  assert.equal(manifest.name,'Gymlytics');assert.equal(manifest.short_name,'Gymlytics');
- assert.match(html,/<title>Gymlytics · Pruebas Android<\/title>/);
+ assert.match(html,/<title>GymLytics 01.18 · Ajustes de Tablas<\/title>/);
  assert.match(html,/<strong>Gymlytics<\/strong>/);
 });

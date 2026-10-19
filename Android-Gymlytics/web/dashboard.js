@@ -17,7 +17,7 @@
  const matchSide=r=>{const s=clean(r.subdivision);return s&&s!=='-'?s:'Sin subdivisiones'};
  const grip=r=>[clean(r.grip),clean(r.accessory)].filter(x=>x&&x!=='No especificado'&&x!=='-').join(' / ')||'Sin implemento';
  const valid=r=>r&&/^\d{4}-\d\d-\d\d$/.test(r.date||'')&&clean(r.exercise)&&Number.isFinite(Number(r.weight))&&Number.isFinite(Number(r.reps))&&Number(r.weight)>=0&&Number(r.reps)>=0;
- const comparable=(a,b,checkTech=true)=>clean(a.exercise)===clean(b.exercise)&&clean(a.gym)===clean(b.gym)&&
+ const comparable=(a,b,checkTech=true)=>(!a.unit&&!b.unit||a.unit&&b.unit)&&clean(a.exercise)===clean(b.exercise)&&clean(a.gym)===clean(b.gym)&&
   clean(a.sede)===clean(b.sede)&&clean(a.equipment)===clean(b.equipment)&&grip(a)===grip(b)&&
   matchSide(a)===matchSide(b)&&seriesNo(a)!==null&&seriesNo(a)===seriesNo(b)&&
   (!checkTech||clean(a.technique)===clean(b.technique));
@@ -175,22 +175,24 @@
    return {date,technique:top.technique,value:metric==='weight'?kg(top):Number(top.reps)};
   }).filter(Boolean);
   const maxKg=Math.max(...rs.map(kg),0),maxReps=Math.max(...rs.map(r=>Number(r.reps)),0);
+  const unknownUnit=rs.some(r=>!r.unit),knownUnit=rs.some(r=>!!r.unit);
+  const weightUnit=unknownUnit?(knownUnit?'unidades mixtas':'u. s/e'):'kg';
   const status=exerciseStatus(rs);
   $('dashProgressCards').innerHTML=[
    ['Última sesión',latest||'—','Fecha con registros'],
-   ['Peso mayor registrado',fmt(maxKg)+' kg','No equivale por sí solo a una mejora'],
+   ['Peso mayor registrado',fmt(maxKg)+' '+weightUnit,'No equivale por sí solo a una mejora'],
    ['Máximas repeticiones',fmt(maxReps,0),'En una serie, no suma de series'],
    ['Comparación reciente',status.state,status.message]
   ].map(x=>'<div class="dash-kpi"><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong><span>'+esc(x[2])+'</span></div>').join('');
-  $('dashTrendNote').textContent=(serial?'Serie '+serial:'Mejor valor individual por sesión')+' · '+(metric==='weight'?'Peso en kg':'Repeticiones')+(techOn()?' · Misma técnica que la serie reciente':' · Varias técnicas: interpretar con cautela');
-  $('dashTrend').innerHTML=trendChart(points,'Evolución de '+value('dashExercise'),metric==='weight'?'kg':'repeticiones');
+  $('dashTrendNote').textContent=(serial?'Serie '+serial:'Mejor valor individual por sesión')+' · '+(metric==='weight'?'Peso en '+weightUnit:'Repeticiones')+(techOn()?' · Misma técnica que la serie reciente':' · Varias técnicas: interpretar con cautela');
+  $('dashTrend').innerHTML=trendChart(points,'Evolución de '+value('dashExercise'),metric==='weight'?weightUnit:'repeticiones');
   const paired=pickPairs(rs);
   const current=paired.pairs.filter(p=>!serial||seriesNo(p.current)===Number(serial));
   if(!paired.previous||!current.length){
    $('dashSeriesChart').innerHTML=empty('Se requieren registros de al menos dos fechas diferentes.');
    $('dashSeriesTable').innerHTML=''; 
   }else{
-   const unit=metric==='weight'?'kg':'rep.',number=r=>metric==='weight'?kg(r):Number(r.reps);
+   const unit=metric==='weight'?weightUnit:'rep.',number=r=>metric==='weight'?kg(r):Number(r.reps);
    const labels=current.map(p=>({title:'Serie '+(seriesNo(p.current)??'?')+' · '+matchSide(p.current),old:p.previous?number(p.previous):0,new:number(p.current),p}));
    const max=Math.max(1,...labels.flatMap(x=>[x.old,x.new]));
    $('dashSeriesChart').innerHTML='<div class="dash-compare-legend"><span>■ '+esc(paired.previous)+'</span><span>■ '+esc(paired.latest)+'</span></div>'+
@@ -198,7 +200,7 @@
    $('dashSeriesTable').innerHTML='<table class="dash-table"><thead><tr><th>Serie / lado</th><th>Anterior</th><th>Actual</th><th>Resultado</th></tr></thead><tbody>'+
     labels.map(x=>{
      const p=x.p,reason=!p.previous?'Sin serie equivalente':p.state==='no-comparable'?'Técnica o condiciones distintas':p.state==='mixto'?'Peso y repeticiones cambiaron en sentidos opuestos':p.state==='mejora'?'Mejora comparable':p.state==='retrocede'?'Menor rendimiento comparable':'Sin cambio';
-     return '<tr><td>'+esc(x.title)+'</td><td>'+esc(p.previous?fmt(kg(p.previous))+' kg × '+fmt(p.previous.reps,0):'—')+'</td><td>'+esc(fmt(kg(p.current))+' kg × '+fmt(p.current.reps,0))+'</td><td>'+esc(reason)+'</td></tr>';
+     return '<tr><td>'+esc(x.title)+'</td><td>'+esc(p.previous?fmt(kg(p.previous))+' '+(p.previous.unit?'kg':'u. s/e')+' × '+fmt(p.previous.reps,0):'—')+'</td><td>'+esc(fmt(kg(p.current))+' '+(p.current.unit?'kg':'u. s/e')+' × '+fmt(p.current.reps,0))+'</td><td>'+esc(reason)+'</td></tr>';
     }).join('')+'</tbody></table>';
   }
   const tecs=[...group(rs,r=>clean(r.technique)||'Sin técnica').entries()].map(([name,arr])=>({name,last:arr.map(r=>r.date).sort().at(-1),dates:days(arr)})).sort((a,b)=>b.last.localeCompare(a.last));

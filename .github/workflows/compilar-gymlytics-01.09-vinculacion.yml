@@ -1,0 +1,138 @@
+# Compilación aislada, solicitada 18/10/2026. No modifica APK instalada, main ni Supabase.
+name: "GymLytics 01.09 - APK Vinculacion sch_gymlytics"
+on:
+  push:
+    branches:
+      - cambios/gymlytics-01.08-offline-ubicacion-ejercicios-20261018
+    paths:
+      - .github/workflows/compilar-gymlytics-01.09-vinculacion.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compilar-gymlog-hojamatriz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        working-directory: Android-Gymlytics
+    env:
+      VITE_SUPABASE_URL: https://jasuqnxrskhqfobsazwd.supabase.co
+      VITE_SUPABASE_SCHEMA: sch_gymlytics
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_sQH_z37OD2mzNMoL4M3Lwg_jF8Lpmx2
+      VITE_GYMLYTICS_ENVIRONMENT: pruebas
+      VITE_GYMLYTICS_RECOVERY_URL: ''
+    steps:
+      - name: Descargar rama HojaMatriz aprobada
+        uses: actions/checkout@v4
+        with:
+          ref: cambios/gymlytics-01.08-offline-ubicacion-ejercicios-20261018
+      - name: Confirmar proyecto y preservar aplicación original
+        shell: bash
+        run: |
+          test "${GITHUB_REF_NAME}" = "cambios/gymlytics-01.08-offline-ubicacion-ejercicios-20261018"
+          test -f web/data/hojamatriz-offline-20261018.json
+          test -f web/gymlytics-seed-offline.mjs
+          test -f web/gymlytics-cloud-v2.mjs
+          node -e 'if(process.env.VITE_SUPABASE_SCHEMA!=="sch_gymlytics"||!process.env.VITE_SUPABASE_PUBLISHABLE_KEY)process.exit(1)'
+          test ! -d android/app
+          test -f android/README.md
+          node -e 'const p=require("./package.json"),c=require("./capacitor.config.json");if(p.name!=="gymlytics"||c.appId!=="com.datapublicm.gymlytics")process.exit(1)'
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preparar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Instalar SDK Android
+        shell: bash
+        run: |
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+      - name: Validar semilla y ejecutar pruebas de regresión
+        run: |
+          npm run test:static
+          node --check web/offline-first.js
+          node --check web/catalog-offline-enhancements.js
+          node --check web/gymlytics-seed-offline.mjs
+          node --check web/gymlytics-cloud-v2.mjs
+      - name: Instalar dependencias
+        run: npm install --no-package-lock --no-audit --no-fund
+      - name: Validar IndexedDB y arranque offline en Chromium
+        run: node tools/verificar-hojamatriz-chromium.mjs
+      - name: Construir web incluyendo el historial HojaMatriz
+        run: |
+          npm run build:web
+          test -s dist/data/hojamatriz-offline-20261018.json
+          test -s dist/gymlytics-seed-offline.mjs
+          test -s dist/gymlytics-cloud-v2.mjs
+          test -s dist/offline-first.js
+          test -s dist/app.js
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const seed=JSON.parse(fs.readFileSync('dist/data/hojamatriz-offline-20261018.json','utf8'));
+          if(seed.tables.series.length!==9424||seed.tables.session.length!==446||seed.tables.exercise.length!==146)throw Error('La semilla está incompleta');
+          if(!fs.readFileSync('dist/sw.js','utf8').includes('hojamatriz-offline-20261018.json'))throw Error('Semilla excluida del service worker');
+          console.log('HojaMatriz completa en el paquete web');
+          JS
+      - name: Asignar identificador independiente de pruebas
+        run: |
+          node <<'JS'
+          const fs=require('node:fs'),f='capacitor.config.json';
+          const c=JSON.parse(fs.readFileSync(f,'utf8'));
+          if(c.appId!=='com.datapublicm.gymlytics')throw Error('Identidad no esperada');
+          c.appId='com.datapublicm.gymlytics.pruebas.vinculacion';
+          c.appName='GymLytics 01.09 Vincular';
+          fs.writeFileSync(f,JSON.stringify(c,null,2)+'\n');
+          JS
+      - name: Preparar proyecto Android temporal
+        run: |
+          test "$(find android -mindepth 1 -maxdepth 1 | wc -l)" -eq 1
+          mv android/README.md android-notas-de-plataforma.txt
+          rmdir android
+          npx cap add android
+          npx cap sync android
+          test -s android/app/src/main/assets/public/data/hojamatriz-offline-20261018.json
+          test -s android/app/src/main/assets/public/gymlytics-seed-offline.mjs
+          test -s android/app/src/main/assets/public/gymlytics-cloud-v2.mjs
+          test -s android/app/src/main/assets/public/offline-first.js
+      - name: Establecer version Android 01.08
+        run: |
+          node <<'JS'
+          const fs=require('node:fs'),f='android/app/build.gradle';
+          let s=fs.readFileSync(f,'utf8');
+          if(!/versionCode\s+\d+/.test(s)||!/versionName\s+["'][^"']+["']/.test(s))throw Error('Datos de versión Android ausentes');
+          s=s.replace(/versionCode\s+\d+/,'versionCode 9').replace(/versionName\s+["'][^"']+["']/,'versionName "01.09"');
+          fs.writeFileSync(f,s);
+          JS
+      - name: Compilar APK debug de Android
+        working-directory: Android-Gymlytics/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace assembleDebug
+      - name: Revisar paquete y firma, generar SHA256
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          for f in app.js offline-first.js gymlytics-seed-offline.mjs gymlytics-cloud-v2.mjs data/hojamatriz-offline-20261018.json; do
+            unzip -Z1 "$APK" | grep -Fxq "assets/public/$f"
+          done
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep '^package:' | tee /tmp/gymlytics-badging.txt
+          grep -q "name='com.datapublicm.gymlytics.pruebas.vinculacion'" /tmp/gymlytics-badging.txt
+          grep -q "versionCode='9'" /tmp/gymlytics-badging.txt
+          mkdir -p entregables
+          cp "$APK" entregables/GymLytics_01.09_Vinculacion_Supabase_Pruebas.apk
+          (cd entregables && sha256sum GymLytics_01.09_Vinculacion_Supabase_Pruebas.apk > SHA256.txt)
+          ls -lh entregables
+      - name: Publicar APK de pruebas
+        uses: actions/upload-artifact@v4
+        with:
+          name: GymLytics_01.09_Vinculacion_Supabase_Pruebas
+          path: Android-Gymlytics/entregables/
+          retention-days: 30
+          if-no-files-found: error

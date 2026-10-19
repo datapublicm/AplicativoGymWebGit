@@ -1,12 +1,51 @@
 import {sourceKey,payloadOf,remoteToRow,planUpload,mergeDownload,acknowledge} from './sync-engine.js';
 import {legacyAlerts,normalizeLegacySnapshot} from './legacy-compat.js';
 import {mergeDownloadedCatalog} from './offline-catalog-download.js';
+import {planCatalogUpload,acknowledgeCatalog} from './catalog-sync-engine.js';
+import {photoJobPlan,acknowledgePhoto,decidePhotoDownload,applyDownloadedPhoto} from './photo-sync-engine.js';
 
-// Adaptador de red sin sincronización automática. Las mutaciones se confirman
-// primero en IndexedDB y los conflictos requieren decisión humana.
+// Adaptador de red local-first: toda escritura ocurre primero en IndexedDB.
+// El usuario puede elegir sincronizar manualmente o tras cada cambio.
 export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLinkedElsewhere,confirmAction,notify,catalogFetch}){
  let busy=false;
  const isBusy=()=>busy;
+ const PHOTO_BUCKET='gymlog-usuarios',PHOTO_LIMIT=3*1024*1024;
+ function photoBlob(dataUrl){
+  if(!/^data:image\/jpeg;base64,[A-Za-z0-9+/=\s]+$/.test(dataUrl))throw Error('Imagen local no válida');
+  const bytes=atob(dataUrl.split(',')[1]);
+  if(!bytes.length||bytes.length>PHOTO_LIMIT)throw Error('Imagen de más de 3 MB');
+  const buf=new Uint8Array(bytes.length);
+  for(let i=0;i<bytes.length;i++)buf[i]=bytes.charCodeAt(i);
+  return new Blob([buf],{type:'image/jpeg'});
+ }
+ const toDataUrl=blob=>new Promise((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onload=()=>resolve(reader.result);
+  reader.onerror=()=>reject(reader.error||Error('Foto descargada ilegible'));
+  reader.readAsDataURL(blob);
+ });
+ async function photoRows(uid,stamp){
+  const rows=await pages('tbl_fotos_offline',uid);
+  validate(uid,stamp);
+  for(const row of rows)
+   if(!row.storage_path?.startsWith(uid+'/gymlytics/')||!row.storage_path.endsWith('.jpg'))
+    throw Error('Ruta remota de fotografía inválida');
+  return rows;
+ }
+ async function fetchPhotos(uid,stamp,rows){
+  const received=[];
+  for(const item of rows){
+   validate(uid,stamp);
+   const decision=decidePhotoDownload(getState().data,item,uid);
+   if(decision!=='download'){received.push({item,decision});continue;}
+   const {data:blob,error}=await remote.storage.from(PHOTO_BUCKET).download(item.storage_path);
+   if(error||!blob)throw Error('Foto incompleta: '+(error?.message||item.photo_key));
+   if(blob.type!=='image/jpeg'||!blob.size||blob.size>PHOTO_LIMIT)throw Error('JPEG remoto inválido');
+   validate(uid,stamp);
+   received.push({item,decision,dataUrl:await toDataUrl(blob)});
+  }
+  return received;
+ }
  function validate(uid,stamp){
   if(!uid||!isCurrent(uid,stamp))throw Error('Cambió la cuenta o el perfil');
   const {data}=getState();
@@ -22,13 +61,13 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
   if(error||!data?.activo)throw Error('La cuenta todavía no está habilitada en Gymlytics.');
  }
  async function pages(table,uid){
-  const column=table==='tbl_sync_series'?'source_key':'id';
+  const column=table==='tbl_sync_series'?'source_key':table==='tbl_fotos_offline'?'photo_key':'id';
   const count=await remote.from(table).select(column,{count:'exact',head:true}).eq('user_id',uid);
   if(count.error||!Number.isSafeInteger(count.count)||count.count<0)
    throw Error('No se pudo comprobar el total remoto de '+table);
   const result=[],seen=new Set(),size=500;
   for(let start=0;start<count.count;start+=size){
-   const sort=table==='tbl_sync_series'?'source_key':'date';
+   const sort=table==='tbl_sync_series'?'source_key':table==='tbl_fotos_offline'?'photo_key':'date';
    let q=remote.from(table).select('*').eq('user_id',uid).order(sort,{ascending:sort!=='date'});
    if(sort==='date')q=q.order('id',{ascending:true});
    const {data,error}=await q.range(start,start+size-1);
@@ -42,21 +81,59 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
   }
   return result;
  }
- async function upload(uid,stamp){
+ async function upload(uid,stamp,{automatic=false}={}){
   if(busy)throw Error('Hay otra sincronización activa');
   await authorized(uid,stamp);
-  const {data,profileName}=getState(),plan=planUpload(data);
-  if(!plan.ops.length){notify('No hay series listas para subir; otros tipos de cambios siguen pendientes.');return {done:0,blocked:plan.blocked.length};}
-  if(!confirmAction('¿Subir '+plan.ops.length+' cambios de series de '+profileName+'? Solo se aplicarán si coinciden las versiones. '+plan.blocked.length+' operaciones no compatibles seguirán pendientes.'))return null;
+  validate(uid,stamp);
+  const initial=getState(),series=planUpload(initial.data),catalog=planCatalogUpload(initial.data,uid),photos=photoJobPlan(initial.data,uid);
+  const expected=series.ops.length+catalog.ops.length+photos.ops.length;
+  if(!expected&&!catalog.noops.length){
+   notify('No hay cambios compatibles para subir. '+(catalog.blocked.length+series.blocked.length+photos.blocked.length)+' pendientes requieren revisión.');
+   return {done:0,blocked:catalog.blocked.length+series.blocked.length};
+  }
+  if(!automatic&&!confirmAction('¿Actualizar Supabase con '+expected+' operaciones pendientes de «'+initial.profileName+'»? Las modificaciones se comprobarán antes de aplicar y nunca se mezclan cuentas.'))return null;
   busy=true;refresh();
-  let done=0,duplicates=0,conflicts=0;
+  let done=0,duplicates=0,conflicts=0,iterations=0,localOnly=0;
   try{
-   for(let i=0;i<plan.ops.length;i+=50){
+   while(true){
     validate(uid,stamp);
-    const chunk=plan.ops.slice(i,i+50);
-    // Persistir en IndexedDB el sobre exacto de solicitud ANTES de enviarlo.
-    // Si el servidor confirma pero la respuesta se pierde, reusar estos
-    // mismos bytes y UUID permite un reintento estrictamente idempotente.
+    const plan=planCatalogUpload(getState().data,uid);
+    if(plan.noops.length){
+     await mutate(data=>{
+      const ids=new Set(plan.noops);
+      data.pending=data.pending.filter(x=>!ids.has(x.id));
+      // Altas locales eliminadas antes de su primera subida jamás existieron en la nube.
+      const keys=new Set(plan.noops.map(id=>{const p=getState().data.pending.find(x=>x.id===id);return p?.catalogKind+':'+p?.localId;}));
+      data.tombstones=data.tombstones.filter(x=>!keys.has(x.catalogKind+':'+x.localId));
+     });
+     localOnly+=plan.noops.length;
+     continue;
+    }
+    if(!plan.ops.length)break;
+    if(++iterations>5000)throw Error('Se detuvo una cola de catálogo demasiado extensa');
+    const selected=plan.ops[0],op=selected.request;
+    await mutate(data=>{
+     validate(uid,stamp);
+     const item=data.pending.find(x=>x.id===op.op_id);
+     if(!item)throw Error('La operación de catálogo cambió antes del envío');
+     if(item.submittedRequest&&JSON.stringify(item.submittedRequest)!==JSON.stringify(op))
+      throw Error('Una operación de catálogo enviada no puede alterarse');
+     if(!item.submittedRequest){item.submittedRequest=structuredClone(op);item.attemptedAt=new Date().toISOString();}
+    });
+    const {data:response,error}=await remote.rpc('aplicar_cambio_catalogo',{p_change:op});
+    if(error)throw Error('Error de catálogo: '+error.message);
+    validate(uid,stamp);
+    await mutate(data=>{
+     validate(uid,stamp);
+     if(acknowledgeCatalog(data,selected,response,uid)) {
+      done++;if(response.status==='duplicate')duplicates++;
+     }else conflicts++;
+    });
+   }
+   const seriesPlan=planUpload(getState().data);
+   for(let i=0;i<seriesPlan.ops.length;i+=50){
+    validate(uid,stamp);
+    const chunk=seriesPlan.ops.slice(i,i+50);
     await mutate(local=>{
      validate(uid,stamp);
      for(const op of chunk){
@@ -74,11 +151,44 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
     await mutate(local=>{
      validate(uid,stamp);
      const result=acknowledge(local,chunk,response.data);
-     local.cloudUserId=uid;done+=result.done;duplicates+=result.duplicate;conflicts=result.conflicts;
+     local.cloudUserId=uid;done+=result.done;duplicates+=result.duplicate;conflicts+=result.conflicts;
     });
    }
-   notify('Subida confirmada: '+done+' operaciones · '+duplicates+' reintentos idempotentes · '+conflicts+' conflictos.');
-   return {done,duplicates,conflicts};
+   // Subir imagen versionada y confirmar su relación sin sobrescribir silenciosamente.
+   let photoAttempts=0;
+   while(true){
+    validate(uid,stamp);
+    const pending=photoJobPlan(getState().data,uid).ops[0];
+    if(!pending)break;
+    if(++photoAttempts>5000)throw Error('Cola de fotografías demasiado extensa');
+    const request=pending.request;
+    await mutate(local=>{
+     validate(uid,stamp);
+     const job=local.pending.find(p=>p.id===pending.jobId);
+     if(!job)throw Error('La fotografía cambió antes de subirse');
+     if(job.submittedRequest&&JSON.stringify(job.submittedRequest)!==JSON.stringify(request))
+      throw Error('No se puede alterar una solicitud fotográfica enviada');
+     if(!job.submittedRequest){job.submittedRequest=structuredClone(request);job.attemptedAt=new Date().toISOString();}
+    });
+    const blob=photoBlob(pending.payload);
+    const {error:uploadError}=await remote.storage.from(PHOTO_BUCKET).upload(
+     request.storage_path,blob,{contentType:'image/jpeg',upsert:true});
+    if(uploadError)throw Error('No se pudo subir la foto: '+uploadError.message);
+    validate(uid,stamp);
+    const response=await remote.rpc('confirmar_foto_offline',{p_photo:request});
+    if(response.error)throw Error('No se pudo confirmar la foto: '+response.error.message);
+    validate(uid,stamp);
+    await mutate(local=>{
+     validate(uid,stamp);
+     if(acknowledgePhoto(local,pending,response.data,uid)){
+      done++;if(response.data.status==='duplicate')duplicates++;
+     }else conflicts++;
+    });
+   }
+   const last=getState().data,remaining=(last.pending||[]).length;
+   notify('Actualización: '+done+' confirmadas · '+duplicates+' reintentos · '+conflicts+' conflictos · '+
+    localOnly+' cancelaciones locales · '+remaining+' operaciones pendientes.');
+   return {done,duplicates,conflicts,remaining,blocked:planCatalogUpload(last,uid).blocked.length+photoJobPlan(last,uid).blocked.length};
   }finally{busy=false;refresh();}
  }
  async function download(uid,stamp,{readOnly=false}={}){
@@ -87,36 +197,45 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
   const {profileName,data}=getState();
   // Las modificaciones del catálogo se conservan primero en el dispositivo:
   // la descarga añadirá referencias sin sobrescribir ni borrar dichos cambios.
-  if(readOnly&&!data.readOnly&&(data.records?.length||data.entities?.gyms?.length||data.entities?.sites?.length||
-      data.entities?.machines?.length||data.entities?.options?.length||data.custom?.length||
-      data.library?.length||data.baseCatalog?.length))
-   throw Error('La cuenta de prueba solo se descarga en un perfil vacío; crea primero un perfil local nuevo.');
-  if(data.readOnly&&!readOnly)throw Error('El perfil de prueba solo admite descargas en modo de consulta.');
-  const mode=readOnly?'CUENTA DE PRUEBA: únicamente consulta, sin cambios':'CUENTA PERSONAL: cambios solamente offline';
+  const mode=readOnly?'CUENTA DE PRUEBA: escritura local permitida, subida bloqueada':'CUENTA PERSONAL: edición offline';
   if(!confirmAction('¿Descargar el historial completo, gimnasios, sedes, instrumentos, ejercicios y técnicas a «'+profileName+'»? '+mode+'. Se conservarán las ediciones locales y no se sobrescribirán datos sin autorización.'))return null;
   busy=true;refresh();
   try{
    // Cargar ambos orígenes por completo ANTES de modificar IndexedDB.
-   const [legacy,mirror,catalog]=await Promise.all([
-    pages('vw_historial_series',uid),pages('tbl_sync_series',uid),catalogFetch(uid,stamp)
+   const [legacy,mirror,catalog,remotePhotos]=await Promise.all([
+    pages('vw_historial_series',uid),pages('tbl_sync_series',uid),catalogFetch(uid,stamp),photoRows(uid,stamp)
    ]);
    validate(uid,stamp);
    if(!catalog||!Array.isArray(catalog.baseCatalog)||!Array.isArray(catalog.muscles)||!catalog.entities||!Array.isArray(catalog.library)||!Array.isArray(catalog.custom))
     throw Error('Descarga de catálogo incompleta; se conservó el perfil local');
+   const photos=await fetchPhotos(uid,stamp,remotePhotos);
    let summary;
    await mutate(local=>{
     validate(uid,stamp);
-    if(readOnly&&!local.readOnly&&(local.records?.length||local.baseCatalog?.length||local.library?.length||local.custom?.length||
-      Object.values(local.entities||{}).some(a=>Array.isArray(a)&&a.length)))
-     throw Error('El perfil de prueba dejó de estar vacío. No se aplicó la descarga.');
-    const snap=readOnly?structuredClone(catalog):mergeDownloadedCatalog(local,catalog);
+    const snap=mergeDownloadedCatalog(local,catalog);
     local.baseCatalog=snap.baseCatalog;
     local.muscles=snap.muscles;
     local.entities=snap.entities;
     local.library=snap.library;
     local.custom=snap.custom;
-    local.readOnly=!!(readOnly||local.readOnly);
-    local.demo=local.readOnly;
+    local.conflicts??=[];
+    for(const photo of photos){
+     if(photo.decision==='download'){
+      if(!applyDownloadedPhoto(local,photo.item,photo.dataUrl,uid)&&
+       !local.conflicts.some(x=>x.kind==='photo_conflict'&&x.photoKey===photo.item.photo_key))
+       local.conflicts.push({kind:'photo_conflict',photoKey:photo.item.photo_key,currentRevision:photo.item.revision});
+     }else if(photo.decision==='conflict'&&
+      !local.conflicts.some(x=>x.kind==='photo_conflict'&&x.photoKey===photo.item.photo_key))
+      local.conflicts.push({kind:'photo_conflict',photoKey:photo.item.photo_key,currentRevision:photo.item.revision});
+    }
+    for(const item of snap.catalogWarnings||[]){
+     if(!local.conflicts.some(x=>x.kind===item.kind&&(
+       item.kind==='catalog_conflict'&&x.catalogKind===item.catalogKind&&x.localId===item.localId||
+       item.kind==='reference_conflict'&&x.refId===item.refId
+     )))local.conflicts.push(item);
+    }
+    local.readOnly=false; // La restricción de prueba nunca se aplica al perfil offline.
+    local.demo=!!readOnly;
     const alert=legacyAlerts(local,legacy,mirror);
     const known=new Set(local.records.map(sourceKey));
     const removed=new Set(local.tombstones.map(t=>t.syncKey||t.remoteId&&'legacy:'+t.remoteId||t.localId&&'local:'+t.localId));
@@ -142,13 +261,13 @@ export function createCloudSync({remote,getState,mutate,refresh,isCurrent,isLink
     }
     summary.added+=oldAdded;
     summary.legacyAlerts=alert.changed+alert.missing;
-    local.cloudUserId=uid;local.lastPull=new Date().toISOString();
+    local.cloudUserId=readOnly?null:uid;local.lastPull=new Date().toISOString();
    });
    refresh();
-   notify('Descarga COMPLETA ('+(readOnly?'prueba: solo lectura':'cuenta personal: edición offline')+'): '+
+   notify('Descarga COMPLETA ('+(readOnly?'prueba: edición local':'cuenta personal: edición offline')+'): '+
     catalog.baseCatalog.length+' entradas de catálogo base, '+catalog.muscles.length+' músculos, '+
     catalog.library.length+' ejercicios propios sin sede, '+
-    catalog.custom.length+' ejercicios propios con sede y '+
+    catalog.custom.length+' ejercicios propios con sede, '+photos.filter(x=>x.decision==='download').length+' fotos recibidas y '+
     (summary.added+summary.updated)+' series nuevas/actualizadas. '+
     summary.conflicts+' conflictos; '+summary.legacyAlerts+' alertas de clientes antiguos.');
    return summary;

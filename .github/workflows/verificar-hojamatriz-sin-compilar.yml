@@ -1,0 +1,51 @@
+name: "GymLytics 01.13 - cambios Word 001.004"
+on:
+  push:
+    branches:
+      - cambios/gymlytics-01.08-offline-ubicacion-ejercicios-20261018
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validar-sin-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: Android-Gymlytics
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: "Sintaxis: archivos modificados"
+        run: |
+          node --check web/app.js
+          node --check web/offline-first.js
+          node --check web/gymlytics-cloud-v2.mjs
+          node --check tools/verificar-correcciones-001004-chromium.mjs
+          node --check web/catalog-field-admin.mjs
+          node --check web/catalog-detail-browser.mjs
+          node --check web/catalog-detail-filter.mjs
+          node --check web/catalog-offline-enhancements.js
+          node --check web/sw.js
+          node --check vite.config.js
+      - name: "Semilla y pruebas estáticas"
+        run: npm run test:static
+      - name: "Chromium real e IndexedDB offline sin compilar"
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          node tools/verificar-correcciones-001004-chromium.mjs
+      - name: "Integridad del paquete antes de compilar"
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const app=fs.readFileSync('web/offline-first.js','utf8');
+          const sw=fs.readFileSync('web/sw.js','utf8');
+          const config=fs.readFileSync('vite.config.js','utf8');
+          if(!app.includes("async function addExampleProfile()"))throw Error('No existe botón de ejemplo bajo demanda');
+          if(app.includes("installGymlyticsSeed(seed"))throw Error('Queda precarga al arranque');
+          if(!sw.includes('hojamatriz-offline-20261018.json')||!sw.includes('catalog-detail-browser.mjs'))throw Error('Faltan recursos opcionales en caché');
+          if(!config.includes("['assets','icons','data']"))throw Error('No se empaqueta ejemplo opcional');
+          console.log('OK: ejemplo solo por botón, empaquetado para modo offline');
+          JS

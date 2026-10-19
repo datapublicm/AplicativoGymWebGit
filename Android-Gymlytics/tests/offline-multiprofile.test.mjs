@@ -54,7 +54,7 @@ test('UI de Perfil permite crear, renombrar y vincular sin pedir login previo',(
  assert.match(src,/function rotateCloudClient\(/);
  assert.match(src,/await queue;/);
  assert.match(src,/validateProfileBinding\(profiles,activeId,uid\)/);
- assert.match(src,/if\(!confirm\('¿Vincular/);
+ assert.match(src,/await linkAccount\(\); \/\/ Solo marca vinculación/);
  assert.match(bundle,/profile-policy\.js/);
 });
 test('El cambio de A a B espera guardados activos y destruye sesión previa',async()=>{
@@ -84,7 +84,7 @@ const rotateCloudClient=()=>{rotations++;remoteSession=null};
 const structuredClone=x=>JSON.parse(JSON.stringify(x));
 const localStorage={setItem:(k,v)=>savedId=v};
 const invalidatePendingSave=()=>{},showHistoryLoadProgress=()=>{},setHistoryReady=()=>{};
-const catalogInit=()=>[],resetHistoryFilters=()=>{},resetExerciseTabs=()=>{},renderOwnCatalog=()=>{};
+const catalogInit=()=>[],personalCatalogInit=()=>[],migrateLegacyPhotoJobs=()=>({converted:0,removed:0}),resetHistoryFilters=()=>{},resetExerciseTabs=()=>{},renderOwnCatalog=()=>{};
 const renderIndependentCatalog=()=>{},catalogUpdate=()=>{},cascade=()=>{},renderSyncStatus=()=>{},renderProfileControls=()=>{};
 const drawRecent=()=>{draws++},drawHistory=()=>{draws++},drawReports=()=>{draws++};
 const renderConflictButtons=()=>{},refreshCloudControls=()=>{},status=()=>{},showPage=()=>{};

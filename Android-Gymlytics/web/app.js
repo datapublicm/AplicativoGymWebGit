@@ -2,7 +2,7 @@
 const KEY='gymlog_cloud_migracion';
 let seriesMode='normal', seriesGroups=4, seriesCustomized=false;
 const FLOW=[['g','gimnasio'],['s','sede'],['z','zona'],['kind','tipo'],['i','instrumento'],['a','implemento'],['gr','agarre'],['e','ejercicio'],['t','tecnica']];
-const INITIAL={g:'Smart Fit',s:'La Rambla Brasil',z:'Espalda lateral',kind:'Máquina',i:'Máquina de polea alta',a:'Cable Pulldown',gr:'No especificado',e:'Jalón al pecho',t:'01 - Ejecución base'};
+const INITIAL={g:'',s:'',z:'',kind:'',i:'',a:'',gr:'',e:'',t:''};
 let model={records:[],photos:{}},toastTimer;
 let historyReady=false;
 const $=id=>document.getElementById(id);
@@ -33,11 +33,27 @@ function readStorage(){try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&A
 function persist(){return true} // Fotos: vista previa en memoria; no se almacenan como datos de entrenamiento.
 function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3400)}
 function getValue(key){if(key==='kind')return document.querySelector('input[name="tipo"]:checked')?.value||'';return $(FLOW.find(x=>x[0]===key)[1]).value}
-function fillSelect(id,choices,preferred){const el=$(id),old=el.value,selection=[preferred,old,choices[0]].find(v=>choices.includes(v))||'';el.replaceChildren();if(!choices.length){el.add(new Option('Sin opciones para esta selección',''));el.disabled=true;return}el.disabled=false;for(const value of choices)el.add(new Option(value,value));el.value=selection}
+function fillSelect(id,choices,preferred){
+ const el=$(id),old=el.value;
+ const selection=[preferred,old,choices.length===1?choices[0]:null].find(v=>choices.includes(v))||'';
+ el.replaceChildren();
+ if(!choices.length){el.add(new Option(id==='ejercicio'?'Agregar ejercicio':'Sin opciones para esta selección',''));el.disabled=true;return;}
+ el.disabled=false;
+ el.add(new Option(choices.length===1?'Seleccionar…':'Seleccionar…',''));
+ for(const value of choices)el.add(new Option(value,value));
+ el.value=selection;
+}
 function fillTypes(choices,preferred){const valid=new Set(choices);const old=getValue('kind');const chosen=[preferred,old,'Máquina',...choices].find(v=>valid.has(v));document.querySelectorAll('input[name="tipo"]').forEach(r=>{r.disabled=!valid.has(r.value);r.checked=r.value===chosen})}
 function allCatalog(){return [...(window.GymBaseCatalog||[]),...(window.GymCustomCatalog||[])].filter(r=>r.g&&r.s&&r.e)}
 function cascade(start=0,preferred={}){
  const all=allCatalog(),ent=window.GymEntities||{gyms:[],sites:[],machines:[],options:[]},lib=window.GymExerciseLibrary||[];
+ // Sin catálogos, no ofrecer valores ficticios como alternativas seleccionables.
+ if(!all.length&&!ent.gyms.length&&!ent.sites.length&&!ent.machines.length&&!ent.options.length&&!lib.length){
+  for(const [key,id] of FLOW)if(key==='kind'){
+   document.querySelectorAll('input[name="tipo"]').forEach(input=>{input.checked=false;input.disabled=true});
+  }else fillSelect(id,[]);
+  updateDetailState();window.GymOfflineRefreshSelectors?.();return;
+ }
  const extras=type=>(ent.options||[]).filter(x=>x.tipo===type).map(x=>x.nombre);
  let related=all;
  for(let n=0;n<FLOW.length;n++){
@@ -48,7 +64,7 @@ function cascade(start=0,preferred={}){
   else if(key==='s'){
    const ownGym=ent.gyms.find(g=>g.nombre===getValue('g'));
    const ownSites=ent.sites.filter(site=>site.gimnasio_id===ownGym?.id).map(s=>s.nombre);
-   choices=uniq([...related.map(r=>r.s),...ownSites,'No registrado']);
+   choices=uniq([...related.map(r=>r.s),...ownSites]);if(!choices.length)choices=['No registrado'];
   }else if(key==='z')choices=uniq([...related.map(r=>r.z),...all.map(r=>r.z),...lib.map(r=>r.zona_entrenamiento),...extras('zona'),'Sin clasificar']);
   else if(key==='kind')choices=uniq([...related.map(r=>r.kind),...all.map(r=>r.kind),...ent.machines.map(m=>m.tipo_equipo)]);
   else if(key==='i')choices=uniq([...related.map(r=>r.i),
@@ -68,18 +84,22 @@ function cascade(start=0,preferred={}){
   related=related.filter(r=>key==='t'?(r.t||[]).includes(chosen):r[key]===chosen);
  }
  updateDetailState();
+ window.GymOfflineRefreshSelectors?.();
 }
 function chosenRow(){
  const values=Object.fromEntries(FLOW.map(([key])=>[key,getValue(key)]));
  if(!values.g||!values.s||!values.i||!values.e||!values.t)return null;
+ const variants=(window.GymExerciseLibrary||[]).filter(e=>e.nombre===values.e);
+ const library=variants.find(e=>String(e.id)===String(globalThis.GymSelectedExerciseId||''))||
+  (variants.length===1?variants[0]:null);
+ if(variants.length>1&&!library)return null;
  const matched=allCatalog().find(r=>FLOW.filter(x=>x[0]!=='t').every(([key])=>r[key]===values[key]));
- if(matched)return matched;
- const library=(window.GymExerciseLibrary||[]).find(e=>e.nombre===values.e);
+ if(matched)return library?{...matched,exerciseId:library.id}:matched;
  const sample=allCatalog().find(r=>r.e===values.e);
  return {
   g:values.g,s:values.s,z:values.z||'Sin clasificar',kind:values.kind||'Otro',
   i:values.i,a:values.a||'No especificado',gr:values.gr||'No especificado',e:values.e,
-  t:[values.t],m:sample?.m||library?.musculos_principales?.join(', ')||'Pendiente de asignación',
+  exerciseId:library?.id||null,t:[values.t],m:sample?.m||library?.musculos_principales?.join(', ')||'Pendiente de asignación',
   ms:sample?.ms||library?.musculos_secundarios?.join(', ')||'Pendiente de asignación',
   n:0,last:null
  };
@@ -126,6 +146,7 @@ function snapshotExerciseRows(){return [...$('seriesRows').querySelectorAll('tr'
 function storeActiveDraft(){
  const tab=draftTabs.find(x=>x.id===activeDraftId);if(!tab)return;
  tab.values=Object.fromEntries(FLOW.map(([key])=>[key,getValue(key)]));
+ tab.exerciseId=globalThis.GymSelectedExerciseId||null;
  tab.date=$('fecha').value;tab.notes=$('observaciones').value;
  tab.seriesMode=seriesMode;tab.seriesGroups=seriesGroups;tab.seriesCustomized=seriesCustomized;
  tab.rows=snapshotExerciseRows();
@@ -139,7 +160,10 @@ function openDraft(id,saveCurrent=true){
  if(saveCurrent)storeActiveDraft();
  const tab=draftTabs.find(x=>x.id===id);if(!tab)return;
  activeDraftId=tab.id;
+ globalThis.GymSelectedExerciseId=tab.exerciseId||null;
  cascade(0,tab.values);
+ if($('registroVariante')&&tab.exerciseId){$('registroVariante').value=tab.exerciseId;
+  globalThis.GymSelectedExerciseId=$('registroVariante').value||null;}
  $('fecha').value=tab.date||dateNow();$('observaciones').value=tab.notes||'';
  seriesMode=tab.seriesMode;seriesGroups=tab.seriesGroups;seriesCustomized=tab.seriesCustomized;
  renderSeries();
@@ -155,7 +179,7 @@ function openDraft(id,saveCurrent=true){
 function newDraft(saveCurrent=true){
  if(saveCurrent)storeActiveDraft();
  const first=allCatalog()[0], values=first?{g:first.g,s:first.s,z:first.z,kind:first.kind,i:first.i,a:first.a,gr:first.gr,e:first.e,t:first.t?.[0]}:{...INITIAL};
- const tab={id:'e'+(++draftSeq),title:'Ejercicio '+draftSeq,values,date:$('fecha').value||dateNow(),notes:'',seriesMode:'normal',seriesGroups:4,seriesCustomized:false,rows:[],stage:'context'};
+ const tab={id:'e'+(++draftSeq),title:'Ejercicio '+draftSeq,values,exerciseId:null,date:$('fecha').value||dateNow(),notes:'',seriesMode:'normal',seriesGroups:4,seriesCustomized:false,rows:[],stage:'context'};
  draftTabs.push(tab);openDraft(tab.id,false);
 }
 function closeDraft(id){
@@ -174,37 +198,86 @@ function hasSeriesData(){return getEntries().length>0}
 let catalogActiveKind='gym',catalogActiveOptionType='zona';
 const catalogNorm=v=>String(v??'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es');
 const catalogOwnOptions=()=>window.GymEntities?.options||[];
-const catalogBaseOptions=(kind)=>{
- const all=window.GymBaseCatalog||[];
- if(kind==='gym')return all.map(x=>x.g);
- if(kind==='site')return all.map(x=>x.s);
- if(kind==='machine')return all.map(x=>x.i);
- if(kind==='exercise')return all.map(x=>x.e);
- if(kind==='zone')return all.map(x=>x.z);
- if(kind==='grip')return all.flatMap(x=>[x.gr,x.a]);
- if(kind==='technique')return all.flatMap(x=>Array.isArray(x.t)?x.t:[x.t]);
- return [];
+const catalogBaseOptions=kind=>{
+ const selected=$('gymExistingSelect')?.value||'';
+ const gymName=kind==='site'?catalogChoices('gym').find(x=>x.id===selected)?.name||'':'';
+ return window.GymReferenceChoices?.(kind,{gymId:selected,gymName})||[];
 };
 function catalogChoices(kind){
  let own=[];
- if(['gym','site','machine','exercise'].includes(kind))own=existingCatalogItems(kind).map(x=>({id:String(x.id),name:x.nombre,own:true}));
+ if(['gym','site','machine'].includes(kind))
+  own=existingCatalogItems(kind).map(x=>({id:String(x.id),name:x.nombre,own:true}));
+ if(kind==='exercise'){
+  const grouped=new Map();
+  for(const e of existingCatalogItems('exercise')){
+   const key=catalogNorm(e.nombre);
+   if(!key)continue;
+   if(!grouped.has(key))grouped.set(key,{id:String(e.id),name:e.nombre,own:true,rawName:e.nombre,variantIds:[]});
+   const row=grouped.get(key);
+   if(!row.variantIds.includes(String(e.id)))row.variantIds.push(String(e.id));
+  }
+  own=[...grouped.values()].map(g=>({...g,name:g.rawName+' ('+g.variantIds.length+')'}));
+ }
+ if(kind==='site'){
+  const selected=$('gymExistingSelect')?.value||'';
+  const sites=window.GymEntities?.sites||[];
+  if(selected)own=own.filter(x=>sites.some(s=>String(s.id)===x.id&&String(s.gimnasio_id)===selected));
+ }
  if(kind==='zone')own=catalogOwnOptions().filter(x=>x.tipo==='zona').map(x=>({id:String(x.id),name:x.nombre,own:true,type:x.tipo}));
  if(kind==='grip')own=catalogOwnOptions().filter(x=>['agarre','accesorio'].includes(x.tipo)).map(x=>({id:String(x.id),name:x.nombre,own:true,type:x.tipo}));
  if(kind==='technique')own=catalogOwnOptions().filter(x=>x.tipo==='tecnica').map(x=>({id:String(x.id),name:x.nombre,own:true,type:x.tipo}));
- const seen=new Set(own.map(x=>catalogNorm(x.name))),refs=[];
- for(const raw of catalogBaseOptions(kind)){
-  const name=String(raw||'').trim();
-  if(!name||['-','No especificado','Sin clasificar','Pendiente'].includes(name)||seen.has(catalogNorm(name)))continue;
-  seen.add(catalogNorm(name));refs.push({id:'base:'+name,name,own:false});
- }
- return [...own,...refs].sort((a,b)=>a.name.localeCompare(b.name,'es',{numeric:true}));
+ const refs=catalogBaseOptions(kind);
+ // Conservar también las referencias ya descargadas, sin acceder a la red.
+ return [...own,...refs].sort((a,b)=>a.name.localeCompare(b.name,'es',{numeric:true})||Number(b.own)-Number(a.own));
+}
+let catalogSelectedExerciseId=null;
+function catalogSelectExerciseVariant(id,notify=true){
+ const exercise=(window.GymExerciseLibrary||[]).find(x=>String(x.id)===String(id));
+ if(!exercise)return false;
+ const group=catalogChoices('exercise').find(g=>g.variantIds?.includes(String(id)));
+ const picker=$('exerciseExistingSelect');
+ if(!group||!picker)return false;
+ picker.value=group.id;
+ catalogSelectedExerciseId=String(id);
+ window.GymCatalogSelectedExerciseId=String(id);
+ const name=$('exerciseEditName');if(name)name.value=exercise.nombre;
+ const form=$('catalogForm');
+ if(form?.elements?.namedItem('e'))form.elements.namedItem('e').value=exercise.nombre;
+ if(notify){window.GymCatalogExerciseChanged?.();window.GymCatalogDetailSelectName?.(exercise.nombre);}
+ return true;
+}
+function catalogNavigateExercise(target){
+ const choice=catalogChoices('exercise').find(x=>x.id===$('exerciseExistingSelect')?.value);
+ const ids=choice?.variantIds||[];
+ if(!ids.length)return;
+ const index=Math.max(0,ids.indexOf(String(catalogSelectedExerciseId||ids[0])));
+ const next=target==='first'?0:target==='last'?ids.length-1:target==='previous'?Math.max(0,index-1):Math.min(ids.length-1,index+1);
+ catalogSelectExerciseVariant(ids[next]);
+ refreshExerciseNavigation();
+}
+function refreshExerciseNavigation(){
+ const node=$('exerciseVariantNav'),choice=catalogChoices('exercise').find(x=>x.id===$('exerciseExistingSelect')?.value);
+ if(!node)return;
+ const ids=choice?.variantIds||[];
+ node.hidden=ids.length<=1||!!node.closest('.catalog-compact-detail')?.hidden;
+ if(!ids.length)return;
+ if(!ids.includes(String(catalogSelectedExerciseId)))catalogSelectExerciseVariant(ids[0]);
+ const index=ids.indexOf(String(catalogSelectedExerciseId));
+ const pos=node.querySelector('[data-variant-position]');if(pos)pos.textContent=(index+1)+' / '+ids.length;
+ node.querySelectorAll('[data-variant-go]').forEach(button=>{
+  button.disabled=(index===0&&['first','previous'].includes(button.dataset.variantGo))||
+   (index===ids.length-1&&['next','last'].includes(button.dataset.variantGo));
+ });
 }
 function catalogFillSelect(select,choices,placeholder){
  if(!select)return;
  const before=select.value;
- select.replaceChildren(new Option(placeholder||'Selecciona un elemento…',''));
+ const emptyLabel={gymExistingSelect:'Agregar gimnasio',siteExistingSelect:'Agregar sede',exerciseExistingSelect:'Agregar ejercicio'}[select.id]||'Agregar elemento';
+ select.replaceChildren(new Option(choices.length?placeholder||'Seleccionar…':emptyLabel,''));
  choices.forEach(x=>select.add(new Option(x.name+(x.own?'':' · referencia'),x.id)));
- select.value=choices.some(x=>x.id===before)?before:(choices.find(x=>x.own)?.id||choices[0]?.id||'');
+ const wanted=select.id==='exerciseExistingSelect'
+  ?choices.find(x=>x.variantIds?.includes(String(catalogSelectedExerciseId)))?.id||before:before;
+ select.value=choices.some(x=>x.id===wanted)?wanted:(choices.length===1?choices[0].id:'');
  select.disabled=false;
  // Mostrar el nombre completo al consultar cada categoría, incluso si el
  // desplegable queda estrecho en dispositivos pequeños.
@@ -217,6 +290,7 @@ function catalogUpdateCounters(){
 }
 function catalogActiveCard(kind){
  catalogActiveKind=kind;
+ refreshCatalogEmptyActions();
  document.querySelectorAll('#catalogCompactRows .catalog-compact-card').forEach(row=>row.classList.toggle('catalog-chosen',row.dataset.catalogKind===kind));
  const quick=$('catalogQuickFeedback');
  if(quick){
@@ -225,7 +299,7 @@ function catalogActiveCard(kind){
   const item=catalogChoices(kind).find(x=>x.id===id);
   quick.textContent=kind==='series'||kind==='subdivision'
    ?title+': estos valores se gestionan dentro de Registro, no como un catálogo independiente.'
-   :item?title+' · '+item.name+(item.own?' · Elemento personal: puedes modificarlo o eliminarlo.':' · Referencia: puedes consultarla, pero no modificarla ni eliminarla.')
+   :item?title+' · '+item.name+(item.own?' · Elemento personal: puedes modificarlo o eliminarlo.':' · Referencia compartida: puedes modificarla u ocultarla solo en este perfil offline.')
    :'Categoría seleccionada: '+title+'.';
  }
 }
@@ -239,8 +313,7 @@ function catalogOpenCard(kind,action='add'){
  }
  if(action==='edit'){
   const selected=row.querySelector('.catalog-compact-picker select')?.value||'';
-  if(!selected){toast('Selecciona primero un elemento para modificar.');return;}
-  if(selected.startsWith('base:')){toast('Este valor procede del catálogo de referencia. Solo puedes modificar los elementos propios de tu cuenta.');return;}
+  if(!catalogChoices(kind).length||!selected){toast('No hay elementos para modificar. Primero agrega uno.');return;}
  }
  const detail=row.querySelector('.catalog-compact-detail'),btn=row.querySelector('.catalog-compact-toggle');
  if(!detail){toast('Este catálogo es de referencia y solo permite consultar.');return;}
@@ -253,6 +326,7 @@ function catalogOpenCard(kind,action='add'){
  });
  detail.hidden=!open;
  if(btn){btn.textContent=open?'−':'+';btn.setAttribute('aria-expanded',String(open));}
+ if(kind==='exercise')refreshExerciseNavigation();
  if(!open)return;
  if(['zone','grip','technique'].includes(kind)){
   const form=$('addOptionForm'),type=form.querySelector('[name="tipo"]');
@@ -264,14 +338,26 @@ function catalogOpenCard(kind,action='add'){
   else catalogActiveOptionType=entry?.type||'agarre';
   type.value=catalogActiveOptionType;
   renderIndependentCatalog();
-  $('optionExistingSelect').value=entry?.own?entry.id:'';
-  $('optionEditName').value=entry?.own?entry.name:'';
+  $('optionExistingSelect').value=entry?.id||'';
+  $('optionEditName').value=entry?.name||'';
   const feedback=$('optionFeedback');
-  if(feedback)feedback.textContent=entry&&!entry.own?'Valor de referencia: puedes utilizarlo, pero solo es posible modificar o eliminar valores propios.':'';
+  if(feedback)feedback.textContent=entry&&!entry.own?'Modificación exclusivamente local; la referencia compartida permanece intacta.':'';
+ }
+ if(['gym','site','machine'].includes(kind)){
+  const selected=row.querySelector('.catalog-compact-picker select')?.value;
+  const current=existingCatalogItems(kind).find(x=>String(x.id)===selected);
+  const field=$(kind+'EditName');
+  if(field)field.value=current?.nombre||catalogChoices(kind).find(x=>x.id===selected)?.name||'';
+  if(kind==='site'){
+   const gymId=$('gymExistingSelect')?.value||'';
+   if(gymId)$('siteGymSelect').value=gymId;
+  }
  }
  if(kind==='exercise'){
-  const entry=catalogChoices(kind).find(x=>x.id===$('exerciseExistingSelect')?.value);
-  if(entry&&!entry.own)$('exerciseEditFeedback').textContent='Ejercicio de referencia: no editable. Puedes agregar uno propio.';
+  const group=catalogChoices(kind).find(x=>x.id===$('exerciseExistingSelect')?.value);
+  const id=group?.variantIds?.includes(String(catalogSelectedExerciseId))?catalogSelectedExerciseId:group?.variantIds?.[0];
+  if(id)catalogSelectExerciseVariant(id);
+  refreshExerciseNavigation();
  }
  if(action==='add'){
   const form=detail.querySelector('form');const field=form?.querySelector('[name="nombre"],[name="e"]');field?.focus();
@@ -322,17 +408,14 @@ function setupCatalogCompact(){
  holder.dataset.compactReady='1';
  const forms={gym:$('addGymForm'),site:$('addSiteForm'),machine:$('addMachineForm'),exercise:$('catalogForm'),option:$('addOptionForm')};
  const originalExercise=$('exerciseExistingSelect')?.closest('.catalog-exercise-selector'),entries=$('catalogEntries'),muscle=$('muscleExistingSelect');
+ if(originalExercise)originalExercise.hidden=true;
  // Conservar los formularios activos; nunca duplicarlos ni reemplazar sus IDs.
  const items=[
   {kind:'gym',label:'Gimnasio',icon:'▦',select:$('gymExistingSelect'),count:$('gymCount'),parts:[forms.gym]},
   {kind:'site',label:'Sede',icon:'●',select:$('siteExistingSelect'),count:$('siteCount'),parts:[forms.site]},
-  {kind:'zone',label:'AnotaciónV2',icon:'▤',select:null,count:null,parts:[forms.option]},
-  {kind:'machine',label:'Instrumento',icon:'⚙',select:$('machineExistingSelect'),count:$('machineCount'),parts:[forms.machine]},
-  {kind:'exercise',label:'Ejercicio',icon:'♧',select:$('exerciseExistingSelect'),count:$('exerciseCount'),parts:[originalExercise,forms.exercise,entries]},
-  {kind:'grip',label:'Agarre / Implemento',icon:'✋',select:null,count:null,parts:[]},
-  {kind:'technique',label:'Tecnica_Actualizada',icon:'◈',select:null,count:null,parts:[]},
-  {kind:'series',label:'Número Serie',icon:'#',select:null,count:null,parts:[],readOnly:true},
-  {kind:'subdivision',label:'Subdivisión',icon:'◫',select:null,count:null,parts:[],readOnly:true}
+  // Anotación, Máquina, Agarre/Implemento y Técnica son DETALLES del ejercicio,
+  // no catálogos independientes: se consultan en «Detalle de ejercicio».
+  {kind:'exercise',label:'Ejercicio',icon:'♧',select:$('exerciseExistingSelect'),count:$('exerciseCount'),parts:[originalExercise,forms.exercise,entries]}
  ];
  holder.replaceChildren();
  for(const item of items){
@@ -345,30 +428,75 @@ function setupCatalogCompact(){
   let select=item.select;
   if(select)select.closest('label')?.classList.add('catalog-legacy-label');
   if(!select){select=document.createElement('select');select.id='catalogShortcut'+item.kind;}
-  if(item.kind==='series')select.id='catalogSeriesLookup';
-  if(item.kind==='subdivision')select.id='catalogSubdivisionLookup';
   select.setAttribute('aria-label','Valores de '+item.label);wrapper.append(select);
   const count=item.count||document.createElement('span');count.classList.add('catalog-total');
-  if(!item.count)count.id=item.kind==='series'?'catalogSeriesLookupCount':item.kind==='subdivision'?'catalogSubdivisionLookupCount':'catalogShortcutCount'+item.kind;
+  if(!item.count)count.id='catalogShortcutCount'+item.kind;
   count.textContent='0';
   const add=document.createElement('button');add.className='catalog-compact-toggle';add.type='button';
-  add.textContent=item.readOnly?'›':'+';
-  add.setAttribute('aria-label',item.readOnly?'Consultar o configurar '+item.label:'Agregar o modificar '+item.label);
+  add.textContent='+';
+  add.setAttribute('aria-label','Agregar o modificar '+item.label);
   const detail=document.createElement('div');detail.className='catalog-compact-detail';detail.hidden=true;
   detail.id='catalogDetail'+item.kind;add.setAttribute('aria-controls',detail.id);add.setAttribute('aria-expanded','false');
   if(!item.readOnly)for(const part of item.parts)if(part&&part!==forms.option)detail.append(part);
   if(item.kind==='zone')detail.append(forms.option);
-  bar.append(heading,wrapper,count,add);row.append(bar,detail);holder.append(row);
+  bar.append(heading,wrapper);
+  if(item.kind==='exercise'){
+   const nav=document.createElement('div');nav.id='exerciseVariantNav';nav.className='exercise-variant-nav';nav.hidden=true;
+   nav.setAttribute('aria-label','Navegar por las variantes del mismo ejercicio');
+   for(const [action,title] of [['first','«'],['previous','‹'],['next','›'],['last','»']]){
+    const button=document.createElement('button');button.type='button';button.dataset.variantGo=action;
+    button.textContent=title;button.setAttribute('aria-label',{first:'Primera variante',previous:'Variante anterior',next:'Siguiente variante',last:'Última variante'}[action]);
+    button.addEventListener('click',()=>catalogNavigateExercise(action));nav.append(button);
+   }
+   const position=document.createElement('span');position.dataset.variantPosition='';position.textContent='0 / 0';
+   nav.insertBefore(position,nav.children[2]);detail.prepend(nav);
+  }
+  bar.append(count,add);row.append(bar,detail);holder.append(row);
   select.addEventListener('focus',()=>catalogActiveCard(item.kind));
   select.addEventListener('change',()=>{
    select.title=select.selectedOptions?.[0]?.textContent||'';
+   if(item.kind==='gym'){
+    const gymId=select.value;
+    if($('siteGymSelect'))$('siteGymSelect').value=gymId;
+    renderIndependentCatalog();
+   }
+   if(item.kind==='site'&&select.value){
+    const chosen=catalogChoices('site').find(x=>x.id===select.value);
+    const sameName=catalogChoices('site').filter(x=>catalogNorm(x.name)===catalogNorm(chosen?.name));
+    const gymChoices=catalogChoices('gym'),sites=window.GymEntities?.sites||[];
+    const siteOwn=sites.find(x=>String(x.id)===select.value);
+    const associated=siteOwn
+     ?gymChoices.find(x=>x.id===String(siteOwn.gimnasio_id))
+     :gymChoices.find(x=>catalogNorm(x.name)===catalogNorm(chosen?.sourceGym));
+    if(chosen&&associated&&sameName.length===1){
+     $('gymExistingSelect').value=associated.id;
+     if($('siteGymSelect'))$('siteGymSelect').value=associated.id;
+     renderIndependentCatalog();$('siteExistingSelect').value=chosen.id;
+    }else if(sameName.length>1){
+     $('gymExistingSelect').value='';
+     // No escoger automáticamente un gimnasio si varios comparten esta sede.
+    }
+   }
+   if(['gym','site','machine'].includes(item.kind)){
+    const entry=existingCatalogItems(item.kind).find(x=>String(x.id)===select.value);
+    const input=$(item.kind+'EditName');if(input)input.value=entry?.nombre||catalogChoices(item.kind).find(x=>x.id===select.value)?.name||'';
+   }
+   if(item.kind==='exercise'){
+    window.GymCatalogCancelFieldEdits?.();
+    const group=catalogChoices('exercise').find(x=>x.id===select.value);
+    catalogSelectedExerciseId=group?.variantIds?.[0]||null;
+    window.GymCatalogSelectedExerciseId=catalogSelectedExerciseId;
+    if(catalogSelectedExerciseId)catalogSelectExerciseVariant(catalogSelectedExerciseId);
+    window.GymCatalogDetailSelectName?.(group?.rawName||'');
+    refreshExerciseNavigation();
+   }
    catalogActiveCard(item.kind);
-   // El selector muestra los existentes; solo los elementos personales
-   // pueden abrirse en modo de modificación.
-   if(['zone','grip','technique'].includes(item.kind)&&select.value&&!select.value.startsWith('base:'))
+   refreshCatalogEmptyActions();
+   // Las referencias compartidas también permiten una modificación local.
+   if(['zone','grip','technique'].includes(item.kind)&&select.value)
     catalogOpenCard(item.kind,'edit');
   });
-  add.addEventListener('click',()=>catalogOpenCard(item.kind,item.readOnly?'configure':'toggle'));
+  add.addEventListener('click',()=>catalogOpenCard(item.kind,'toggle'));
   heading.addEventListener('click',()=>catalogActiveCard(item.kind));
  }
  // Cabecera de ejercicio obsoleta tras mover su formulario al listado compacto.
@@ -376,19 +504,22 @@ function setupCatalogCompact(){
  const quick=$('catalogQuickPanel');if(quick)quick.querySelectorAll('[data-catalog-quick]').forEach(button=>button.addEventListener('click',async()=>{
   const action=button.dataset.catalogQuick,kind=catalogActiveKind,card=document.querySelector('[data-catalog-kind="'+kind+'"]');
   const id=card?.querySelector('.catalog-compact-picker select')?.value||'';
+  if(action!=='add'&&!catalogChoices(kind).length){toast('Primero agrega un registro.');return;}
   if(action==='list'){
    const rows=catalogChoices(kind),list=$('catalogQuickList');
    if(['series','subdivision','muscle'].includes(kind)){
     catalogOpenCard(kind,'configure');return;
    }
    list.hidden=!list.hidden;
-   list.innerHTML='<strong>'+rows.length+' elementos: '+esc(kind)+'</strong><div>'+rows.map(x=>'<span>'+esc(x.name)+(x.own?'':' · referencia')+'</span>').join('')+'</div>';
+   list.innerHTML='<strong>'+rows.length+' elementos: '+esc(kind)+'</strong><div>'+rows.map(x=>'<span>'+esc(x.name)+'</span>').join('')+'</div>';
    return;
   }
   if(action==='delete'){
-   if(!id||id.startsWith('base:')){toast('Selecciona un valor propio para eliminar; los de referencia se conservan.');return;}
+   if(!id){toast('Selecciona primero el elemento que quieres eliminar.');return;}
    if(!window.GymCloud?.deleteCatalogItem){toast('La eliminación no está disponible.');return;}
-   if(!confirm('¿Eliminar este elemento de tu catálogo? Si está relacionado con registros, Supabase puede impedirlo.'))return;
+   if(!confirm(id.startsWith('base:')?
+    '¿Ocultar esta referencia únicamente en el perfil local? No se borrará el catálogo compartido ni el historial.':
+    '¿Eliminar este elemento de tu perfil local? Su eliminación en tu nube personal dependerá de la modalidad de sincronización.'))return;
    button.disabled=true;
    try{await window.GymCloud.deleteCatalogItem(['zone','grip','technique'].includes(kind)?'option':kind,id);$('catalogQuickFeedback').textContent='Elemento eliminado. Catálogos actualizados.';}
    catch(e){$('catalogQuickFeedback').textContent='No se pudo eliminar: '+String(e.message||e).slice(0,160);}
@@ -397,7 +528,35 @@ function setupCatalogCompact(){
   }
   catalogOpenCard(kind,action);
  }));
- catalogActiveCard('gym');renderCatalogShortcuts();renderSeriesCatalogShortcuts();
+ const group=document.createElement('section');group.className='catalog-visual-group';
+ group.innerHTML='<h3>📍 Ubicación</h3><p>Gimnasio, sede y GPS opcional.</p>';
+ for(const kind of ['gym','site']){const card=holder.querySelector('[data-catalog-kind="'+kind+'"]');if(card)group.append(card);}
+ holder.prepend(group);
+ const heading=document.createElement('h3');heading.className='catalog-group-title';heading.textContent='🏋️ Ejercicio';
+ const first=holder.querySelector('[data-catalog-kind="exercise"]');if(first)holder.insertBefore(heading,first);
+ catalogActiveCard('gym');renderCatalogShortcuts();refreshCatalogEmptyActions();
+}
+function refreshCatalogEmptyActions(){
+ // No hay nada que modificar o eliminar hasta que exista un elemento.
+ const kind=catalogActiveKind,has=!!catalogChoices(kind).length;
+ document.querySelectorAll('#catalogQuickPanel [data-catalog-quick]').forEach(button=>{
+  const action=button.dataset.catalogQuick;
+  button.hidden=action!=='add'&&!has;
+ });
+ for(const card of document.querySelectorAll('#catalogCompactRows .catalog-compact-card')){
+  const type=card.dataset.catalogKind,exists=!!catalogChoices(type).length;
+  const picker=card.querySelector('.catalog-compact-picker');
+  if(picker)picker.hidden=!exists;
+  const detail=card.querySelector('.catalog-compact-detail');
+  if(detail){
+   for(const control of detail.querySelectorAll('[data-catalog-existing]')){
+    const parent=control.closest('label');if(parent)parent.hidden=!exists;
+   }
+   for(const edit of detail.querySelectorAll('.catalog-edit-row'))edit.hidden=!exists;
+   const save=detail.querySelector('#editExerciseDetails');if(save)save.hidden=!exists;
+   const gps=detail.querySelector('#openSiteGPS');if(gps)gps.hidden=!exists;
+  }
+ }
 }
 function renderCatalogShortcuts(){
  for(const [kind,id] of [['zone','catalogShortcutzone'],['grip','catalogShortcutgrip'],['technique','catalogShortcuttechnique']]){
@@ -416,7 +575,7 @@ function renderSeriesCatalogShortcuts(){
 function populateCatalogSelect(selectId,items,labelFn){
  const select=$(selectId);if(!select)return;
  const kind=selectId==='gymExistingSelect'?'gym':selectId==='siteExistingSelect'?'site':selectId==='machineExistingSelect'?'machine':selectId==='exerciseExistingSelect'?'exercise':null;
- if(kind)catalogFillSelect(select,catalogChoices(kind),'Selecciona un elemento…');
+ if(kind)catalogFillSelect(select,catalogChoices(kind),kind==='exercise'?'Seleccionar ejercicio…':kind==='gym'?'Seleccionar gimnasio…':kind==='site'?'Seleccionar sede…':'Seleccionar elemento…');
  else catalogFillSelect(select,items.map(x=>({id:String(x.id),name:labelFn(x),own:true})),'Selecciona un valor…');
  const inputId=selectId.replace('ExistingSelect','EditName'),input=$(inputId),original=items.find(x=>String(x.id)===select.value);
  if(input)input.value=original?.nombre||'';
@@ -432,32 +591,39 @@ function existingCatalogItems(kind){
 }
 function renderIndependentCatalog(){
  const ent=window.GymEntities||{gyms:[],sites:[],machines:[],options:[]};
- const el=$('siteGymSelect'),previous=el.value;
+ const el=$('siteGymSelect'),previous=el.value,chosen=$('gymExistingSelect')?.value||'';
  el.replaceChildren();
- if(!ent.gyms.length){el.add(new Option('Primero registra un gimnasio',''));el.disabled=true;}
+ const gyms=catalogChoices('gym');
+ if(!gyms.length){el.add(new Option('Primero registra un gimnasio',''));el.disabled=true;}
  else{
   el.disabled=false;
-  for(const gym of ent.gyms)el.add(new Option(gym.nombre,gym.id));
-  if(ent.gyms.some(g=>g.id===previous))el.value=previous;
+  el.add(new Option(gyms.length===1?'Gimnasio único':'Seleccionar gimnasio…',''));
+  for(const gym of gyms)el.add(new Option(gym.name,gym.id));
+  el.value=gyms.some(g=>g.id===chosen)?chosen:(gyms.some(g=>g.id===previous)?previous:(gyms.length===1?gyms[0].id:''));
  }
  const gymById=new Map((ent.gyms||[]).map(x=>[x.id,x.nombre]));
  populateCatalogSelect('gymExistingSelect',ent.gyms||[],x=>x.nombre);
  populateCatalogSelect('siteExistingSelect',ent.sites||[],x=>x.nombre+' · '+(gymById.get(x.gimnasio_id)||'Sin gimnasio'));
  populateCatalogSelect('machineExistingSelect',ent.machines||[],x=>x.nombre+' · '+(x.tipo_equipo||'Equipo'));
  const values=existingCatalogItems('option');
- populateCatalogSelect('optionExistingSelect',values,x=>x.nombre);
+ if(['zone','grip','technique'].includes(catalogActiveKind))
+  catalogFillSelect($('optionExistingSelect'),catalogChoices(catalogActiveKind),'Selecciona un valor…');
+ else populateCatalogSelect('optionExistingSelect',values,x=>x.nombre);
  for(const [id,count] of [['siteCount',ent.sites.length],['machineCount',ent.machines.length]])
   if($(id))$(id).textContent=String(count);
  if($('optionCount'))$('optionCount').textContent=values.length+' / '+ent.options.length+' total';
  if($('customCatalogItems'))$('customCatalogItems').innerHTML='';
- renderCatalogShortcuts();
+ renderCatalogShortcuts();refreshCatalogEmptyActions();
  if(window.GymBaseCatalog?.length||window.GymCustomCatalog?.length)cascade(0);
 }
 function renderOwnCatalog(){
  const records=existingCatalogItems('exercise');
  populateCatalogSelect('exerciseExistingSelect',records,x=>x.nombre);
+ refreshExerciseNavigation();
  const entries=$('catalogEntries');
  if(entries)entries.innerHTML=records.length?'':'<div class="empty">Aún no hay ejercicios propios. Puedes agregar el primero aquí.</div>';
+ refreshCatalogEmptyActions();
+ window.GymCatalogDetailRefresh?.();
 }
 
 function changeSeriesMode(mode){if(!['normal','sub','lateral'].includes(mode))return;if(mode!==seriesMode&&hasSeriesData()&&!confirm('Cambiar el tipo de subdivisión borrará los valores aún no guardados. ¿Continuar?'))return;seriesMode=mode;if(!seriesCustomized)seriesGroups=mode==='normal'?4:3;renderSeries();$('splitOptions').hidden=true;$('toggleSubdivisions').setAttribute('aria-expanded','false');$('resetSubdivisions').hidden=mode==='normal'}
@@ -519,9 +685,27 @@ function invalidatePendingSave(){
 }
 async function saveSeries(){
  const r=chosenRow(),date=$('fecha').value,tech=getValue('t'),entries=getEntries();
- if(!r||!tech||!date||!entries.length){toast('Completa ejercicio, fecha y al menos una serie.');return}
- if(entries.some(x=>!validSeriesEntry(x))){
-  toast('Revisa peso, repeticiones y asistencias.');return;
+ const missing=[];
+ if(!getValue('g'))missing.push('gimnasio');
+ if(!getValue('s'))missing.push('sede');
+ if(!getValue('e'))missing.push('ejercicio');
+ if(!getValue('i'))missing.push('máquina/instrumento');
+ if(!getValue('t'))missing.push('técnica');
+ if(!date)missing.push('fecha');
+ if(!r&&getValue('e')&&(window.GymExerciseLibrary||[]).filter(x=>x.nombre===getValue('e')).length>1&&!window.GymSelectedExerciseId)
+  missing.push('variante del ejercicio');
+ if(!entries.length)missing.push('una serie con peso y repeticiones');
+ const fail=message=>{const feedback=$('saveFeedback');feedback.textContent=message;feedback.hidden=false;toast(message)};
+ if(missing.length){fail('Falta completar: '+[...new Set(missing)].join(', ')+'.');return}
+ if(!r){fail('La selección del ejercicio no es válida. Revisa los campos y elige su variante.');return}
+ const bad=entries.find(x=>!validSeriesEntry(x));
+ if(bad){
+  const incomplete=[];
+  if(!validSeriesDecimal(bad.weight,1e10))incomplete.push('peso');
+  if(!validSeriesDecimal(bad.reps,1e8)||Number(bad.reps)<=0)incomplete.push('repeticiones');
+  if(!validSeriesDecimal(bad.assistance||'0',1e8))incomplete.push('asistencias');
+  fail(bad.series+(bad.sub==='-'?'':' · '+bad.sub)+': revisa '+incomplete.join(', ')+'. Deben ser números válidos.');
+  return;
  }
  if(!window.GymCloud?.canWrite?.()){
   const message=window.GymCloud?.getWriteStatus?.()?.message||
@@ -536,8 +720,8 @@ async function saveSeries(){
  const sessionStamp=window.GymCloud.getSessionStamp?.();
  const current=()=>requestId===window.GymSaveAttempt&&
   sessionStamp===window.GymCloud.getSessionStamp?.();
- const payload={exercise:r,date,technique:tech,notes:$('observaciones').value.trim(),entries};
- const rowSignature=()=>JSON.stringify({date:$('fecha').value,tech:getValue('t'),exercise:chosenRow()?.e,
+ const payload={exercise:{...r,detailValues:window.GymRegistroNewDetails?.()||{}},date,technique:tech,notes:$('observaciones').value.trim(),entries};
+ const rowSignature=()=>JSON.stringify({date:$('fecha').value,tech:getValue('t'),exercise:chosenRow()?.e,exerciseId:globalThis.GymSelectedExerciseId||null,
    notes:$('observaciones').value.trim(),entries:getEntries().map(({el,...entry})=>entry)});
  const submittedSignature=rowSignature();
  const btn=$('saveRecords'),feedback=$('saveFeedback');feedback.hidden=true;feedback.textContent='';btn.disabled=true;btn.textContent='Guardando en este dispositivo…';
@@ -574,7 +758,7 @@ async function saveSeries(){
  }
  finally{if(current()){btn.disabled=false;btn.textContent='Guardar series'}}
 }
-function recordHtml(r){return `<div class="record-item"><div><strong>${esc(r.exercise)}</strong><p>${esc(fmtDate(r.date))} · ${esc(r.gym)} · ${esc(r.sede)}<br>${esc(r.series)}${r.subdivision!=='-'?' · '+esc(r.subdivision):''} · ${esc(r.technique)}${r.assistance!==null&&r.assistance!==undefined?' · Asist.: '+esc(r.assistance):''}</p></div><aside><strong>${esc(r.weight)} ${esc(r.unit)} × ${esc(r.reps)}</strong><small>repeticiones</small><div class="record-actions"><button type="button" data-edit="${esc(r.id)}" title="Modificar serie">Modificar</button><button type="button" data-delete="${esc(r.id)}" title="Eliminar serie">Eliminar</button><button type="button" data-progress="${esc(r.exercise)}" title="Mostrar evolución de este ejercicio">Ver progreso</button></div></aside></div>`}
+function recordHtml(r){return `<div class="record-item"><div><strong>${esc(r.exercise)}</strong><p>${esc(fmtDate(r.date))} · ${esc(r.gym)} · ${esc(r.sede)}<br>${esc(r.series)}${r.subdivision!=='-'?' · '+esc(r.subdivision):''} · ${esc(r.technique)}${r.assistance!==null&&r.assistance!==undefined?' · Asist.: '+esc(r.assistance):''}</p></div><aside><strong>${esc(r.weight)} ${esc(r.unit||'u. s/e')} × ${esc(r.reps)}</strong><small>repeticiones</small><div class="record-actions"><button type="button" data-edit="${esc(r.id)}" title="Modificar serie">Modificar</button><button type="button" data-delete="${esc(r.id)}" title="Eliminar serie">Eliminar</button><button type="button" data-progress="${esc(r.exercise)}" title="Mostrar evolución de este ejercicio">Ver progreso</button></div></aside></div>`}
 function orderedRecords(){return [...model.records].sort((a,b)=>b.date.localeCompare(a.date)||(b.createdAt||'').localeCompare(a.createdAt||''))}
 function drawRecent(){const list=orderedRecords().slice(0,3);$('recentRecords').innerHTML=list.length?list.map(recordHtml).join(''):'<div class="empty">Aún no hay registros nuevos. Completa una fila y guárdala.</div>'}
 const HISTORY_FIELDS=[
@@ -593,7 +777,7 @@ function historyFieldValue(record,key){
 }
 function historyColumnValue(record,key){
  if(key==='date')return fmtDate(record.date);
- if(key==='weight')return String(record.weight??'')+' '+String(record.unit||'kg');
+ if(key==='weight')return String(record.weight??'')+' '+String(record.unit||'u. s/e');
  if(key==='reps')return String(record.reps??'');
  return historyFieldValue(record,key);
 }
@@ -821,26 +1005,51 @@ function photoCanvas(file,maxSize){
 }
 
 function detailOpenAfterUpload(type){const r=chosenRow(),[src,available]=photoFor(type,r);$(type==='equipo'?'detailEquipmentImg':'detailExerciseImg').src=src;$(type==='equipo'?'equipmentNoPhoto':'exerciseNoPhoto').hidden=available}
-function install(){$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('resetSubdivisions').addEventListener('click',()=>changeSeriesMode('normal'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('progressExercise').addEventListener('change',()=>drawProgressChart(model.records));$('progressMetric').addEventListener('change',()=>drawProgressChart(model.records));$('progressRange').addEventListener('change',()=>drawProgressChart(model.records));document.querySelectorAll('[data-history-field]').forEach(field=>field.addEventListener('change',()=>drawHistory(true)));$('historyView').addEventListener('change',()=>drawHistory(true));$('historyDateFrom').addEventListener('change',()=>drawHistory(true));$('historyDateTo').addEventListener('change',()=>drawHistory(true));$('historyClearFilters').addEventListener('click',()=>{resetHistoryFilters();drawHistory(true)});$('historyLoadMore').addEventListener('click',()=>{historyVisible+=60;drawHistory()});$('historyRefresh').addEventListener('click',refreshHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.querySelector('#addOptionForm [name="tipo"]').addEventListener('change',renderIndependentCatalog);
+function install(){$('catalogModifyAdjacent')?.addEventListener('click',()=>document.querySelector('[data-catalog-modify="exercise"]')?.click());$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('resetSubdivisions').addEventListener('click',()=>changeSeriesMode('normal'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('progressExercise').addEventListener('change',()=>drawProgressChart(model.records));$('progressMetric').addEventListener('change',()=>drawProgressChart(model.records));$('progressRange').addEventListener('change',()=>drawProgressChart(model.records));document.querySelectorAll('[data-history-field]').forEach(field=>field.addEventListener('change',()=>drawHistory(true)));$('historyView').addEventListener('change',()=>drawHistory(true));$('historyDateFrom').addEventListener('change',()=>drawHistory(true));$('historyDateTo').addEventListener('change',()=>drawHistory(true));$('historyClearFilters').addEventListener('click',()=>{resetHistoryFilters();drawHistory(true)});$('historyLoadMore').addEventListener('click',()=>{historyVisible+=60;drawHistory()});$('historyRefresh').addEventListener('click',refreshHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.querySelector('#addOptionForm [name="tipo"]')?.addEventListener('change',renderIndependentCatalog);
 document.querySelectorAll('[data-catalog-existing]').forEach(select=>select.addEventListener('change',()=>{
  const kind=select.dataset.catalogExisting;
  const item=existingCatalogItems(kind).find(x=>x.id===select.value);
- const field=$(kind+'EditName');if(field)field.value=item?.nombre||'';
+ const field=$(kind+'EditName');if(field)field.value=item?.nombre||
+  catalogChoices(kind==='option'?catalogActiveKind:kind).find(x=>x.id===select.value)?.name||'';
 }));
 document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEventListener('click',async()=>{
  const kind=button.dataset.catalogModify;
  const select=$({gym:'gymExistingSelect',site:'siteExistingSelect',machine:'machineExistingSelect',option:'optionExistingSelect',exercise:'exerciseExistingSelect'}[kind]);
- const name=$(kind+'EditName')?.value.trim()||'',feedback=$(kind==='exercise'?'exerciseEditFeedback':{gym:'gymFeedback',site:'siteFeedback',machine:'machineFeedback',option:'optionFeedback'}[kind]);
- if(!select.value||!name){feedback.textContent='Selecciona un elemento y escribe su nuevo nombre.';return;}
+ const targetId=kind==='exercise'?catalogSelectedExerciseId||select.value:select.value;
+ const name=(kind==='exercise'?($('catalogForm')?.elements.namedItem('e')?.value||''):$(kind+'EditName')?.value||'').trim(),feedback=$(kind==='exercise'?'exerciseEditFeedback':{gym:'gymFeedback',site:'siteFeedback',machine:'machineFeedback',option:'optionFeedback'}[kind]);
+ if(!targetId||!name){feedback.textContent='Selecciona un elemento y escribe su nuevo nombre.';return;}
  if(!window.GymCloud?.canWrite?.()){feedback.textContent=window.GymCloud?.getWriteStatus?.()?.message||'El perfil local todavía no está disponible para modificar.';return;}
  const stamp=window.GymCloud.getSessionStamp?.(),current=()=>stamp===window.GymCloud.getSessionStamp?.()&&window.GymCloud.canWrite();
  button.disabled=true;
- try{await window.GymCloud.updateCatalogItem(kind,select.value,name);if(current())feedback.textContent='Nombre actualizado en este perfil.';}
- catch(error){if(current())feedback.textContent='No se pudo modificar: '+error.message;}
+ try{
+  if(kind==='exercise'){
+   window.GymCatalogPrepareFieldEdits?.();
+   const values=window.GymCatalogCollectExerciseValues?.()||
+    Object.fromEntries(new FormData($('catalogForm')).entries());
+   values.e=name;
+   values.e=$('catalogForm')?.elements.namedItem('e')?.value?.trim()||name;
+   await window.GymCloud.saveExerciseChanges(targetId,values);
+  }else await window.GymCloud.updateCatalogItem(kind,targetId,name);
+  if(current()){
+   if(kind==='exercise')catalogSelectExerciseVariant(targetId);
+   else if(select.querySelector('option[value="'+CSS.escape(targetId)+'"]'))select.value=targetId;
+   feedback.textContent=kind==='exercise'?'✅ Ejercicio modificado en la misma variante.':'✅ Nombre actualizado: '+name+'.';
+   if(kind==='exercise'){
+    window.GymCatalogCancelFieldEdits?.(true);
+    const section=$('catalogDetailexercise');
+    if(section){section.hidden=true;const toggle=section.closest('.catalog-compact-card')?.querySelector('.catalog-compact-toggle');if(toggle){toggle.textContent='+';toggle.setAttribute('aria-expanded','false');}}
+    toast('✓ Ejercicio modificado correctamente');
+    window.GymCatalogDetailSelectName?.((window.GymExerciseLibrary||[]).find(x=>String(x.id)===String(targetId))?.nombre||'');
+   }
+   refreshExerciseNavigation();
+  }
+ }
+ catch(error){if(current()){feedback.textContent='No se pudo modificar: '+error.message;
+    if(/Ya existe un ejercicio/.test(error.message||''))toast('⚠️ Ya existe: nombre y características idénticos.');}}
  finally{button.disabled=false;}
 }));
 document.addEventListener('click',e=>{const detail=e.target.closest('[data-history-detail]');if(detail){expandedHistoryId=expandedHistoryId===detail.dataset.historyDetail?null:detail.dataset.historyDetail;drawHistory();return;}const edit=e.target.closest('[data-edit]');if(edit){editRecord(edit.dataset.edit);return;}const b=e.target.closest('[data-delete]');if(b){deleteRecord(b.dataset.delete);return;}const progress=e.target.closest('[data-progress]');if(progress){const exercise=progress.dataset.progress;showPage('dashboard');if(model.records.some(r=>r.exercise===exercise)){$('progressExercise').value=exercise;drawProgressChart(model.records);}}})}
-$('fecha').value=dateNow();renderSeries();cascade(0,INITIAL);resetExerciseTabs();setupCatalogCompact();setupMockupHeaders();install();installRegistroCompact();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+$('fecha').value=dateNow();renderSeries();cascade(0);resetExerciseTabs();setupCatalogCompact();setupMockupHeaders();install();installRegistroCompact();setHistoryReady(false);drawRecent();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
 
 
 // Vista anatómica 2D; visor 3D reservado hasta conectar un modelo real.
@@ -850,8 +1059,8 @@ function gymlyticsAnatomyDraw(){
  const r=chosenRow();if(!r)return;
  $('anatomyPrimary').textContent=anatomyData?.primary.length?anatomyData.primary.join(', '):(r.m||'Pendiente');$('anatomySecondary').textContent=anatomyData?.secondary.length?anatomyData.secondary.join(', '):(r.ms||'Pendiente');
  document.querySelectorAll('[data-anatomy-side]').forEach(b=>{let on=b.dataset.anatomySide===gymlyticsAnatomySide;b.classList.toggle('selected',on);b.setAttribute('aria-pressed',String(on))});
- const key='anatomia:'+gymlyticsAnatomySide+':'+r.e;
- const src=model.photos[key]||anatomyData?.photos['musculos:'+gymlyticsAnatomySide]||anatomyData?.images[gymlyticsAnatomySide];$('anatomyPhoto').hidden=!src;$('anatomyPhoto').removeAttribute('src');if(src)$('anatomyPhoto').src=src;
+ const key='anatomia:'+gymlyticsAnatomySide+':'+[r.g,r.s,r.i,r.e].join('|');
+ const src=model.photos[key]||model.photos['anatomia:'+gymlyticsAnatomySide+':'+r.e]||anatomyData?.photos['musculos:'+gymlyticsAnatomySide]||anatomyData?.images[gymlyticsAnatomySide];$('anatomyPhoto').hidden=!src;$('anatomyPhoto').removeAttribute('src');if(src)$('anatomyPhoto').src=src;
  $('anatomyEmpty').hidden=Boolean(src);
 }
 function gymlyticsAnatomyView(side){gymlyticsAnatomySide=side;gymlyticsAnatomyDraw()}
@@ -869,8 +1078,8 @@ async function gymlyticsAnatomyUpload(event){
   if(!current())return;
   await window.GymCloud.uploadUserPhoto({exercise:r,technique:getValue('t'),type:'musculos',side,blob});
   if(!current())return;
-  model.photos['anatomia:'+side+':'+r.e]=canvas.toDataURL('image/jpeg',.78);
-  gymlyticsAnatomyDraw();toast('Foto anatómica guardada en Supabase ✓');
+  model.photos['anatomia:'+side+':'+[r.g,r.s,r.i,r.e].join('|')]=canvas.toDataURL('image/jpeg',.78);
+  gymlyticsAnatomyDraw();toast('Foto anatómica guardada offline ✓');
  }catch(error){if(current())toast('Error al guardar foto: '+error.message.slice(0,110));}
  finally{event.target.value='';}
 }

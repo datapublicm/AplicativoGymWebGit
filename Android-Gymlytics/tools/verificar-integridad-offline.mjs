@@ -89,7 +89,8 @@ try{
  assert.equal(await evaluate('(window.GymCustomCatalog||[]).length'),0);
  assert.equal(await evaluate('(window.GymEntities?.gyms||[]).length'),0);
  assert.equal(await evaluate('model.records.length'),0,'Tablas y Dashboard empiezan vacíos');
- assert.equal(await evaluate('document.querySelector("#offlineCloudUpload").hidden'),true);
+ assert.equal(await evaluate('document.querySelector("#offlineCloudUpload").disabled'),true,
+  'Actualizar debe quedar deshabilitado sin cuenta personal vinculada');
  assert.equal(await evaluate('!!document.querySelector("#offlineDemoDownload")'),true);
  console.log('PASS 1: instalación web vacía, sin login, sin catálogo ajeno ni subida automática');
 
@@ -173,7 +174,7 @@ try{
   beforeUpdate.map(p=>({id:p.id,records:p.records.length,tombstones:p.tombstones.length})));
  console.log('PASS 8: actualización de recursos web sin destruir perfiles ni lápidas');
 
- // Un perfil de prueba descargado debe bloquear escrituras sin ocultar sus datos.
+ // Cuenta de prueba: editable OFFLINE, sin permisos de subida a la nube.
  await evaluate(`(async()=>{
   const req=indexedDB.open('gymlytics_offline_profiles_v1',1);
   const database=await new Promise((ok,fail)=>{req.onsuccess=()=>ok(req.result);req.onerror=()=>fail(req.error)});
@@ -192,18 +193,18 @@ try{
  await until('document.querySelector("#offlineProfiles").options.length===3','cuenta demo aislada');
  await evaluate(`(()=>{const x=document.querySelector('#offlineProfiles');
   x.value='perfil-demo-chrome';x.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
- await until('!window.GymCloud?.canWrite?.()&&model.records.length===1','cuenta de prueba solo lectura');
- assert.equal(await evaluate('document.querySelector("#saveRecords").disabled'),true);
- assert.equal(await evaluate('document.querySelector("#offlineReadOnlyWarning").hidden'),false);
+ await until('window.GymCloud?.canWrite?.()&&model.records.length===1','cuenta prueba editable sin nube');
+ assert.equal(await evaluate('document.querySelector("#saveRecords").disabled'),false);
+ assert.equal(await evaluate('document.querySelector("#offlineCloudUpload").disabled'),true);
  assert.equal(await evaluate('model.records[0].weight'),80);
- const blocked=await evaluate('window.GymCloud.saveWorkout('+JSON.stringify(workout('2026-10-15',200))+').then(()=>false,e=>/solo lectura/.test(e.message))');
- assert.equal(blocked,true);
- await navigate(url);await until('!window.GymCloud?.canWrite?.()&&document.querySelector("#offlineProfiles").value==="perfil-demo-chrome"','se conserva modo prueba solo lectura al reiniciar');
- await evaluate(`(()=>{const x=document.querySelector('#offlineProfiles');
-  x.value='perfil-demo-chrome';x.dispatchEvent(new Event('change',{bubbles:true}));return true})()`);
- await until('!window.GymCloud?.canWrite?.()','perfil prueba sigue bloqueado');
- assert.equal((await db()).find(x=>x.name==='Cuenta prueba').records.length,1);
- console.log('PASS 9: demostración solo lectura mantiene registros offline e impide guardar series');
+ const demoSaved=await evaluate('window.GymCloud.saveWorkout('+JSON.stringify(workout('2026-10-15',200))+')');
+ assert.equal(demoSaved,1,'La cuenta de prueba debe admitir guardados locales');
+ assert.equal((await db()).find(x=>x.name==='Cuenta prueba').records.length,2);
+ await navigate(url);
+ await until('window.GymCloud?.canWrite?.()&&document.querySelector("#offlineProfiles").value==="perfil-demo-chrome"','modo prueba editable después de reiniciar');
+ assert.equal((await db()).find(x=>x.name==='Cuenta prueba').records.length,2);
+ assert.equal(await evaluate('document.querySelector("#offlineCloudUpload").disabled'),true);
+ console.log('PASS 9: demo editable offline, datos persistentes y subida en nube bloqueada');
 
  console.log('9 escenarios Chromium+IndexedDB reales superados, sin compilar ni desplegar APK.');
 }finally{

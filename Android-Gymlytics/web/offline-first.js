@@ -6,17 +6,21 @@ import {sourceKey} from './sync-engine.js';
 import {createCloudSync} from './cloud-sync.js';
 import {profileMeta,validateProfileName,validateProfileBinding,verifyRestoreBackup} from './profile-policy.js';
 import {prepareDownloadedCatalog} from './offline-catalog-download.js';
+import {materializeReferenceCatalog,parseReferenceId,setReferenceOverride,listReferenceChoices} from './reference-overrides.js';
+import {photoLocalKey,migrateLegacyPhotoJobs} from './photo-sync-engine.js';
+import {createGymlyticsCloudSync} from './gymlytics-cloud-v2.mjs';
+import {GYMLYTICS_SEED_PATH,createGymlyticsSeedProfile} from './gymlytics-seed-offline.mjs';
 const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
- records:[],photos:{},baseCatalog:[],muscles:[],custom:[],library:[],readOnly:false,demo:false,
- entities:{gyms:[],sites:[],machines:[],options:[]},
- tombstones:[],pending:[],conflicts:[],cloudUserId:null,lastPull:null
+ records:[],photos:{},photoVersions:{},photoPayloads:{},baseCatalog:[],referenceOverrides:{},muscles:[],custom:[],library:[],readOnly:false,demo:false,
+ entities:{gyms:[],sites:[],machines:[],options:[]},exerciseDetailFields:[],
+ tombstones:[],pending:[],conflicts:[],cloudUserId:null,lastPull:null,syncMode:'later'
 });
 const uuid=()=>crypto.randomUUID();
 const tidy=v=>String(v??'').trim();
 let db,profiles=[],activeId=null,profileEpoch=0,latest=null,queue=Promise.resolve(),remoteSession=null,cloudAccountKind=null,syncController=null,transitioning=false,offlineInitError=null;
 const config={url:import.meta.env.VITE_SUPABASE_URL,key:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
- schema:import.meta.env.VITE_SUPABASE_SCHEMA||'sch_android_gymlytics'};
+ schema:import.meta.env.VITE_SUPABASE_SCHEMA||'sch_gymlytics'};
 const newClient=()=>config.url&&config.key?createClient(config.url,config.key,{
  auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,
   storageKey:'gymlytics-profile-memory-'+crypto.randomUUID()}
@@ -25,7 +29,8 @@ let client=newClient(),remote=client?.schema(config.schema);
 function rotateCloudClient(){client=newClient();remote=client?.schema(config.schema);remoteSession=null;cloudAccountKind=null;}
 const remoteGateway={
  from:(...args)=>{if(!remote)throw Error('Supabase no está configurado');return remote.from(...args)},
- rpc:(...args)=>{if(!remote)throw Error('Supabase no está configurado');return remote.rpc(...args)}
+ rpc:(...args)=>{if(!remote)throw Error('Supabase no está configurado');return remote.rpc(...args)},
+ storage:{from:(...args)=>{if(!client)throw Error('Supabase no está configurado');return client.storage.from(...args)}}
 };
 function openDB(){
  return new Promise((resolve,reject)=>{
@@ -74,17 +79,35 @@ function status(message){$('authStatus').textContent=message;}
 function renderSyncStatus(){
  if(!latest)return;
  const data=latest.data,counts=(data.pending||[]).length,deleted=(data.tombstones||[]).length;
- $('offlinePending').textContent=counts+' operaciones pendientes · '+deleted+' eliminaciones conservadas';
- $('offlineProfileInfo').textContent=(data.readOnly?'🔒 PRUEBA · SOLO CONSULTA · ':'Perfil personal offline · ')+latest.name+' · '+data.records.length+' series visibles';
+ const oldPhotos=(data.pending||[]).filter(x=>x.kind==='photo'&&!x.photoKey).length;
+ $('offlinePending').textContent=counts+' operaciones pendientes · '+deleted+' eliminaciones conservadas'+
+  (oldPhotos?' · '+oldPhotos+' fotos antiguas necesitan volver a seleccionarse':'');
+ $('offlineProfileInfo').textContent=(data.demo?'PRUEBA · EDICIÓN LOCAL · ':'Perfil offline · ')+latest.name+' · '+data.records.length+' series visibles'+(data.importInfo?.weightUnit?' · peso histórico: unidad sin especificar':'');
  $('offlineConflictSummary').textContent=(data.conflicts||[]).length+' conflictos por revisar';
- $('offlineSyncState').textContent=data.readOnly?'Cuenta de prueba descargada: datos visibles offline. Edición y eliminación BLOQUEADAS.':
-  data.cloudUserId?'Cuenta vinculada: '+data.cloudUserId.slice(0,8)+'… · Los cambios permanecen solamente en este dispositivo.':
-  'Solo en este dispositivo. Puedes crear una cuenta más adelante sin perder tus registros.';
+ $('offlineSyncState').textContent=data.demo&&!data.cloudUserId?'Cuenta de prueba descargada: puedes agregar, modificar y eliminar datos offline.':
+  data.cloudUserId?'Cuenta personal asociada · '+(data.syncMode==='instant'?'sincronización automática':'actualización manual')+'.':
+  'No vinculado · todos los cambios se guardan en este dispositivo.';
 }
 function catalogInit(){
- // No mostrar plantillas compartidas ni referencias de otros orígenes:
- // el catálogo visible procede solo del perfil activo.
- return [];
+ const source=Array.isArray(latest?.data?.baseCatalog)?latest.data.baseCatalog:[];
+ const map=latest?.data?.referenceOverrides||{};
+ window.GymReferenceCatalog=structuredClone(source);
+ window.GymReferenceOverrides=structuredClone(map);
+ window.GymReferenceChoices=(kind,ctx)=>listReferenceChoices(
+  latest?.data?.baseCatalog||[],latest?.data?.referenceOverrides||{},kind,ctx);
+ return materializeReferenceCatalog(source,map).map(x=>({
+  ...x,t:[...(x.t||[])],n:0,last:null
+ }));
+}
+function personalCatalogInit(){
+ const entities=latest?.data?.entities||EMPTY().entities;
+ const gyms=new Map(entities.gyms.map(x=>[String(x.id),x.nombre]));
+ const sites=new Map(entities.sites.map(x=>[String(x.id),x.nombre]));
+ return (latest?.data?.custom||[]).map(x=>({
+  ...x,g:gyms.get(String(x.gimnasio_id))||x.g,
+  s:sites.get(String(x.sede_id))||x.s,
+  e:x.nombre||x.e
+ }));
 }
 async function activate(id,initial=false){
  if(transitioning)throw Error('Hay un cambio de perfil en curso.');
@@ -103,20 +126,30 @@ async function activate(id,initial=false){
   rotateCloudClient();
   activeId=null;latest=null;
   model.records=[];model.photos={};
-  window.GymBaseCatalog=[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
+  window.GymBaseCatalog=[];window.GymReferenceCatalog=[];window.GymReferenceOverrides={};window.GymReferenceChoices=()=>[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];window.GymDetailFields=[];
   window.GymEntities={gyms:[],sites:[],machines:[],options:[]};
   drawRecent();drawHistory();drawReports();
   const p=await get(id);
   if(!p||epoch!==profileEpoch)throw Error('No se pudo abrir el nuevo perfil.');
+  // Migración segura: la restricción de la cuenta de prueba solo afecta a Supabase.
+  const wasReadOnly=!!p.data?.readOnly;
+  if(wasReadOnly){p.data.demo=true;p.data.readOnly=false;p.data.cloudUserId=null;}
+  // Convertir fotografías JPEG pendientes de la versión anterior sin perder archivos.
+  // Las anatómicas antiguas sin vista identificable quedan intactas y requieren
+  // que se seleccione nuevamente la vista: nunca adivinar frontal/posterior.
+  const legacyPhotos=migrateLegacyPhotoJobs(p.data);
+  if(legacyPhotos.converted||legacyPhotos.removed||wasReadOnly)await put(p);
   activeId=id;latest=p;profiles=(await all()).map(profileMeta);
-  $('offlineProfiles').replaceChildren(...profiles.map(x=>new Option(x.readOnly?'🔒 '+x.name+' · prueba':x.name,x.id)));
+  $('offlineProfiles').replaceChildren(...profiles.map(x=>new Option(x.demo?'◌ '+x.name+' · prueba':x.name,x.id)));
   $('offlineProfiles').value=id;
   window.GymBaseCatalog=catalogInit();
   window.GymEntities=structuredClone(p.data.entities||EMPTY().entities);
   window.GymExerciseLibrary=structuredClone(p.data.library||[]);
-  window.GymCustomCatalog=structuredClone(p.data.custom||[]);
+  window.GymDetailFields=structuredClone(p.data.exerciseDetailFields||[]);
+  window.GymCustomCatalog=personalCatalogInit();
   model.records=structuredClone(p.data.records||[]);
   model.photos=structuredClone(p.data.photos||{});
+  window.GymCatalogSelectedExerciseId=null;
   if(typeof resetHistoryFilters==='function')resetHistoryFilters();
   if(typeof resetExerciseTabs==='function')resetExerciseTabs();
   if(typeof renderOwnCatalog==='function')renderOwnCatalog();
@@ -129,7 +162,7 @@ async function activate(id,initial=false){
   $('offlineCloudPanel').hidden=true;$('offlineRemoteUser').textContent='';
   localStorage.setItem('gymlytics-active-profile',id);
   renderSyncStatus();renderProfileControls();
-  status((p.data?.readOnly?'Perfil de PRUEBA solo lectura':'Perfil local editable')+' · '+p.name+' · funciona sin conexión');
+  status('Perfil local editable · '+p.name+' · funciona sin conexión');
   document.body.classList.remove('auth-locked');
   document.querySelectorAll('[data-page]').forEach(x=>{x.disabled=false;x.setAttribute('aria-disabled','false');});
   renderConflictButtons();refreshCloudControls();
@@ -148,15 +181,30 @@ async function createProfile(){
  await activate(p.id);
  status('Perfil local creado. Los registros de los demás perfiles se mantienen separados.');
 }
+async function addExampleProfile(){
+ if(transitioning||syncController?.isBusy())throw Error('Termina la operación actual.');
+ if((await all()).some(p=>p.data?.importInfo?.importedTag==='hojamatriz-20261018'))
+  throw Error('Ya tienes el ejemplo en tus perfiles. Puedes modificar su nombre.');
+ if(!confirm('¿Agregar Ejemplo con las 9.424 series de HojaMatriz? Se guardará solo en este dispositivo, sin subir nada a Supabase.'))return;
+ status('Importando el perfil de ejemplo solo en el dispositivo…');
+ const response=await fetch(GYMLYTICS_SEED_PATH);
+ if(!response.ok)throw Error('El ejemplo no está disponible en esta instalación.');
+ const sample=createGymlyticsSeedProfile(await response.json(),EMPTY);
+ sample.id=uuid();sample.name='Ejemplo';sample.modifiedAt=new Date().toISOString();
+ sample.data.demo=true;sample.data.cloudUserId=null;sample.data.syncMode='later';
+ sample.data.pending=[];sample.data.cloudV2=null;
+ if(transitioning||syncController?.isBusy())throw Error('La operación cambió durante la importación.');
+ await put(sample);profiles.push(profileMeta(sample));
+ await activate(sample.id);
+ status('Ejemplo incorporado con 9.424 series offline; puedes modificar su nombre.');
+}
 function renderProfileControls(){
  const control=$('offlineRenameName');if(control)control.value=latest?.name||'';
  const count=$('offlineProfileCount');
  if(count)count.textContent=profiles.length+' perfiles locales independientes';
- const locked=!!latest?.data?.readOnly;
- document.querySelectorAll('#page-catalogos [data-catalog-quick],#page-catalogos .catalog-compact-toggle,#page-catalogos [data-catalog-modify],#page-catalogos .catalog-form button[type=submit],#page-registro #saveRecords,#page-registro #clearSeries,#page-registro #addSeriesGroup,#page-registro #removeSeriesGroup').forEach(b=>{
-  b.disabled=locked;b.title=locked?'Cuenta de prueba: edición bloqueada':'';
- });
- const hint=$('offlineReadOnlyWarning');if(hint)hint.hidden=!locked;
+ const del=document.querySelector('[data-profile-action="delete"]');if(del)del.disabled=profiles.length<2;
+ const hint=$('offlineReadOnlyWarning');if(hint)hint.hidden=true;
+ document.querySelectorAll('#page-catalogos [data-catalog-quick],#page-catalogos .catalog-compact-toggle,#page-catalogos [data-catalog-modify],#page-catalogos .catalog-form button[type=submit],#page-registro #saveRecords,#page-registro #clearSeries,#page-registro #addSeriesGroup,#page-registro #removeSeriesGroup').forEach(b=>{b.disabled=false;b.title='';});
 }
 async function renameProfile(){
  if(transitioning||syncController?.isBusy())throw Error('Termina la operación actual.');
@@ -171,23 +219,104 @@ async function renameProfile(){
  if(id!==activeId||epoch!==profileEpoch||transitioning)return;
  latest=profile;profiles=profiles.map(x=>x.id===profile.id?profileMeta(profile):x);
  const item=[...$('offlineProfiles').options].find(x=>x.value===profile.id);
- if(item)item.textContent=latest?.data?.readOnly?'🔒 '+name+' · prueba':name;
+ if(item)item.textContent=latest?.data?.demo?'◌ '+name+' · prueba':name;
  renderSyncStatus();renderProfileControls();
  status('Perfil renombrado sin modificar registros ni vínculos de nube.');
 }
 
+async function deleteActiveProfile(){
+ if(transitioning||syncController?.isBusy())throw Error('Termina la operación actual.');
+ if(profiles.length<2)throw Error('No se puede eliminar el único perfil local.');
+ const deleting=activeId,profile=await get(deleting),replacement=profiles.find(x=>x.id!==deleting);
+ if(!profile||!replacement)throw Error('No hay otro perfil disponible.');
+ if(!confirm('¿Eliminar definitivamente el perfil local «'+profile.name+'» y todos sus datos guardados en este dispositivo? Esta acción no elimina datos de Supabase. Se recomienda respaldarlo antes.'))return false;
+ if(deleting!==activeId||transitioning||syncController?.isBusy())throw Error('El perfil cambió; no se eliminó nada.');
+ // Activar primero el destino: se terminan guardados pendientes y se invalida
+ // la sesión de nube antes de borrar el perfil saliente.
+ await activate(replacement.id);
+ await requestFrom('profiles','readwrite',store=>store.delete(deleting));
+ profiles=(await all()).map(profileMeta);
+ const select=$('offlineProfiles');
+ select.replaceChildren(...profiles.map(x=>new Option(x.name,x.id)));
+ select.value=replacement.id;
+ renderProfileControls();
+ status('Perfil eliminado únicamente de este dispositivo. La cuenta en Supabase, si existe, no ha cambiado.');
+ return true;
+}
 function catalogUpdate(){
+ window.GymBaseCatalog=catalogInit();
  window.GymEntities=structuredClone(latest.data.entities);
  window.GymExerciseLibrary=structuredClone(latest.data.library);
- window.GymCustomCatalog=structuredClone(latest.data.custom);
+ window.GymDetailFields=structuredClone(latest.data.exerciseDetailFields||[]);
+ window.GymCustomCatalog=personalCatalogInit();
  if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
  if(typeof renderOwnCatalog==='function')renderOwnCatalog();
  if(typeof cascade==='function')cascade(0);
  if(typeof catalogUpdateCounters==='function')catalogUpdateCounters();
+ window.GymCatalogFieldRefresh?.();window.GymSiteGpsRefresh?.();
  const muscle=$('muscleExistingSelect'),count=$('muscleCount');
  if(muscle){muscle.replaceChildren(new Option('Selecciona un músculo…',''));
   for(const row of latest.data.muscles||[])muscle.add(new Option(row.nombre,row.id));}
  if(count)count.textContent=String((latest.data.muscles||[]).length);
+}
+function normalizarDetallesEjercicio(values){
+ const keys=[['agrupacion','Agrupación'],['anotacion','Anotación'],['instrumento','Máquina'],
+  ['agarre_implemento','Agarre / Implemento'],['tecnica','Técnica']];
+ const result=keys.map(([key,campo])=>({campo,valor:tidy(values[key]).slice(0,500)})).filter(x=>x.valor);
+ let extras=[];
+ try{extras=typeof values.detalles_extra==='string'?JSON.parse(values.detalles_extra):values.detalles_extra||[]}
+ catch{throw Error('Los detalles adicionales no tienen formato válido');}
+ if(!Array.isArray(extras)||extras.length>30)throw Error('Máximo 30 detalles adicionales por ejercicio');
+ for(const x of extras){
+  const campo=tidy(x.campo).slice(0,120),valor=tidy(x.valor).slice(0,500);
+  if(campo&&valor)result.push({campo,valor});
+ }
+ return result;
+}
+const fixedDetails=new Set(['Agrupación','Anotación','Máquina','Instrumento','Agarre / Implemento','Técnica','Nombre del ejercicio']);
+const fieldNormalize=x=>tidy(x).replace(/\s+/g,' ').slice(0,120);
+const fieldKey=x=>fieldNormalize(x).toLocaleLowerCase('es');
+function detailFields(data){
+ const names=[...(data.exerciseDetailFields||[]),...(data.library||[]).flatMap(e=>(e.detalles||[]).map(d=>d.campo))];
+ return [...new Set(names.filter(x=>x&&!fixedDetails.has(x)))].sort((a,b)=>a.localeCompare(b,'es'));
+}
+function fieldStats(data,field){
+ const affected=(data.library||[]).filter(e=>(e.detalles||[]).some(d=>fieldKey(d.campo)===fieldKey(field)));
+ const linked=new Set(affected.map(e=>String(e.id)));
+ const records=(data.records||[]).filter(r=>linked.has(String(r.exerciseId))||
+  r.detailValues&&Object.keys(r.detailValues).some(k=>fieldKey(k)===fieldKey(field))).length;
+ return {exercises:affected.length,records};
+}
+function ensureCustomField(data,name,old=null){
+ const clean=fieldNormalize(name);
+ if(!clean||fixedDetails.has(clean)||data.exerciseDetailFields?.some(x=>fieldKey(x)===fieldKey(clean)&&fieldKey(x)!==fieldKey(old)))
+  throw Error('Nombre de campo vacío, reservado o duplicado.');
+ return clean;
+}
+function addImplicitFields(data,values){
+ let extras=[];
+ try{extras=typeof values.detalles_extra==='string'?JSON.parse(values.detalles_extra):values.detalles_extra||[];}catch{}
+ data.exerciseDetailFields??=[];
+ for(const d of extras){
+  const name=fieldNormalize(d.campo);
+  if(name&&!fixedDetails.has(name)&&!detailFields(data).some(f=>fieldKey(f)===fieldKey(name))){
+   if(data.exerciseDetailFields.length>=30)throw Error('Máximo 30 campos adicionales por perfil.');
+   data.exerciseDetailFields.push(name);
+  }
+ }
+}
+
+function fingerprintExercise(name,details){
+ const nm=tidy(name).normalize('NFKC').toLocaleLowerCase('es');
+ const signature=(details||[]).filter(d=>tidy(d.campo)&&tidy(d.valor))
+  .map(d=>[tidy(d.campo)==='Instrumento'?'Máquina':tidy(d.campo),tidy(d.valor)]
+   .map(x=>x.normalize('NFKC').toLocaleLowerCase('es'))).sort((a,b)=>a.join('|').localeCompare(b.join('|'),'es'));
+ return JSON.stringify([nm,signature]);
+}
+function assertNewExerciseVariant(data,name,details,exceptId=null){
+ const token=fingerprintExercise(name,details);
+ if((data.library||[]).some(e=>String(e.id)!==String(exceptId)&&fingerprintExercise(e.nombre,e.detalles)===token))
+  throw Error('Ya existe un ejercicio con el mismo nombre y todos los mismos detalles.');
 }
 const groups={gym:'gyms',site:'sites',machine:'machines',option:'options',exercise:'library'};
 function presentCatalog(kind){
@@ -198,7 +327,6 @@ const writeStatus=()=>{
  if(transitioning)return {code:'switching',message:'Se está cambiando de perfil. Espera a que finalice antes de guardar.'};
  if(offlineInitError&&!latest)return {code:'error',message:'El almacenamiento local no pudo iniciarse: '+offlineInitError+'. Ve a Perfil para revisar el estado. No borres los datos de la aplicación.'};
  if(!activeId||!latest)return {code:'loading',message:'El perfil local aún no termina de cargarse. Ve a Perfil y comprueba que diga «Perfil local editable».'};
- if(latest.data?.readOnly)return {code:'read_only',message:'«'+latest.name+'» es una cuenta de prueba de solo lectura. En Perfil, crea o elige otro perfil personal para guardar.'};
  return {code:'ready',message:'Perfil «'+latest.name+'» listo para guardar offline.'};
 };
 const assertEditable=()=>{
@@ -206,11 +334,11 @@ const assertEditable=()=>{
  if(state.code!=='ready')throw Error(state.message);
 };
 const api={
- canWrite:()=>!!activeId&&!latest?.data?.readOnly&&!transitioning,
+ canWrite:()=>!!activeId&&!!latest&&!transitioning,
  getWriteStatus:writeStatus,
  canRead:()=>!!activeId&&!!latest,
  getSessionStamp:stamp,
- async refreshCatalog(){window.GymBaseCatalog=catalogInit();catalogUpdate();return presentCatalog('exercise').length},
+ async refreshCatalog(){window.GymBaseCatalog=catalogInit();if(typeof cascade==='function')cascade(0);return window.GymBaseCatalog.length},
  async loadInitialCatalog(){return catalogInit()},
  async loadOwnCatalog(){return structuredClone(latest.data.custom)},
  async loadIndependentCatalog(){catalogUpdate();return structuredClone(latest.data.entities)},
@@ -226,6 +354,8 @@ const api={
    if(!Number.isFinite(weight)||weight<0||!Number.isFinite(reps)||reps<=0||!Number.isFinite(assistance)||assistance<0||!['kg','lb'].includes(entry.unit))
     throw Error('Peso, repeticiones o asistencias inválidos');
    return {id:uuid(),origin:'offline',date,gym:exercise.g,sede:exercise.s,
+    detailValues:{...(exercise.detailValues||{})},
+    exerciseId:exercise.exerciseId||null,
     zone:exercise.z,type:exercise.kind,equipment:exercise.i,accessory:exercise.a,
     grip:exercise.gr,exercise:exercise.e,technique,notes,series:entry.series,
     subdivision:entry.sub||'-',weight,reps,assistance,unit:entry.unit,
@@ -288,6 +418,19 @@ const api={
   if(!nombre||nombre.length>180)throw Error('Escribe un nombre válido');
   return flush(data=>{
    const target=data.entities[group];
+   // Si el gimnasio seleccionado es una referencia del catálogo base, crear
+   // su copia local antes de añadir la sede, conservando una relación por ID.
+   if(kind==='site'&&String(values.gimnasio_id||'').startsWith('base:')){
+    const ref=parseReferenceId(String(values.gimnasio_id));
+    if(!ref||ref.kind!=='gym')throw Error('Referencia de gimnasio inválida');
+    const visible=listReferenceChoices(data.baseCatalog,data.referenceOverrides||{},'gym').find(x=>x.id===values.gimnasio_id);
+    if(!visible)throw Error('El gimnasio fue eliminado del catálogo local');
+    const gymName=visible.name;
+    let gym=data.entities.gyms.find(row=>tidy(row.nombre).toLocaleLowerCase('es')===gymName.toLocaleLowerCase('es'));
+    if(!gym){gym={id:uuid(),nombre:gymName};data.entities.gyms.push(gym);
+     data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'gym',localId:gym.id});}
+    values={...values,gimnasio_id:gym.id};
+   }
    if(target.some(x=>x.nombre.toLocaleLowerCase('es')===nombre.toLocaleLowerCase('es')&&
     (kind!=='site'||x.gimnasio_id===values.gimnasio_id)&&
     (kind!=='option'||x.tipo===values.tipo)))throw Error('Ya existe ese elemento');
@@ -296,85 +439,291 @@ const api={
     ...kind==='machine'?{tipo_equipo:values.tipo_equipo||'Otro'}:{},
     ...kind==='option'?{tipo:values.tipo||'zona'}:{}};
    target.push(item);data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:kind,localId:item.id});
+   // Cada nuevo gimnasio comienza con una sede «Única», renombrable.
+   if(kind==='gym'){
+    const site={id:uuid(),nombre:'Única',gimnasio_id:item.id,latitud:null,longitud:null};
+    data.entities.sites.push(site);
+    data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'site',localId:site.id});
+   }
    return item.id;
   }).then(result=>{catalogUpdate();return result;});
+ },
+ async updateSiteGPS(id,latitude,longitude){
+  assertEditable();
+  // No requiere conexión ni permisos de Supabase.
+  const lat=latitude===''||latitude==null?null:Number(latitude);
+  const lon=longitude===''||longitude==null?null:Number(longitude);
+  if((lat===null)!==(lon===null)||lat!==null&&(!Number.isFinite(lat)||lat < -90||lat > 90||!Number.isFinite(lon)||lon < -180||lon > 180))
+   throw Error('Las coordenadas deben incluir latitud (-90 a 90) y longitud (-180 a 180).');
+  const savedId=await flush(data=>{
+   let site=data.entities.sites.find(x=>String(x.id)===String(id));
+   if(!site&&String(id).startsWith('base:')){
+    const ref=parseReferenceId(String(id));
+    if(!ref||ref.kind!=='site')throw Error('La referencia seleccionada no es una sede.');
+    const references=data.baseCatalog,overrides=data.referenceOverrides||{};
+    const visibleSite=listReferenceChoices(references,overrides,'site').find(x=>x.id===id);
+    const visibleGym=listReferenceChoices(references,overrides,'gym').find(x=>x.sourceName===ref.gym);
+    if(!visibleSite||!visibleGym)throw Error('La sede descargada ya no existe.');
+    let gym=data.entities.gyms.find(x=>tidy(x.nombre).toLocaleLowerCase('es')===tidy(visibleGym.name).toLocaleLowerCase('es'));
+    if(!gym){
+     gym={id:uuid(),nombre:visibleGym.name};data.entities.gyms.push(gym);
+     data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'gym',localId:gym.id});
+    }
+    site=data.entities.sites.find(x=>x.gimnasio_id===gym.id&&tidy(x.nombre).toLocaleLowerCase('es')===tidy(visibleSite.name).toLocaleLowerCase('es'));
+    if(!site){
+     site={id:uuid(),nombre:visibleSite.name,gimnasio_id:gym.id};
+     data.entities.sites.push(site);
+     data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'site',localId:site.id});
+    }
+   }
+   if(!site)throw Error('Selecciona primero una sede disponible.');
+   site.latitud=lat;site.longitud=lon;site.modificado_en=new Date().toISOString();
+   data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:'site',localId:site.id});
+   return site.id;
+  });
+  catalogUpdate();return savedId;
+ },
+ async saveExerciseChanges(id,values){
+  assertEditable();
+  const name=tidy(values.e||values.nombre);
+  if(!name||name.length>160)throw Error('Escribe el nombre del ejercicio.');
+  const details=normalizarDetallesEjercicio(values);
+  const changed=await flush(data=>{
+   const row=(data.library||[]).find(x=>String(x.id)===String(id));
+   if(!row)throw Error('La variante seleccionada ya no pertenece a este perfil.');
+   assertNewExerciseVariant(data,name,details,id);
+   addImplicitFields(data,values);
+   row.nombre=name;row.detalles=details;
+   row.zona_entrenamiento=tidy(values.anotacion||values.z)||'Sin clasificar';
+   row.tecnica_actualizada=tidy(values.tecnica)||'Ejecución base';
+   data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:'exercise',localId:id});
+   return id;
+  });
+  catalogUpdate();return changed;
+ },
+ async updateExerciseDetails(id,values){
+  assertEditable();
+  await flush(data=>{
+   const row=data.library.find(x=>String(x.id)===String(id));
+   if(!row)throw Error('Selecciona un ejercicio de tu perfil local.');
+   addImplicitFields(data,values);
+   row.detalles=normalizarDetallesEjercicio(values);
+   row.zona_entrenamiento=tidy(values.anotacion||values.z)||'Sin clasificar';
+   row.tecnica_actualizada=tidy(values.tecnica)||'Ejecución base';
+   data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:'exercise',localId:id});
+  });
+  catalogUpdate();return id;
  },
  async saveCustomExercise(values){
   assertEditable();
   const nombre=tidy(values.e);
   if(!nombre)throw Error('Escribe un nombre de ejercicio');
   await flush(data=>{
-   if(data.library.some(x=>x.nombre.toLocaleLowerCase('es')===nombre.toLocaleLowerCase('es')))
-    throw Error('El ejercicio ya existe en este perfil');
-   const id=uuid();
-   data.library.push({id,nombre,origen:'usuario',zona_entrenamiento:tidy(values.z)||'Sin clasificar',
-    tecnica_actualizada:tidy(values.tecnica)||'Ejecución base'});
+   // Los ejercicios pueden compartir nombre: cada variante conserva su UUID.
+   const id=uuid(),detalles=normalizarDetallesEjercicio(values);
+   assertNewExerciseVariant(data,nombre,detalles);
+   addImplicitFields(data,values);
+   data.library.push({id,nombre,origen:'usuario',zona_entrenamiento:tidy(values.anotacion||values.z)||'Sin clasificar',
+    tecnica_actualizada:tidy(values.tecnica)||'Ejecución base',detalles});
    data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'exercise',localId:id});
   });catalogUpdate();return structuredClone(latest.data.custom);
+ },
+ detailFieldList(){return structuredClone(detailFields(latest?.data||EMPTY()));},
+ detailFieldStats(name){return fieldStats(latest?.data||EMPTY(),name);},
+ async addDetailField(name){
+  assertEditable();
+  const result=await flush(data=>{
+   data.exerciseDetailFields??=[];
+   if(data.exerciseDetailFields.length>=30)throw Error('Máximo 30 detalles por perfil.');
+   const value=ensureCustomField(data,name);
+   if(detailFields(data).some(x=>fieldKey(x)===fieldKey(value)))throw Error('Este detalle ya existe.');
+   data.exerciseDetailFields.push(value);
+   return value;
+  });catalogUpdate();return result;
+ },
+ async renameDetailField(oldName,newName){
+  assertEditable();
+  await flush(data=>{
+   const old=detailFields(data).find(x=>fieldKey(x)===fieldKey(oldName));
+   if(!old)throw Error('El campo no existe en este perfil.');
+   const next=ensureCustomField(data,newName,old);
+   if(detailFields(data).some(x=>fieldKey(x)===fieldKey(next)&&fieldKey(x)!==fieldKey(old)))throw Error('Ya existe este campo.');
+   data.exerciseDetailFields=detailFields(data).map(x=>fieldKey(x)===fieldKey(old)?next:x);
+   for(const ex of data.library||[]){
+    let affected=false;for(const detail of ex.detalles||[])if(fieldKey(detail.campo)===fieldKey(old)){
+     detail.campo=next;affected=true;
+    }
+    if(affected)data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:'exercise',localId:ex.id});
+   }
+   for(const r of data.records||[])if(r.detailValues)
+    for(const key of Object.keys(r.detailValues))if(fieldKey(key)===fieldKey(old)){
+     r.detailValues[next]=r.detailValues[key];delete r.detailValues[key];
+    }
+  });catalogUpdate();return true;
+ },
+ async removeDetailField(name){
+  assertEditable();
+  const removed=await flush(data=>{
+   const field=detailFields(data).find(x=>fieldKey(x)===fieldKey(name));
+   if(!field)throw Error('No existe ese campo.');
+   const affected=fieldStats(data,field);
+   data.exerciseDetailFields=(data.exerciseDetailFields||[]).filter(x=>fieldKey(x)!==fieldKey(field));
+   for(const ex of data.library||[]){
+    const before=(ex.detalles||[]).length;
+    ex.detalles=(ex.detalles||[]).filter(d=>fieldKey(d.campo)!==fieldKey(field));
+    if(ex.detalles.length!==before)data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:'exercise',localId:ex.id});
+   }
+   for(const r of data.records||[])if(r.detailValues)
+    for(const k of Object.keys(r.detailValues))if(fieldKey(k)===fieldKey(field))delete r.detailValues[k];
+   return affected;
+  });catalogUpdate();return removed;
  },
  async updateCatalogItem(kind,id,name){
   assertEditable();
   name=tidy(name);if(!name)throw Error('Introduce el nombre nuevo');
+  if(String(id).startsWith('base:')){
+   await flush(data=>{
+    const ref=parseReferenceId(id);
+    if(!ref||!['gym','site','machine','exercise','zone','grip','technique'].includes(ref.kind))
+     throw Error('Referencia inválida');
+    if(kind!==ref.kind&&!(kind==='option'&&['zone','grip','technique'].includes(ref.kind)))
+     throw Error('Tipo de referencia incorrecto');
+    data.referenceOverrides=setReferenceOverride(data.baseCatalog,data.referenceOverrides||{},id,{name});
+   });
+   catalogUpdate();return id;
+  }
   await flush(data=>{
-   const list=kind==='exercise'?data.library:data.entities[groups[kind]];
+   const list=kind==='exercise'
+    ?(data.library.some(x=>String(x.id)===String(id))?data.library:data.custom)
+    :data.entities[groups[kind]];
    if(!list)throw Error('Categoría inválida');
-   const item=list.find(x=>x.id===id);
+   const item=list.find(x=>String(x.id||x.cloud_id)===String(id));
    if(!item)throw Error('No se encontró el elemento personal');
+   if(kind!=='exercise'&&list.some(x=>x.id!==id&&tidy(x.nombre).toLocaleLowerCase('es')===name.toLocaleLowerCase('es')&&
+     (kind!=='site'||x.gimnasio_id===item.gimnasio_id)&&
+     (kind!=='option'||x.tipo===item.tipo)))throw Error('Ya existe otro elemento con ese nombre');
    item.nombre=name;
+   if(kind==='exercise'&&item.cloud_id)item.e=name;
+   // Un intento con conflicto NO quedó confirmado: la nueva edición habilita
+   // reintento con UUID nuevo sin reutilizar la solicitud anterior.
+   const conflicted=data.conflicts?.some(x=>x.kind==='catalog_conflict'&&x.catalogKind===kind&&x.localId===id);
+   if(conflicted){
+    data.conflicts=data.conflicts.filter(x=>!(x.kind==='catalog_conflict'&&x.catalogKind===kind&&x.localId===id));
+    for(const op of data.pending.filter(x=>x.catalogKind===kind&&x.localId===id)){
+     delete op.submittedRequest;delete op.attemptedAt;
+    }
+   }
    data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:kind,localId:id});
   });catalogUpdate();return id;
  },
  async deleteCatalogItem(kind,id){
   assertEditable();
+  if(String(id).startsWith('base:')){
+   await flush(data=>{
+    const ref=parseReferenceId(id);
+    if(!ref||!(kind===ref.kind||kind==='option'&&['zone','grip','technique'].includes(ref.kind)))
+     throw Error('Tipo de referencia incorrecto');
+    data.referenceOverrides=setReferenceOverride(data.baseCatalog,data.referenceOverrides||{},id,{deleted:true});
+   });
+   catalogUpdate();return id;
+  }
   await flush(data=>{
-   const list=kind==='exercise'?data.library:data.entities[groups[kind]];
+   const list=kind==='exercise'
+    ?(data.library.some(x=>String(x.id)===String(id))?data.library:data.custom)
+    :data.entities[groups[kind]];
    if(!list)throw Error('Categoría inválida');
-   const idx=list.findIndex(x=>String(x.id)===String(id));
+   const idx=list.findIndex(x=>String(x.id||x.cloud_id)===String(id));
    if(idx<0)throw Error('No se encontró el elemento personal');
+   const removed=structuredClone(list[idx]);
    if(kind==='gym'&&data.entities.sites.some(x=>x.gimnasio_id===id))
     throw Error('Este gimnasio contiene sedes');
    list.splice(idx,1);
    data.pending=data.pending.filter(x=>x.localId!==id||x.kind!=='add_catalog');
    data.pending.push({id:uuid(),kind:'delete_catalog',catalogKind:kind,localId:id});
-   data.tombstones.push({catalogKind:kind,localId:id,at:new Date().toISOString()});
+   data.tombstones.push({catalogKind:kind,localId:id,at:new Date().toISOString(),
+    cloudSnapshot:removed.cloudSnapshot||null,cloudOwnerId:removed.cloudOwnerId||null});
   });catalogUpdate();return id;
  },
  async loadAnatomy(exercise){
   const photos={};
-  const keys=[['maquina','equipo'],['ejercicio','ejercicio'],['musculos','anatomia']];
-  for(const [type,prefix] of keys){
-   const key=type==='maquina'?`${exercise.g}|${exercise.s}|${exercise.i}`:`${exercise.g}|${exercise.s}|${exercise.i}|${exercise.e}`;
-   if(latest.data.photos[prefix+':'+key])photos[type+':general']=latest.data.photos[prefix+':'+key];
+  for(const [type,view] of [['maquina',null],['ejercicio',null],
+   ...['frontal','posterior','lateral_izquierda','lateral_derecha'].map(v=>['musculos',v])]){
+   const key=photoLocalKey(exercise,type,view);
+   if(latest.data.photos?.[key])photos[(type==='maquina'?'maquina':type)+':'+(view||'general')]=latest.data.photos[key];
   }
   return {id:null,primary:[],secondary:[],images:{},zones3d:[],photos};
  },
  async uploadUserPhoto({exercise,type,side,blob}){
   assertEditable();
   const ownerStamp=stamp();
-  if(!blob||blob.size>3*1024*1024)throw Error('Fotografía demasiado grande (máximo 3 MB)');
-  const key=type==='maquina'?`${exercise.g}|${exercise.s}|${exercise.i}`:`${exercise.g}|${exercise.s}|${exercise.i}|${exercise.e}`;
-  const base64=await new Promise((resolve,reject)=>{
-   const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob);
+  if(!blob||blob.type!=='image/jpeg'||blob.size>3*1024*1024||blob.size<1)
+   throw Error('Fotografía JPEG inválida o demasiado grande (máximo 3 MB)');
+  const key=photoLocalKey(exercise,type,side);
+  const dataUrl=await new Promise((resolve,reject)=>{
+   const reader=new FileReader();
+   reader.onload=()=>resolve(reader.result);
+   reader.onerror=()=>reject(reader.error||Error('No se pudo leer fotografía'));
+   reader.readAsDataURL(blob);
   });
-  if(ownerStamp!==stamp())throw Error('Cambiaste de perfil antes de guardar la fotografía.');
-  await flush(data=>{data.photos[(type==='maquina'?'equipo':type==='ejercicio'?'ejercicio':'anatomia')+':'+key]=base64;
-   data.pending.push({id:uuid(),kind:'photo',key,at:new Date().toISOString()});
+  if(ownerStamp!==stamp())throw Error('Cambiaste de perfil antes de guardar la fotografía');
+  if(!/^data:image\/jpeg;base64,[A-Za-z0-9+/=\s]+$/.test(dataUrl))
+   throw Error('La fotografía no pudo codificarse de forma segura');
+  await flush(data=>{
+   data.photoPayloads??={};data.photoVersions??={};data.photos??={};
+   // Una nueva foto escogida por el usuario permite copiarla al perfil personal
+   // sin heredar la revisión de la cuenta de prueba descargada.
+   if(data.cloudUserId&&data.photoVersions[key]?.ownerId&&
+      data.photoVersions[key].ownerId!==data.cloudUserId)delete data.photoVersions[key];
+   // Los envíos ya intentados conservan su archivo inmutable.
+   for(const job of [...data.pending]){
+    if(job.kind==='photo'&&job.photoKey===key&&!job.submittedRequest){
+     data.pending=data.pending.filter(x=>x.id!==job.id);
+     delete data.photoPayloads[job.id];
+    }
+   }
+   const id=uuid();
+   data.photoPayloads[id]=dataUrl;
+   data.photos[key]=dataUrl;
+   data.pending.push({id,kind:'photo',photoKey:key,photoType:type,side:side||null,
+    createdAt:new Date().toISOString()});
   });
-  return 'local:'+key;
+  return key;
  }
 };
 function refreshCloudControls(){
  const linked=!!remoteSession?.user&&!transitioning;
  $('offlineRemoteUser').textContent=linked?'Conectado: '+(remoteSession.user.email||remoteSession.user.id):'Sin sesión de nube';
  const demo=cloudAccountKind==='demo';
- $('offlineLinkAccount').disabled=!linked||demo||!!syncController?.isBusy()||!!latest?.data?.cloudUserId||!!latest?.data?.readOnly;
- $('offlineLinkAccount').textContent=demo?'🔒 La cuenta de prueba no puede vincularse':latest?.data?.cloudUserId?'Perfil ya vinculado a esta cuenta':'Vincular este perfil con esta cuenta';
- $('offlineCloudDownload').disabled=!linked||demo||!!latest?.data?.readOnly||!!syncController?.isBusy();
- // No publicar modificaciones: todo el trabajo de esta versión se queda offline.
- $('offlineCloudUpload').hidden=true;$('offlineCloudUpload').disabled=true;
- $('offlineDemoDownload').disabled=!linked||!demo||!!syncController?.isBusy();
+ $('offlineLinkAccount').hidden=!linked||latest?.data?.cloudUserId===remoteSession?.user?.id;
  $('authLogout').hidden=!linked;
+ $('offlineLinkAccount').disabled=!linked||demo||!!syncController?.isBusy()||!!latest?.data?.cloudUserId;
+ $('offlineLinkAccount').textContent=demo?'🔒 La cuenta de prueba no puede vincularse':latest?.data?.cloudUserId?'Perfil ya vinculado a esta cuenta':'Vincular este perfil con esta cuenta';
+ const personal=linked&&!demo&&latest?.data?.cloudUserId===remoteSession.user.id;
+ $('offlineCloudDownload').disabled=!linked||!!syncController?.isBusy();
+ $('offlineCloudDownload').textContent='↓ Descargar datos';
+ $('offlineCloudUpload').hidden=false;$('offlineCloudUpload').disabled=!personal||!!syncController?.isBusy();
+ $('offlineDemoDownload').hidden=true;$('offlineDemoDownload').disabled=true;
+ const state=$('offlineLinkStatus');if(state)state.textContent=personal?'✅ Vinculado':latest?.data?.cloudUserId?'✅ Vinculado · inicia sesión para actualizar':'No vinculado';
+ const mode=$('offlineSyncMode');if(mode){mode.closest('.offline-sync-mode').hidden=!personal;mode.value=latest?.data?.syncMode==='instant'?'instant':'later';}
 }
+let autoUploadTimer=null;
+function scheduleAutoUpload(){
+ if(autoUploadTimer)clearTimeout(autoUploadTimer);
+ if(!navigator.onLine||!remoteSession?.user||cloudAccountKind!=='personal'||
+    latest?.data?.cloudUserId!==remoteSession.user.id||latest?.data?.syncMode!=='instant')return;
+ if(!latest?.data?.pending?.some(op=>['create_series','update_series','delete_series','add_catalog','update_catalog','delete_catalog'].includes(op.kind)))return;
+ autoUploadTimer=setTimeout(async()=>{
+  autoUploadTimer=null;
+  if(syncController?.isBusy()){scheduleAutoUpload();return;}
+  try{await remoteAction('upload',{automatic:true})}
+  catch(error){status('Los cambios siguen offline. Error de actualización: '+error.message)}
+ },1100);
+}
+for(const name of ['saveWorkout','deleteSeries','updateSeries','addIndependentItem','saveCustomExercise','updateCatalogItem','deleteCatalogItem','uploadUserPhoto']){
+ const action=api[name].bind(api);
+ api[name]=async(...args)=>{const result=await action(...args);scheduleAutoUpload();return result;};
+}
+window.addEventListener('online',()=>scheduleAutoUpload());
 function requireCloudIdentity(uid,ownerStamp,ownerClient=client){
  if(ownerStamp!==stamp()||ownerClient!==client||!uid||transitioning)
   throw Error('Cambiaste de perfil durante la autenticación.');
@@ -384,57 +733,33 @@ async function linkAccount(){
  const user=remoteSession?.user;
  if(!user)throw Error('Inicia sesión en la nube primero.');
  if(cloudAccountKind==='demo')throw Error('La cuenta de prueba no puede vincularse como una cuenta personal.');
- if(latest?.data?.readOnly)throw Error('Una cuenta de prueba no puede vincularse como personal.');
  requireCloudIdentity(user.id,stamp());
  if(latest?.data?.cloudUserId===user.id)return status('Perfil ya vinculado a esta cuenta.');
- if(!confirm('¿Vincular '+latest.name+' con esta cuenta? No se subirán ni descargarán datos automáticamente. La asociación permanecerá en este perfil.'))return;
  await flush(data=>{
   validateProfileBinding(profiles,activeId,user.id);
   data.cloudUserId=user.id;
+  data.demo=false; // Una vinculación personal deja de mostrar el perfil como prueba.
  });
  renderSyncStatus();refreshCloudControls();
- status('Cuenta vinculada. Tus cambios permanecen offline; la subida a Supabase está deshabilitada.');
+ status('Vinculado. Tus cambios se guardan localmente; elige cuándo actualizar Supabase.');
 }
-async function provisionGymlyticsAccount(ownerStamp){
- if(!remote)throw Error('No está configurada la base de datos');
- const {data,error}=await remote.rpc('asegurar_perfil_gymlytics');
- if(ownerStamp!==stamp())throw Error('El perfil cambió durante el registro de la cuenta');
- if(error)throw Error('No se pudo habilitar la cuenta: '+error.message);
- if(!data?.activo)throw Error('La cuenta Gymlytics está desactivada; no se reactivó automáticamente.');
-}
-async function completeCloudLogin(session,ownerStamp,ownerClient,register=false){
+async function completeCloudLogin(session,ownerStamp,ownerClient){
  requireCloudIdentity(session?.user?.id,ownerStamp,ownerClient);
  try{
-  if(register)await provisionGymlyticsAccount(ownerStamp);
-  // Consultar la identidad autorizada por el servidor: NUNCA inferir la cuenta
-  // de prueba del nombre de perfil ni del botón que pulsó el usuario.
-  let result=await remote.from('tbl_usuarios')
-   .select('id,usuario,activo').eq('id',session.user.id).maybeSingle();
-  if(result.error)throw Error('No se pudo verificar la cuenta Gymlytics: '+result.error.message);
-  // Con confirmación por correo, signUp carece de sesión. La primera
-  // autenticación provisiona únicamente si la fila de usuario falta.
-  // Una cuenta existente deshabilitada NUNCA se reactiva.
-  if(!result.data){
-   await provisionGymlyticsAccount(ownerStamp);
-   result=await remote.from('tbl_usuarios')
-    .select('id,usuario,activo').eq('id',session.user.id).maybeSingle();
-  }
-  const {data,error}=result;
-  if(error||!data?.activo)throw Error('La cuenta todavía no está habilitada en Gymlytics.');
-  const kind=String(data.usuario||'').trim().toLocaleLowerCase('es')==='prueba'?'demo':'personal';
+  // Publicar temporalmente la sesión para autorizar la verificación RLS
+  // y retirarla si falla. Los datos locales no se alteran.
+  remoteSession=session;cloudAccountKind='personal';
+  await syncController.ensureUser(session.user.id,ownerStamp);
   requireCloudIdentity(session.user.id,ownerStamp,ownerClient);
-  if(kind==='demo'&&latest?.data?.cloudUserId&&latest.data.cloudUserId!==session.user.id)
-   throw Error('Esta cuenta de prueba no puede abrirse sobre un perfil vinculado a otra cuenta.');
-  cloudAccountKind=kind;
+  cloudAccountKind='personal';
  }catch(error){
   if(ownerStamp===stamp()&&ownerClient===client)rotateCloudClient();
   throw error;
  }
  remoteSession=session;
+ await linkAccount(); // Solo marca vinculación; jamás sube datos sin permiso.
  refreshCloudControls();renderSyncStatus();
- status(cloudAccountKind==='demo'?
-  'Cuenta de prueba verificada: solo descarga de consulta. Ningún dato se modificará.':
-  'Cuenta personal autenticada: puedes vincular o descargar datos, sin subir cambios locales.');
+ status('✅ Vinculado con sch_gymlytics. Elige «Actualizar» para subir el perfil local.');
 }
 async function cloudLogin(email,password,register=false){
  if(transitioning)throw Error('Espera a que termine el cambio de perfil.');
@@ -442,15 +767,7 @@ async function cloudLogin(email,password,register=false){
  const ownerStamp=stamp(),ownerClient=client;
  if(!client)throw Error('No hay conexión de Supabase configurada');
  if(!navigator.onLine)throw Error('Sin conexión a Internet. Tus registros locales siguen disponibles');
- if(!register&&!email.includes('@')){
-  const {data,error}=await ownerClient.functions.invoke('gymlytics-login-usuario',{body:{username:email,password}});
-  if(error)throw error;
-  if(!data?.access_token||!data?.refresh_token)throw Error(data?.error||'Nombre de usuario o contraseña inválidos');
-  const set=await ownerClient.auth.setSession({access_token:data.access_token,refresh_token:data.refresh_token});
-  if(set.error)throw set.error;
-  await completeCloudLogin(set.data.session,ownerStamp,ownerClient);
-  return;
- }
+ if(!email.includes('@'))throw Error('Ingresa el correo electrónico de tu cuenta personal.');
  if(register&&(!email.includes('@')||password.length<6))throw Error('Para registrarte, introduce un correo válido y contraseña de al menos 6 caracteres.');
  const result=register?await ownerClient.auth.signUp({email,password}):await ownerClient.auth.signInWithPassword({email,password});
  if(result.error)throw result.error;
@@ -458,13 +775,87 @@ async function cloudLogin(email,password,register=false){
   status('Revisa tu correo para confirmar la cuenta. Tu perfil local no se modificó.');
   return;
  }
- await completeCloudLogin(result.data.session,ownerStamp,ownerClient,register);
+ await completeCloudLogin(result.data.session,ownerStamp,ownerClient);
 }
 function renderConflictButtons(){
  const holder=$('offlineConflicts');if(!holder)return;
  holder.replaceChildren();
  for(const c of latest?.data?.conflicts||[]){
   const box=document.createElement('div');box.className='offline-conflict';
+  if(c.kind==='photo_conflict'){
+   const info=document.createElement('p');
+   info.textContent='Conflicto de fotografía. La imagen guardada en este dispositivo se conserva; Supabase no ha sido sobrescrito.';
+   const keep=document.createElement('button');keep.type='button';
+   keep.textContent='Conservar mi fotografía offline';
+   keep.addEventListener('click',async()=>{
+    const uid=remoteSession?.user?.id;
+    const personal=cloudAccountKind==='personal'&&latest?.data?.cloudUserId===uid;
+    if(personal&&!confirm('La fotografía remota es diferente. ¿Preparar tu versión local para reemplazarla en la próxima actualización de Supabase?'))return;
+    try{
+     await flush(data=>{
+      if(personal){
+       if(c.currentRevision)data.photoVersions[c.photoKey]={revision:c.currentRevision,ownerId:uid};
+       else delete data.photoVersions[c.photoKey];
+       for(const op of data.pending.filter(x=>x.kind==='photo'&&x.photoKey===c.photoKey)){
+        delete op.submittedRequest;delete op.attemptedAt;
+       }
+       // Si el conflicto provino de una descarga sin modificaciones en cola,
+       // no se subirá nada hasta que la persona vuelva a guardar la foto.
+      }
+      data.conflicts=data.conflicts.filter(x=>!(x.kind==='photo_conflict'&&x.photoKey===c.photoKey));
+     });
+     renderConflictButtons();
+     status(personal?'Fotografía local conservada. Podrás sincronizarla tras volver a guardar o mediante Actualizar si ya estaba pendiente.':'Fotografía local conservada. Cuenta de prueba: la nube permanece intacta.');
+    }catch(error){status('No se pudo revisar la fotografía: '+error.message);}
+   });box.append(info,keep);holder.append(box);continue;
+  }
+  if(c.kind==='reference_conflict'){
+   const info=document.createElement('p');
+   info.textContent='La referencia compartida cambió en la nube ('+c.refId+'). Se conservó tu versión offline para no reemplazarla sin autorización.';
+   const keep=document.createElement('button');keep.type='button';
+   keep.textContent='Entendido, conservar datos locales';
+   keep.addEventListener('click',async()=>{
+    try{
+     await flush(data=>{data.conflicts=data.conflicts.filter(x=>!(x.kind==='reference_conflict'&&x.refId===c.refId));});
+     renderConflictButtons();
+    }catch(error){status('No se pudo confirmar el aviso: '+error.message);}
+   });box.append(info,keep);holder.append(box);continue;
+  }
+  if(c.kind==='catalog_conflict'){
+   const info=document.createElement('p');
+   info.textContent='Conflicto de catálogo ('+c.catalogKind+') · '+c.reason+
+    '. Tus modificaciones siguen offline y la nube no se sobrescribió.';
+   box.append(info);
+   if(c.current?.activo===true){
+    const keep=document.createElement('button');keep.type='button';
+    keep.textContent='Conservar mi cambio local';
+    keep.addEventListener('click',async()=>{
+     if(!confirm('El registro cambió en Supabase. ¿Intentar aplicar tu versión sobre la versión remota actual? No se enviará nada hasta pulsar Actualizar o activar la sincronización automática.'))return;
+     try{
+      await flush(data=>{
+       const group={gym:'gyms',site:'sites',machine:'machines',option:'options',exercise:'library'}[c.catalogKind];
+       const row=c.catalogKind==='exercise'
+        ?data.library.find(x=>x.id===c.localId)||data.custom.find(x=>String(x.id||x.cloud_id)===c.localId)
+        :data.entities[group]?.find(x=>x.id===c.localId);
+       const tomb=data.tombstones.find(x=>x.catalogKind===c.catalogKind&&x.localId===c.localId);
+       if(!row&&!tomb)throw Error('El elemento local ya no existe');
+       const owner=row||tomb;owner.cloudSnapshot=structuredClone(c.current);
+       owner.cloudOwnerId=remoteSession?.user?.id;
+       for(const op of data.pending.filter(x=>x.catalogKind===c.catalogKind&&x.localId===c.localId)){
+        delete op.submittedRequest;delete op.attemptedAt;
+       }
+       data.conflicts=data.conflicts.filter(x=>x!==c&&!(x.kind==='catalog_conflict'&&x.catalogKind===c.catalogKind&&x.localId===c.localId));
+      });
+      renderConflictButtons();status('Conflicto de catálogo revisado. Puedes volver a Actualizar.');
+     }catch(error){status('No se pudo revisar el conflicto: '+error.message);}
+    });box.append(keep);
+   }else{
+    const hint=document.createElement('p');
+    hint.textContent='Revisa o cambia el nombre local. Si falta el elemento remoto, no se aplicará una actualización automáticamente.';
+    box.append(hint);
+   }
+   holder.append(box);continue;
+  }
   const title=document.createElement('p');title.textContent=(c.kind==='legacy_unversioned'?'Alerta de cliente antiguo · ':'Conflicto de versiones · ')+c.sourceKey;
   const local=document.createElement('button');local.type='button';local.textContent='Conservar este dispositivo';
   const cloud=document.createElement('button');cloud.type='button';cloud.textContent='Usar datos de la nube';
@@ -487,18 +878,17 @@ function updateFromProfile(){
  window.GymBaseCatalog=catalogInit();
  catalogUpdate();
  model.records=structuredClone(latest.data.records||[]);
+ model.photos=structuredClone(latest.data.photos||{});
  drawRecent();drawHistory(true);drawReports();
  renderSyncStatus();renderConflictButtons();refreshCloudControls();
 }
 async function remoteAction(action,options={}){
  if(!remoteSession?.user||!cloudAccountKind)throw Error('Inicia sesión o crea tu cuenta de nube primero');
  if(!syncController)throw Error('La sincronización no está disponible');
- if(action==='upload')throw Error('Los cambios de esta versión se conservan únicamente offline; subida deshabilitada.');
+ if(action==='upload'&&(cloudAccountKind!=='personal'||latest?.data?.cloudUserId!==remoteSession.user.id))
+  throw Error('Actualizar requiere una cuenta personal vinculada; la cuenta de prueba solo permite descarga.');
  if(action==='download'){
-  if(cloudAccountKind==='demo'&&!options.readOnly)
-   throw Error('La cuenta de prueba únicamente puede descargarse en modo solo lectura.');
-  if(cloudAccountKind!=='demo'&&options.readOnly)
-   throw Error('La opción de prueba requiere iniciar sesión en la cuenta «prueba».');
+  options.readOnly=cloudAccountKind==='demo';
  }
  await syncController[action](remoteSession.user.id,stamp(),options);
 }
@@ -515,10 +905,10 @@ async function saveProfileBackup(){
  await queue;
  if(id!==activeId||epoch!==profileEpoch||transitioning)throw Error('El perfil cambió antes de crear el respaldo.');
  if(!latest)return;
- downloadLocal('Gymlytics_perfil_'+latest.name.replace(/[^a-z0-9-_]/gi,'_')+'_'+new Date().toISOString().slice(0,10)+'.json',
+ downloadLocal('Gymlytics_respaldo_'+latest.name.replace(/[^a-z0-9-_]/gi,'_')+'_'+new Date().toISOString().slice(0,10)+'.txt',
   {format:'gymlytics-profile-backup',version:1,name:latest.name,data:latest.data,
    exportedAt:new Date().toISOString()});
- status('Respaldo completo del perfil descargado, incluyendo eliminaciones y cambios pendientes.');
+ status('Respaldo completo guardado en archivo de texto estructurado (JSON), con cambios pendientes y relaciones.');
 }
 async function importProfileBackup(event){
  const file=event.target.files?.[0];event.target.value='';
@@ -541,9 +931,8 @@ async function importProfileBackup(event){
 
 // Leer todas las categorías y comprobar recuentos ANTES de escribir en IndexedDB.
 async function downloadAllCatalogs(uid,ownerStamp){
- const fetchTable=async(table)=>{
-  // La lectura de datos siempre queda limitada a la cuenta autenticada.
-  const scope=q=>q.eq('user_id',uid);
+ const fetchTable=async(table,{shared=false}={})=>{
+  const scope=q=>shared?q.eq('activo',true):q.eq('user_id',uid);
   const count=await scope(remote.from(table).select('id',{count:'exact',head:true}));
   if(count.error||!Number.isSafeInteger(count.count)||count.count<0)
    throw Error('No se pudo comprobar el total de '+table);
@@ -555,26 +944,28 @@ async function downloadAllCatalogs(uid,ownerStamp){
    if(error||!Array.isArray(data)||data.length!==Math.min(500,count.count-offset))
     throw Error('Descarga incompleta de '+table+'; no se guardó nada.');
    for(const row of data){
-    if(!row?.id||seen.has(row.id)||row.user_id!==uid)throw Error('Se recibió una fila repetida o ajena de '+table);
+    if(!row?.id||seen.has(row.id)||!shared&&row.user_id!==uid)throw Error('Se recibió una fila repetida o ajena de '+table);
     seen.add(row.id);result.push(row);
    }
   }
   return result;
  };
- const [exercises,gyms,sites,machines,options]=await Promise.all([
-  fetchTable('tbl_ejercicios'),fetchTable('tbl_gimnasios'),
-  fetchTable('tbl_sedes'),fetchTable('tbl_maquinas'),fetchTable('tbl_opciones_personales')
+ const [base,exercises,gyms,sites,machines,options,muscles]=await Promise.all([
+  fetchTable('tbl_catalogo_predeterminado',{shared:true}),fetchTable('tbl_ejercicios'),
+  fetchTable('tbl_gimnasios'),fetchTable('tbl_sedes'),fetchTable('tbl_maquinas'),
+  fetchTable('tbl_opciones_personales'),fetchTable('tbl_musculos',{shared:true})
  ]);
  if(ownerStamp!==stamp()||remoteSession?.user?.id!==uid)throw Error('Se cambió de cuenta durante la descarga.');
- // Los datos comunes siguen guardados en Supabase, sin mezclarse con perfiles de prueba o personales.
- return prepareDownloadedCatalog({exercises,gyms,sites,machines,options:options.filter(x=>x.activo!==false)});
+ return prepareDownloadedCatalog({base,exercises,gyms,sites,machines,muscles,options:options.filter(x=>x.activo!==false)});
 }
 
 async function init(){
- db=await openDB();profiles=(await all()).map(profileMeta);
- syncController=createCloudSync({
-  remote:remoteGateway,getState:()=>({data:latest?.data||EMPTY(),profileName:latest?.name||'Perfil'}),
-  catalogFetch:downloadAllCatalogs,
+ db=await openDB();
+ // Primer inicio: exclusivamente un perfil local vacío. No precargar HojaMatriz,
+ // no borrar ni reescribir perfiles existentes, y no acceder a Supabase sin solicitud.
+ profiles=(await all()).map(profileMeta);
+ syncController=createGymlyticsCloudSync({
+  remote:remoteGateway,getState:()=>({data:latest?.data||EMPTY(),profileName:latest?.name||'Perfil',profileId:activeId}),
   mutate:update=>flush(update),refresh:updateFromProfile,
   isCurrent:(uid,token)=>stamp()===token&&remoteSession?.user?.id===uid,
   isLinkedElsewhere:uid=>profiles.some(p=>p.id!==activeId&&p.cloudUserId===uid),
@@ -588,6 +979,30 @@ async function init(){
  const selected=profiles.find(x=>x.id===last)?.id||profiles[0].id;
  window.GymCloud=api;
  await activate(selected,true);
+ $('offlineProfileMenuToggle')?.addEventListener('click',()=>{$('offlineProfileMenu').hidden=!$('offlineProfileMenu').hidden;});
+ document.querySelectorAll('[data-profile-action]').forEach(button=>button.addEventListener('click',()=>{
+  const action=button.dataset.profileAction;
+  if(action==='example'){
+   $('offlineProfileMenu').hidden=true;
+   addExampleProfile().catch(error=>status('No se agregó el ejemplo: '+error.message));
+   return;
+  }
+  if(action==='delete'){
+   $('offlineProfileMenu').hidden=true;
+   deleteActiveProfile().catch(error=>status('No se pudo eliminar el perfil: '+error.message));
+   return;
+  }
+  $('offlineNewProfileFields').hidden=action!=='add';$('offlineRenameProfileFields').hidden=action!=='rename';
+  $('offlineProfileMenu').hidden=true;(action==='add'?$('offlineNewName'):$('offlineRenameName')).focus();
+ }));
+ $('offlineSyncMode')?.addEventListener('change',async event=>{
+  const mode=event.target.value;
+  try{if(cloudAccountKind!=='personal'||!remoteSession?.user||latest?.data?.cloudUserId!==remoteSession.user.id)throw Error('Primero vincula una cuenta personal.');
+   await flush(data=>{data.syncMode=mode==='instant'?'instant':'later'});
+   renderSyncStatus();refreshCloudControls();if(mode==='instant')scheduleAutoUpload();
+   status(mode==='instant'?'Actualizar al momento activado.':'Actualizar después: guardado local hasta pulsar Actualizar.');
+  }catch(error){refreshCloudControls();status(error.message)}
+ });
  $('offlineProfiles').addEventListener('change',async event=>{
   const chosen=event.target.value,previous=activeId;
   try{await activate(chosen)}
@@ -653,11 +1068,24 @@ async function init(){
   });
  }
  $('catalogForm')?.addEventListener('submit',async event=>{
-  event.preventDefault();const values=Object.fromEntries(new FormData(event.currentTarget).entries());
+  event.preventDefault();const form=event.currentTarget,values=Object.fromEntries(new FormData(form).entries());
   const button=$('catalogSubmit');button.disabled=true;
-  try{await api.saveCustomExercise(values);event.currentTarget.reset();
-   $('catalogFeedback').textContent='Ejercicio guardado en el perfil local.';}
-  catch(e){$('catalogFeedback').textContent=e.message}finally{button.disabled=false}
+  try{await api.saveCustomExercise(values);form.reset();
+   $('catalogExtraDetails')?.replaceChildren();
+   $('catalogExtraPayload').value='[]';
+   window.GymCatalogCancelFieldEdits?.(true);
+   const section=document.querySelector('[data-catalog-kind="exercise"] .catalog-compact-detail');
+   if(section){
+    section.hidden=true;
+    const toggle=section.closest('.catalog-compact-card')?.querySelector('.catalog-compact-toggle');
+    if(toggle){toggle.textContent='+';toggle.setAttribute('aria-expanded','false');}
+    window.GymCatalogFieldRefresh?.();
+   }
+   $('catalogFeedback').textContent='✓ Ejercicio agregado correctamente.';
+   if(typeof toast==='function')toast('✓ Ejercicio registrado correctamente');}
+  catch(e){$('catalogFeedback').textContent=e.message;
+   if(/Ya existe un ejercicio/.test(e.message||'')&&typeof toast==='function')toast('⚠️ Ya existe: ejercicio y características idénticos.');
+  }finally{button.disabled=false}
  });
  $('authRecovery').addEventListener('click',()=>status('La recuperación de contraseña se habilitará cuando se configure una URL HTTPS segura. El perfil offline no se ve afectado.'));
 }

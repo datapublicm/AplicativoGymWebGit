@@ -1,0 +1,27 @@
+name: GymLytics - verificar ubicación botones Tablas
+on:
+  push:
+    branches:
+      - cambios/gymlytics-tablas-exportaciones-20261019
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  comprobar-tablas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: Android-Gymlytics
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar JavaScript
+        run: |
+          node --check web/app.js
+          node --check web/catalogo.js
+          node --check web/offline-first.js
+      - name: Verificar estructura Tablas y exportaciones existentes
+        run: node --test tests/tablas-export-layout.test.mjs tests/history-backup-readiness.test.mjs tests/export-delete-confirmation.test.mjs

@@ -53,7 +53,7 @@ async function online(fn){
 test('Instalación limpia: sin catálogo incrustado ni historial antes de descargar',()=>{
  const src=read('offline-first.js'),html=read('index.html');
  assert.deepEqual(emptyCatalogue().baseCatalog,[]);
- assert.match(src,/baseCatalog:\[\],muscles:\[\],custom:\[\],library:\[\]/);
+ assert.match(src,/baseCatalog:\[\],referenceOverrides:\{\},muscles:\[\],custom:\[\],library:\[\]/);
  assert.match(src,/const source=Array\.isArray\(latest\?\.data\?\.baseCatalog\)/);
  assert.doesNotMatch(html,/src="\.\/catalogo\.js"/);
  assert.match(html,/id="offlineDemoDownload"/);
@@ -87,17 +87,20 @@ test('Descargar cuenta personal: catálogo y series son visibles en el perfil lo
  assert.equal(data.muscles.length,1);
  assert.equal(data.readOnly,false);assert.equal(data.cloudUserId,uid);
 }));
-test('Descargar cuenta de prueba: todos los datos se conservan en consulta, sin edición',async()=>online(async()=>{
+test('Descarga de prueba: editable offline y nunca vinculada para subir',async()=>online(async()=>{
  const h=harness();await h.sync.download(uid,stamp,{readOnly:true});
- const data=h.read();assert.equal(data.readOnly,true);assert.equal(data.demo,true);
+ const data=h.read();assert.equal(data.readOnly,false);assert.equal(data.demo,true);
+ assert.equal(data.cloudUserId,null);
  assert.equal(data.records.length,1);assert.equal(data.entities.gyms.length,1);
- await assert.rejects(h.sync.download(uid,stamp),/solo admite descargas en modo de consulta/);
+ assert.ok(h.writes()>0);
 }));
-test('No convertir un perfil personal con series propias en una cuenta de prueba',async()=>online(async()=>{
+test('Descargar catálogo demo conserva las series existentes en el perfil offline',async()=>online(async()=>{
  const prior=empty();prior.records.push({id:'offline-a',date:'2026-10-02'});
  const h=harness(prior);
- await assert.rejects(h.sync.download(uid,stamp,{readOnly:true}),/perfil vacío/);
- assert.equal(h.writes(),0);assert.deepEqual(h.read(),prior);
+ await h.sync.download(uid,stamp,{readOnly:true});
+ assert.equal(h.read().records.length,2);
+ assert.ok(h.read().records.some(r=>r.id==='offline-a'));
+ assert.equal(h.read().readOnly,false);
 }));
 test('Descarga fallida de catálogo no modifica datos locales ni elimina operaciones pendientes',async()=>online(async()=>{
  const prior=empty();prior.pending=[{id:'pending-1',kind:'add_catalog',localId:'g1'}];
@@ -114,15 +117,17 @@ test('Ediciones locales pendientes se conservan incluso al descargar la cuenta p
  assert.ok(saved.entities.gyms.some(x=>x.nombre==='Gimnasio personal'));
  assert.ok(saved.entities.gyms.some(x=>x.nombre==='Evolution'));
 }));
-test('Operaciones de escritura del modo prueba tienen una barrera explícita',()=>{
- const src=read('offline-first.js');
- assert.match(src,/canWrite:\(\)=>!!activeId&&!latest\?\.data\?\.readOnly/);
+test('La cuenta de prueba solo bloquea la escritura en nube, no la edición local',()=>{
+ const src=read('offline-first.js'),html=read('index.html');
+ assert.match(src,/canWrite:\(\)=>!!activeId&&!!latest&&!transitioning/);
+ assert.doesNotMatch(src,/if\(latest\.data\?\.readOnly\)return \{code:'read_only'/);
  for(const signature of ['saveWorkout','deleteSeries','updateSeries','addIndependentItem','saveCustomExercise',
   'updateCatalogItem','deleteCatalogItem','uploadUserPhoto']){
   const start=src.indexOf('async '+signature+'(');
   assert.ok(start>0,signature);
   assert.match(src.slice(start,start+200),/assertEditable\(\)/,signature);
  }
- assert.match(src,/if\(action==='upload'\)throw Error/);
- assert.match(src,/offlineCloudUpload'\)\.hidden=true/);
+ assert.match(src,/cloudAccountKind!=='personal'/);
+ assert.match(html,/id="offlineCloudUpload"/);
+ assert.match(html,/id="offlineSyncMode"/);
 });
