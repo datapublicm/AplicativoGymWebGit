@@ -121,7 +121,7 @@ try{
  await evaluate("document.querySelector('#addExerciseExtra').click()");
  assert.equal(await evaluate("document.querySelectorAll('#catalogExtraDetails .catalog-extra-row').length"),before+1);
  await evaluate("(()=>{const x=[...document.querySelectorAll('#catalogExtraDetails .catalog-extra-row')].at(-1);x.querySelector('.extra-campo').value='Angulo de trabajo';x.querySelector('.extra-valor').value='45 grados';document.querySelector('[data-catalog-modify=exercise]').click();return true})()");
- await until("document.querySelector('#exerciseEditFeedback')?.textContent?.includes('Nombre y detalles guardados')",'guardar característica adicional');
+ await until("document.querySelector('#exerciseEditFeedback')?.textContent?.includes('Ejercicio modificado en la misma variante')",'guardar característica adicional');
  await evaluate("(()=>{document.querySelector('#catalogDetailBrowser').open=true;window.GymCatalogDetailRefresh();return true})()");
  assert.equal(await evaluate("!!document.querySelector('#catalogDetailFilters select[data-detail-field=\"Angulo de trabajo\"]')"),true);
  console.log('PASS 10: añadir y guardar característica; nuevo campo disponible como filtro');
