@@ -116,8 +116,8 @@ try{
  const before=await evaluate("document.querySelectorAll('#catalogExtraDetails .catalog-extra-row').length");
  await evaluate("document.querySelector('#addExerciseExtra').click()");
  assert.equal(await evaluate("document.querySelectorAll('#catalogExtraDetails .catalog-extra-row').length"),before+1);
- await evaluate("(()=>{const x=[...document.querySelectorAll('#catalogExtraDetails .catalog-extra-row')].at(-1);x.querySelector('.extra-campo').value='Angulo de trabajo';x.querySelector('.extra-valor').value='45 grados';document.querySelector('#editExerciseDetails').click();return true})()");
- await until("document.querySelector('#exerciseEditFeedback')?.textContent?.includes('Detalles del ejercicio modificados')",'guardar característica adicional');
+ await evaluate("(()=>{const x=[...document.querySelectorAll('#catalogExtraDetails .catalog-extra-row')].at(-1);x.querySelector('.extra-campo').value='Angulo de trabajo';x.querySelector('.extra-valor').value='45 grados';document.querySelector('[data-catalog-modify=exercise]').click();return true})()");
+ await until("document.querySelector('#exerciseEditFeedback')?.textContent?.includes('Nombre y detalles guardados')",'guardar característica adicional');
  await evaluate("(()=>{document.querySelector('#catalogDetailBrowser').open=true;window.GymCatalogDetailRefresh();return true})()");
  assert.equal(await evaluate("!!document.querySelector('#catalogDetailFilters select[data-detail-field=\"Angulo de trabajo\"]')"),true);
  console.log('PASS 10: añadir y guardar característica; nuevo campo disponible como filtro');
@@ -174,9 +174,9 @@ try{
  await until("!window.GymCloud.detailFieldList().includes('Recorrido')",'eliminación de campo');
  console.log('PASS 18: eliminar exige advertencia ⚠ con impacto y respeta cancelación');
  await evaluate("document.querySelector('[data-page=registro]').click()");
- assert.equal(await evaluate("!!document.querySelector('[data-field-panel=registro]')"),true);
+ assert.equal(await evaluate("!!document.querySelector('[data-field-panel=registro]')"),false);
  assert.equal(await evaluate("document.querySelector('#registroNuevosDetalles')!==null"),true);
- console.log('PASS 19: administración de nuevos campos también disponible en Registro');
+ console.log('PASS 19: Registro sin panel de administración, con valores adicionales condicionales');
  console.log('Chromium/IndexedDB: 19 escenarios correctos, edición, GPS, variantes y campos adicionales.');
 
 
