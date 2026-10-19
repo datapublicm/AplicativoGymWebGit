@@ -95,6 +95,6 @@ test('01.04 revisión 03: historial completo paginado y catálogo ampliable',()=
 test('Marca Gymlytics en la aplicación, manifest y Capacitor',()=>{
  const manifest=JSON.parse(read('web/manifest.webmanifest'));
  assert.equal(manifest.name,'Gymlytics');assert.equal(manifest.short_name,'Gymlytics');
- assert.match(html,/<title>GymLytics 01.16 · Indicaciones Word 001.006<\/title>/);
+ assert.match(html,/<title>GymLytics 01.17 · Indicaciones Word 001.006<\/title>/);
  assert.match(html,/<strong>Gymlytics<\/strong>/);
 });
