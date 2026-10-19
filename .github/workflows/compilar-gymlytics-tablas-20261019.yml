@@ -1,0 +1,125 @@
+name: GymLytics 01.19 Tablas - compilar APK pruebas
+on:
+  push:
+    branches:
+      - cambios/gymlytics-tablas-exportaciones-20261019
+    paths:
+      - '.github/workflows/compilar-gymlytics-tablas-20261019.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compilar-apk-tablas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        working-directory: Android-Gymlytics
+    env:
+      VITE_SUPABASE_URL: https://jasuqnxrskhqfobsazwd.supabase.co
+      VITE_SUPABASE_SCHEMA: sch_android_gymlytics
+      VITE_GYMLYTICS_ENVIRONMENT: pruebas
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_sQH_z37OD2mzNMoL4M3Lwg_jF8Lpmx2
+      VITE_GYMLYTICS_RECOVERY_URL: ''
+    steps:
+      - name: Descargar codigo aprobado para Tablas
+        uses: actions/checkout@v4
+      - name: Verificar rama, paquete fuente y seguridad del entorno
+        run: |
+          test "$GITHUB_REF_NAME" = "cambios/gymlytics-tablas-exportaciones-20261019"
+          test -f android/README.md
+          test ! -d android/app
+          node -e 'const p=require("./package.json"), c=require("./capacitor.config.json"); if(p.name!=="gymlytics"||c.appId!=="com.datapublicm.gymlytics") process.exit(1)'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Preparar SDK Android
+        run: |
+          SDK="$ANDROID_HOME"
+          test -x "$SDK/cmdline-tools/latest/bin/sdkmanager"
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+      - name: Probar código y regresiones
+        run: |
+          node --check web/app.js
+          npm run test:static
+      - name: Instalar dependencias de Android y web
+        run: npm install --no-package-lock --no-audit --no-fund
+      - name: Construir aplicación web
+        run: |
+          npm run build:web
+          test -s dist/index.html
+          test -s dist/styles.css
+          test -s dist/app.js
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const html=readFileSync('dist/index.html','utf8');
+          const start=html.indexOf('id="page-tablas"'),end=html.indexOf('id="page-dashboard"',start);
+          if(start<0||end<0)throw Error('Falta pantalla Tablas');
+          const section=html.slice(start,end);
+          const ids=['historySubdivision','historyDateFrom','historyDateTo','historyRefresh','historyClearFilters','historyView','historyRecords','historyPagination','exportCsv','exportJson'];
+          const positions=ids.map(id=>section.indexOf('id="'+id+'"'));
+          if(positions.some(p=>p<0)||positions.some((p,i)=>i>0&&p<=positions[i-1]))throw Error('Orden de Tablas distinto al aprobado');
+          if(!section.includes('↓ Exportar JSON'))throw Error('No se actualizó Exportar JSON');
+          NODE
+      - name: Usar identificador de prueba separado para proteger la app instalada
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p='capacitor.config.json',c=JSON.parse(fs.readFileSync(p,'utf8'));
+          if(c.appId!=='com.datapublicm.gymlytics')throw Error('ID base inesperado');
+          c.appId='com.datapublicm.gymlytics.tablaspruebas';
+          c.appName='GymLytics Tablas Pruebas';
+          fs.writeFileSync(p,JSON.stringify(c,null,2)+'\n');
+          NODE
+      - name: Generar plataforma Android temporal
+        run: |
+          mv android/README.md android-notas-de-plataforma.txt
+          rmdir android
+          npx cap add android
+          npx cap sync android
+          test -s android/app/src/main/assets/public/index.html
+          test -s android/app/src/main/assets/public/app.js
+          test -s android/app/src/main/assets/public/styles.css
+      - name: Versionar Android 01.19 Tablas
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path='android/app/build.gradle';
+          let s=fs.readFileSync(path,'utf8');
+          if(!/versionCode\s+\d+/.test(s)||!/versionName\s+["'][^"']+["']/.test(s))throw Error('No existe versionado de Gradle');
+          s=s.replace(/versionCode\s+\d+/,'versionCode 19').replace(/versionName\s+["'][^"']+["']/,'versionName "01.19-tablas"');
+          fs.writeFileSync(path,s);
+          NODE
+      - name: Compilar APK Android debug
+        working-directory: Android-Gymlytics/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+      - name: Verificar contenido y firma de la APK
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -Z1 "$APK" | grep -Fxq 'assets/public/index.html'
+          unzip -Z1 "$APK" | grep -Fxq 'assets/public/styles.css'
+          unzip -Z1 "$APK" | grep -Fxq 'assets/public/app.js'
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep '^package:' | tee /tmp/gyml-check.txt
+          grep -q "name='com.datapublicm.gymlytics.tablaspruebas'" /tmp/gyml-check.txt
+          grep -q "versionCode='19'" /tmp/gyml-check.txt
+          grep -q "versionName='01.19-tablas'" /tmp/gyml-check.txt
+          mkdir -p entregables
+          cp "$APK" entregables/GymLytics_01.19_Tablas_Pruebas.apk
+          (cd entregables && sha256sum GymLytics_01.19_Tablas_Pruebas.apk > SHA256.txt)
+          printf "GymLytics 01.19 Tablas - instalación paralela segura; no reemplaza la app existente.\n" > entregables/LEEME.txt
+          ls -lh entregables/
+      - name: Publicar APK de pruebas
+        uses: actions/upload-artifact@v4
+        with:
+          name: GymLytics_01.19_Tablas_Pruebas_APK
+          path: Android-Gymlytics/entregables/
+          if-no-files-found: error
+          retention-days: 30
