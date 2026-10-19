@@ -1068,9 +1068,9 @@ async function init(){
   });
  }
  $('catalogForm')?.addEventListener('submit',async event=>{
-  event.preventDefault();const values=Object.fromEntries(new FormData(event.currentTarget).entries());
+  event.preventDefault();const form=event.currentTarget,values=Object.fromEntries(new FormData(form).entries());
   const button=$('catalogSubmit');button.disabled=true;
-  try{await api.saveCustomExercise(values);event.currentTarget.reset();
+  try{await api.saveCustomExercise(values);form.reset();
    $('catalogExtraDetails')?.replaceChildren();
    $('catalogExtraPayload').value='[]';
    const section=document.querySelector('[data-catalog-kind="exercise"] .catalog-compact-detail');
