@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/compilar-gymlytics-01.15-indicaciones.yml
       - Android-Gymlytics/web/offline-first.js
+      - Android-Gymlytics/tools/verificar-apk-001005-chromium.mjs
   workflow_dispatch:
 permissions:
   contents: read
