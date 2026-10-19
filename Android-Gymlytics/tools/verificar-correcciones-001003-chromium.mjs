@@ -131,10 +131,7 @@ try{
  // 13. Los botones Modificar deben guardar cambios en el MISMO UUID.
  const siteId=await evaluate("window.GymEntities.sites[0].id");
  await evaluate("(()=>{const site=window.GymEntities.sites[0];const gym=document.querySelector('#gymExistingSelect');gym.value=site.gimnasio_id;gym.dispatchEvent(new Event('change'));const s=document.querySelector('#siteExistingSelect');s.value=site.id;s.dispatchEvent(new Event('change'));catalogOpenCard('site','edit');return true})()");
- console.log('DEBUG PRE',JSON.stringify(await evaluate("({buttonDisabled:document.querySelector('[data-catalog-modify=site]').disabled,canWrite:window.GymCloud.canWrite(),selection:document.querySelector('#siteExistingSelect').value,stamp:window.GymCloud.getSessionStamp(),buttons:document.querySelectorAll('[data-catalog-modify=site]').length})")));
  await evaluate("(()=>{document.querySelector('#siteEditName').value='VES CORREGIDA';document.querySelector('[data-catalog-modify=site]').click();return true})()");
- await wait(400);
- console.log('DEBUG SEDE',JSON.stringify(await evaluate("({wanted:"+JSON.stringify(siteId)+",selector:document.querySelector('#siteExistingSelect').value,editor:document.querySelector('#siteEditName').value,feedback:document.querySelector('#siteFeedback').textContent,buttonDisabled:document.querySelector('[data-catalog-modify=site]').disabled,chosen:window.GymEntities.sites[0],options:Array.from(document.querySelector('#siteExistingSelect').options).map(x=>x.value).slice(0,3)})")));
  await until("window.GymEntities.sites.some(x=>x.id==="+JSON.stringify(siteId)+"&&x.nombre==='VES CORREGIDA')",'renombrar sede en mismo UUID');
  assert.equal(await evaluate("window.GymEntities.sites.length"),16);
  console.log('PASS 13: Modificar sede persiste Única → VES CORREGIDA sin duplicar registros');
@@ -168,8 +165,6 @@ try{
  await until("Array.from(document.querySelector('[data-field-panel=catalog] [data-field-existing]').options).some(x=>x.value==='Rango de movimiento')",'actualizar selector de campos');
  await until("!document.querySelector('[data-field-panel=catalog] [data-field-action=add]').disabled",'guardado inicial de campo completado');
  await evaluate("(()=>{const p=document.querySelector('[data-field-panel=catalog]');p.querySelector('[data-field-existing]').value='Rango de movimiento';p.querySelector('[data-field-existing]').dispatchEvent(new Event('change'));p.querySelector('[data-field-name]').value='Recorrido';window.renameEnabledBeforeClick=!p.querySelector('[data-field-action=rename]').disabled;p.querySelector('[data-field-action=rename]').click();return true})()");
- await wait(400);
- console.log('DEBUG CAMPO',JSON.stringify(await evaluate("({list:window.GymCloud.detailFieldList(),status:document.querySelector('[data-field-panel=catalog] [data-field-status]').textContent,value:document.querySelector('[data-field-panel=catalog] [data-field-existing]').value,newName:document.querySelector('[data-field-panel=catalog] [data-field-name]').value,renameEnabledBeforeClick:window.renameEnabledBeforeClick,renameDisabledAfter:document.querySelector('[data-field-panel=catalog] [data-field-action=rename]').disabled})")));
  await until("window.GymCloud.detailFieldList().includes('Recorrido')",'renombrar campo');
  console.log('PASS 17: campo creado y renombrado desde Catálogos');
  await evaluate("(()=>{const p=document.querySelector('[data-field-panel=catalog]');p.querySelector('[data-field-existing]').value='Recorrido';p.querySelector('[data-field-existing]').dispatchEvent(new Event('change'));window.confirm=m=>{window.warningCaptured=m;return false};p.querySelector('[data-field-action=delete]').click();return true})()");
