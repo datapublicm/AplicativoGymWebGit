@@ -1174,3 +1174,115 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 #page-registro .registro-series-actions>#addSeriesGroup,
 #page-registro .registro-series-actions>#removeSeriesGroup{grid-column:auto!important;grid-row:1!important;min-height:43px;min-width:0;width:100%}
 #page-registro .registro-series-actions>#seriesGroupCount{grid-column:1/-1!important;grid-row:2!important;justify-self:center}
+
+/* GymLytics 01.16: interfaz Word 001.006; conservar las 4 columnas de la cabecera. */
+#page-catalogos .catalog-compact-bar{
+ grid-template-columns:minmax(92px,1.1fr) minmax(96px,1.5fr) 36px 44px!important;
+ gap:6px!important;align-items:center!important;
+}
+#page-catalogos .catalog-inline-modify,
+#page-catalogos .catalog-rename-inline{display:none!important}
+#page-catalogos .catalog-exercise-selector[hidden]{display:none!important}
+#page-catalogos #catalogForm>.catalog-editable-field{min-width:0;position:relative}
+#page-catalogos #catalogForm .catalog-field-title{
+ display:flex;gap:6px;align-items:center;justify-content:space-between;min-width:0;
+ margin-bottom:6px;color:#d8edfa;font-size:13px;font-weight:650;
+}
+#page-catalogos #catalogForm .catalog-field-modify{
+ color:#c5f1ff;background:#113c57;border:1px solid #327d9d;border-radius:7px;
+ min-height:29px;min-width:72px;max-width:95px;padding:4px 6px;
+ font-weight:650;font-size:11px;cursor:pointer;
+}
+#page-catalogos #catalogForm .catalog-editable-field.is-modifying .catalog-field-modify{
+ color:#072137;background:#94eaff;border-color:#94eaff;
+}
+#page-catalogos #catalogForm .catalog-editable-field.is-modifying>input{
+ display:none!important;
+}
+#page-catalogos #catalogForm .catalog-field-inline-editor{
+ display:grid;grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr);
+ align-items:center;gap:5px;width:100%;
+}
+#page-catalogos #catalogForm .catalog-field-inline-editor[hidden]{display:none!important}
+#page-catalogos #catalogForm .catalog-field-inline-editor input{
+ width:100%;min-width:0;min-height:41px;height:41px;padding:5px;
+ font-size:13px;color:#e7f8ff;background:#0e2b42;border:1px solid #3980a1;border-radius:8px;
+}
+#page-catalogos #catalogForm .catalog-field-inline-editor input[readonly]{
+ color:#b0c8d8;border-color:#3e5e71;background:#102538;
+}
+#page-catalogos #catalogForm .catalog-field-inline-editor span{
+ font-size:22px;font-weight:750;color:#56c6ed;text-align:center;
+}
+#page-catalogos #catalogSubmit:disabled{
+ opacity:.35;filter:grayscale(.7);cursor:not-allowed;
+}
+/* Botón e indicador GPS: idéntico tamaño sin importar estado. */
+#page-catalogos .catalog-gps-control{
+ display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+ align-items:center;column-gap:8px!important;row-gap:8px;
+}
+#page-catalogos #openSiteGPS,
+#page-catalogos #siteGPSStatus{
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ box-sizing:border-box!important;width:100%!important;height:44px!important;
+ min-height:44px!important;max-height:44px!important;
+ padding:4px 6px!important;margin:0!important;font-size:11px!important;
+ text-align:center!important;line-height:1.2!important;
+ border-radius:10px!important;white-space:normal!important;
+}
+#page-catalogos #siteGPSStatus{
+ border:1px solid #456780!important;background:#102f4b!important;
+}
+#page-catalogos #siteGPSStatus[data-registered="true"]{
+ border-color:#228f8b!important;color:#9ef0e1!important;
+}
+#page-catalogos .catalog-gps-control>small{
+ grid-column:1/-1;line-height:1.4;
+}
+/* Registro: filas homogéneas y ancho de columnas controlado. */
+#page-registro .registro-field-grid{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ column-gap:9px!important;row-gap:11px!important;align-items:start;
+}
+#page-registro .registro-field-grid>.field{
+ display:flex;flex-direction:column;min-width:0;margin:0!important;align-self:start;
+}
+#page-registro .registro-field-grid>.field>span,
+#page-registro .registro-field-grid>.field>label:first-child{
+ min-height:21px;display:flex;align-items:center;margin-bottom:5px;
+ font-size:12px;
+}
+#page-registro .registro-field-grid>.field select,
+#page-registro .registro-field-grid>.field input,
+#page-registro .registro-field-grid>.field>.subdivision-toggle{
+ box-sizing:border-box;max-width:100%;width:100%;min-width:0;
+}
+#page-registro .registro-field-grid>.field select,
+#page-registro .registro-field-grid>.field>.subdivision-toggle{
+ height:44px!important;min-height:44px!important;
+}
+#page-registro .registro-subdiv-button{grid-column:auto!important;align-self:start!important}
+#page-registro .registro-series-actions{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:8px!important;align-items:stretch!important;
+}
+#page-registro .registro-series-actions>button{
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ grid-row:1!important;min-width:0!important;width:100%!important;
+ height:44px!important;min-height:44px!important;max-height:44px!important;
+ padding:5px 9px!important;border-radius:9px!important;
+ border:1px solid #2d91b1!important;color:#d7faff!important;
+ background:linear-gradient(120deg,#0e526e,#126a91)!important;
+ font-weight:700!important;font-size:12px!important;
+ opacity:1!important;
+}
+#page-registro .registro-series-actions>button:disabled{
+ opacity:.4!important;
+}
+#page-registro #seriesGroupCount{grid-column:1/-1!important;grid-row:2!important;text-align:center!important}
+@media(max-width:375px){
+ #page-catalogos .catalog-compact-bar{grid-template-columns:minmax(74px,1fr) minmax(74px,1.35fr) 30px 36px!important;gap:4px!important}
+ #page-catalogos #catalogForm .catalog-field-modify{min-width:60px;font-size:10px}
+ #page-registro .registro-field-grid{column-gap:6px!important}
+}
