@@ -13,7 +13,7 @@ import {GYMLYTICS_SEED_PATH,createGymlyticsSeedProfile} from './gymlytics-seed-o
 const $=id=>document.getElementById(id);
 const DB_NAME='gymlytics_offline_profiles_v1', EMPTY=()=>({
  records:[],photos:{},photoVersions:{},photoPayloads:{},baseCatalog:[],referenceOverrides:{},muscles:[],custom:[],library:[],readOnly:false,demo:false,
- entities:{gyms:[],sites:[],machines:[],options:[]},
+ entities:{gyms:[],sites:[],machines:[],options:[]},exerciseDetailFields:[],
  tombstones:[],pending:[],conflicts:[],cloudUserId:null,lastPull:null,syncMode:'later'
 });
 const uuid=()=>crypto.randomUUID();
@@ -126,7 +126,7 @@ async function activate(id,initial=false){
   rotateCloudClient();
   activeId=null;latest=null;
   model.records=[];model.photos={};
-  window.GymBaseCatalog=[];window.GymReferenceCatalog=[];window.GymReferenceOverrides={};window.GymReferenceChoices=()=>[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];
+  window.GymBaseCatalog=[];window.GymReferenceCatalog=[];window.GymReferenceOverrides={};window.GymReferenceChoices=()=>[];window.GymCustomCatalog=[];window.GymExerciseLibrary=[];window.GymDetailFields=[];
   window.GymEntities={gyms:[],sites:[],machines:[],options:[]};
   drawRecent();drawHistory();drawReports();
   const p=await get(id);
@@ -145,6 +145,7 @@ async function activate(id,initial=false){
   window.GymBaseCatalog=catalogInit();
   window.GymEntities=structuredClone(p.data.entities||EMPTY().entities);
   window.GymExerciseLibrary=structuredClone(p.data.library||[]);
+  window.GymDetailFields=structuredClone(p.data.exerciseDetailFields||[]);
   window.GymCustomCatalog=personalCatalogInit();
   model.records=structuredClone(p.data.records||[]);
   model.photos=structuredClone(p.data.photos||{});
@@ -246,11 +247,13 @@ function catalogUpdate(){
  window.GymBaseCatalog=catalogInit();
  window.GymEntities=structuredClone(latest.data.entities);
  window.GymExerciseLibrary=structuredClone(latest.data.library);
+ window.GymDetailFields=structuredClone(latest.data.exerciseDetailFields||[]);
  window.GymCustomCatalog=personalCatalogInit();
  if(typeof renderIndependentCatalog==='function')renderIndependentCatalog();
  if(typeof renderOwnCatalog==='function')renderOwnCatalog();
  if(typeof cascade==='function')cascade(0);
  if(typeof catalogUpdateCounters==='function')catalogUpdateCounters();
+ window.GymCatalogFieldRefresh?.();
  const muscle=$('muscleExistingSelect'),count=$('muscleCount');
  if(muscle){muscle.replaceChildren(new Option('Selecciona un músculo…',''));
   for(const row of latest.data.muscles||[])muscle.add(new Option(row.nombre,row.id));}
@@ -269,6 +272,36 @@ function normalizarDetallesEjercicio(values){
   if(campo&&valor)result.push({campo,valor});
  }
  return result;
+}
+const fixedDetails=new Set(['Agrupación','Anotación','Máquina','Instrumento','Agarre / Implemento','Técnica','Nombre del ejercicio']);
+const fieldNormalize=x=>tidy(x).replace(/\\s+/g,' ').slice(0,120);
+const fieldKey=x=>fieldNormalize(x).toLocaleLowerCase('es');
+function detailFields(data){
+ const names=[...(data.exerciseDetailFields||[]),...(data.library||[]).flatMap(e=>(e.detalles||[]).map(d=>d.campo))];
+ return [...new Set(names.filter(x=>x&&!fixedDetails.has(x)))].sort((a,b)=>a.localeCompare(b,'es'));
+}
+function fieldStats(data,field){
+ const exercises=(data.library||[]).filter(e=>(e.detalles||[]).some(d=>fieldKey(d.campo)===fieldKey(field))).length;
+ const records=(data.records||[]).filter(r=>r.detailValues&&Object.keys(r.detailValues).some(k=>fieldKey(k)===fieldKey(field))).length;
+ return {exercises,records};
+}
+function ensureCustomField(data,name,old=null){
+ const clean=fieldNormalize(name);
+ if(!clean||fixedDetails.has(clean)||data.exerciseDetailFields?.some(x=>fieldKey(x)===fieldKey(clean)&&fieldKey(x)!==fieldKey(old)))
+  throw Error('Nombre de campo vacío, reservado o duplicado.');
+ return clean;
+}
+function addImplicitFields(data,values){
+ let extras=[];
+ try{extras=typeof values.detalles_extra==='string'?JSON.parse(values.detalles_extra):values.detalles_extra||[];}catch{}
+ data.exerciseDetailFields??=[];
+ for(const d of extras){
+  const name=fieldNormalize(d.campo);
+  if(name&&!fixedDetails.has(name)&&!detailFields(data).some(f=>fieldKey(f)===fieldKey(name))){
+   if(data.exerciseDetailFields.length>=30)throw Error('Máximo 30 campos adicionales por perfil.');
+   data.exerciseDetailFields.push(name);
+  }
+ }
 }
 const groups={gym:'gyms',site:'sites',machine:'machines',option:'options',exercise:'library'};
 function presentCatalog(kind){
@@ -306,6 +339,7 @@ const api={
    if(!Number.isFinite(weight)||weight<0||!Number.isFinite(reps)||reps<=0||!Number.isFinite(assistance)||assistance<0||!['kg','lb'].includes(entry.unit))
     throw Error('Peso, repeticiones o asistencias inválidos');
    return {id:uuid(),origin:'offline',date,gym:exercise.g,sede:exercise.s,
+    detailValues:structuredClone(exercise.detailValues||{}),
     exerciseId:exercise.exerciseId||null,
     zone:exercise.z,type:exercise.kind,equipment:exercise.i,accessory:exercise.a,
     grip:exercise.gr,exercise:exercise.e,technique,notes,series:entry.series,
@@ -439,6 +473,7 @@ const api={
   await flush(data=>{
    const row=data.library.find(x=>String(x.id)===String(id));
    if(!row)throw Error('Selecciona un ejercicio de tu perfil local.');
+   addImplicitFields(data,values);
    row.detalles=normalizarDetallesEjercicio(values);
    row.zona_entrenamiento=tidy(values.anotacion||values.z)||'Sin clasificar';
    row.tecnica_actualizada=tidy(values.tecnica)||'Ejecución base';
@@ -452,11 +487,62 @@ const api={
   if(!nombre)throw Error('Escribe un nombre de ejercicio');
   await flush(data=>{
    // Los ejercicios pueden compartir nombre: cada variante conserva su UUID.
+   addImplicitFields(data,values);
    const id=uuid(),detalles=normalizarDetallesEjercicio(values);
    data.library.push({id,nombre,origen:'usuario',zona_entrenamiento:tidy(values.anotacion||values.z)||'Sin clasificar',
     tecnica_actualizada:tidy(values.tecnica)||'Ejecución base',detalles});
    data.pending.push({id:uuid(),kind:'add_catalog',catalogKind:'exercise',localId:id});
   });catalogUpdate();return structuredClone(latest.data.custom);
+ },
+ detailFieldList(){return structuredClone(detailFields(latest?.data||EMPTY()));},
+ detailFieldStats(name){return fieldStats(latest?.data||EMPTY(),name);},
+ async addDetailField(name){
+  assertEditable();
+  const result=await flush(data=>{
+   data.exerciseDetailFields??=[];
+   if(data.exerciseDetailFields.length>=30)throw Error('Máximo 30 detalles por perfil.');
+   const value=ensureCustomField(data,name);
+   if(detailFields(data).some(x=>fieldKey(x)===fieldKey(value)))throw Error('Este detalle ya existe.');
+   data.exerciseDetailFields.push(value);
+   return value;
+  });catalogUpdate();return result;
+ },
+ async renameDetailField(oldName,newName){
+  assertEditable();
+  await flush(data=>{
+   const old=detailFields(data).find(x=>fieldKey(x)===fieldKey(oldName));
+   if(!old)throw Error('El campo no existe en este perfil.');
+   const next=ensureCustomField(data,newName,old);
+   if(detailFields(data).some(x=>fieldKey(x)===fieldKey(next)&&fieldKey(x)!==fieldKey(old)))throw Error('Ya existe este campo.');
+   data.exerciseDetailFields=detailFields(data).map(x=>fieldKey(x)===fieldKey(old)?next:x);
+   for(const ex of data.library||[]){
+    let affected=false;for(const detail of ex.detalles||[])if(fieldKey(detail.campo)===fieldKey(old)){
+     detail.campo=next;affected=true;
+    }
+    if(affected)data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:'exercise',localId:ex.id});
+   }
+   for(const r of data.records||[])if(r.detailValues)
+    for(const key of Object.keys(r.detailValues))if(fieldKey(key)===fieldKey(old)){
+     r.detailValues[next]=r.detailValues[key];delete r.detailValues[key];
+    }
+  });catalogUpdate();return true;
+ },
+ async removeDetailField(name){
+  assertEditable();
+  const removed=await flush(data=>{
+   const field=detailFields(data).find(x=>fieldKey(x)===fieldKey(name));
+   if(!field)throw Error('No existe ese campo.');
+   const affected=fieldStats(data,field);
+   data.exerciseDetailFields=(data.exerciseDetailFields||[]).filter(x=>fieldKey(x)!==fieldKey(field));
+   for(const ex of data.library||[]){
+    const before=(ex.detalles||[]).length;
+    ex.detalles=(ex.detalles||[]).filter(d=>fieldKey(d.campo)!==fieldKey(field));
+    if(ex.detalles.length!==before)data.pending.push({id:uuid(),kind:'update_catalog',catalogKind:'exercise',localId:ex.id});
+   }
+   for(const r of data.records||[])if(r.detailValues)
+    for(const k of Object.keys(r.detailValues))if(fieldKey(k)===fieldKey(field))delete r.detailValues[k];
+   return affected;
+  });catalogUpdate();return removed;
  },
  async updateCatalogItem(kind,id,name){
   assertEditable();
