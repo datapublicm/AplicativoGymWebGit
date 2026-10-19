@@ -155,7 +155,9 @@
   for(const e of choices){
    const caption=[detail(e,'Máquina'),detail(e,'Agarre / Implemento'),detail(e,'Técnica')||e.tecnica_actualizada]
     .filter(Boolean).join(' · ');
-   variant.add(new Option((caption||e.nombre)+' · '+String(e.id).slice(0,8),String(e.id)));
+   const similar=choices.filter(x=>[detail(x,'Máquina'),detail(x,'Agarre / Implemento'),detail(x,'Técnica')||x.tecnica_actualizada].filter(Boolean).join(' · ')===caption);
+   const repeated=similar.length>1?' · Variante '+(similar.findIndex(x=>x.id===e.id)+1):'';
+   variant.add(new Option((caption||e.nombre)+repeated,String(e.id)));
   }
   vwrap.hidden=choices.length<=1;variant.disabled=choices.length<=1;
   variant.value=choices.some(e=>String(e.id)===String(prior))?String(prior):

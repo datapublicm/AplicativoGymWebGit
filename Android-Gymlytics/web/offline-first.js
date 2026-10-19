@@ -1071,7 +1071,12 @@ async function init(){
   event.preventDefault();const values=Object.fromEntries(new FormData(event.currentTarget).entries());
   const button=$('catalogSubmit');button.disabled=true;
   try{await api.saveCustomExercise(values);event.currentTarget.reset();
-   $('catalogFeedback').textContent='Ejercicio guardado en el perfil local.';}
+   $('catalogExtraDetails')?.replaceChildren();
+   $('catalogExtraPayload').value='[]';
+   const section=document.querySelector('[data-catalog-kind="exercise"] .catalog-compact-detail');
+   if(section&&!section.hidden)catalogOpenCard('exercise','toggle');
+   $('catalogFeedback').textContent='✓ Ejercicio agregado correctamente.';
+   if(typeof toast==='function')toast('✓ Ejercicio registrado correctamente');}
   catch(e){$('catalogFeedback').textContent=e.message;
    if(/Ya existe un ejercicio/.test(e.message||'')&&typeof toast==='function')toast('⚠️ Ya existe: ejercicio y características idénticos.');
   }finally{button.disabled=false}

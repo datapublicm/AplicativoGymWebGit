@@ -402,6 +402,35 @@ function filterCatalogSearch(text){
  if(status&&needle)status.textContent=found+' categorías coincidentes';
  else if(status&&status.textContent?.includes('categorías coincidentes'))status.textContent='';
 }
+function catalogOpenInlineRename(row,kind){
+ const select=row.querySelector('.catalog-compact-picker select'),chosen=catalogChoices(kind).find(x=>x.id===select?.value);
+ if(!chosen){toast('Selecciona primero el elemento que deseas modificar.');return;}
+ const editor=row.querySelector('.catalog-rename-inline');if(!editor)return;
+ editor.hidden=!editor.hidden;if(editor.hidden)return;
+ editor.dataset.kind=kind;editor.dataset.id=kind==='exercise'?String(catalogSelectedExerciseId||chosen.variantIds?.[0]||chosen.id):chosen.id;
+ editor.querySelector('[data-rename-old]').value=chosen.rawName||chosen.name;
+ const next=editor.querySelector('[data-rename-new]');next.value=editor.querySelector('[data-rename-old]').value;next.focus();
+}
+async function catalogSaveInlineRename(row){
+ const editor=row.querySelector('.catalog-rename-inline');
+ const kind=editor.dataset.kind,id=editor.dataset.id,newName=editor.querySelector('[data-rename-new]').value.trim();
+ const feedback=editor.querySelector('[data-rename-status]'),save=editor.querySelector('[data-rename-save]');
+ if(!id||!newName){feedback.textContent='Escribe el nombre nuevo antes de guardar.';return;}
+ if(!window.GymCloud?.canWrite?.()){feedback.textContent='Selecciona un perfil local editable.';return;}
+ save.disabled=true;
+ try{
+  if(kind==='exercise'){
+   if(!catalogSelectExerciseVariant(id))throw Error('No existe esa variante de ejercicio.');
+   const values=window.GymCatalogCollectExerciseValues?.()||Object.fromEntries(new FormData($('catalogForm')).entries());
+   await window.GymCloud.saveExerciseChanges(id,{...values,e:newName});
+  }else await window.GymCloud.updateCatalogItem(kind,id,newName);
+  editor.hidden=true;toast('✓ Nombre modificado y guardado');
+  const picker=row.querySelector('.catalog-compact-picker select');
+  if(kind==='exercise')catalogSelectExerciseVariant(id);
+  else{picker.value=id;picker.dispatchEvent(new Event('change',{bubbles:true}));}
+ }catch(error){feedback.textContent='No se pudo modificar: '+error.message;}
+ finally{save.disabled=false;}
+}
 function setupCatalogCompact(){
  const holder=$('catalogCompactRows');
  if(!holder||holder.dataset.compactReady)return;
@@ -450,7 +479,18 @@ function setupCatalogCompact(){
    const position=document.createElement('span');position.dataset.variantPosition='';position.textContent='0 / 0';
    nav.insertBefore(position,nav.children[2]);detail.prepend(nav);
   }
-  bar.append(count,add);row.append(bar,detail);holder.append(row);
+  const mini=document.createElement('button');mini.type='button';mini.className='catalog-inline-modify';
+  mini.textContent='Modificar';mini.setAttribute('aria-label','Modificar el nombre de '+item.label);
+  mini.addEventListener('click',()=>catalogOpenInlineRename(row,item.kind));
+  const editor=document.createElement('div');editor.className='catalog-rename-inline';editor.hidden=true;
+  editor.innerHTML='<div class="rename-fields"><label>Nombre actual<input data-rename-old readonly aria-label="Nombre actual"></label>'+
+   '<span aria-hidden="true" class="rename-arrow">→</span>'+
+   '<label>Nombre nuevo<input data-rename-new maxlength="160" aria-label="Nombre nuevo"></label></div>'+
+   '<div class="rename-actions"><button type="button" data-rename-save class="primary-btn">Guardar modificación</button>'+
+   '<button type="button" class="outline-btn" data-rename-cancel>Cancelar</button></div><p data-rename-status role="status"></p>';
+  editor.querySelector('[data-rename-save]').addEventListener('click',()=>catalogSaveInlineRename(row));
+  editor.querySelector('[data-rename-cancel]').addEventListener('click',()=>{editor.hidden=true;});
+  bar.append(count,mini,add);row.append(bar,editor,detail);holder.append(row);
   select.addEventListener('focus',()=>catalogActiveCard(item.kind));
   select.addEventListener('change',()=>{
    select.title=select.selectedOptions?.[0]?.textContent||'';
@@ -1002,7 +1042,7 @@ function photoCanvas(file,maxSize){
 }
 
 function detailOpenAfterUpload(type){const r=chosenRow(),[src,available]=photoFor(type,r);$(type==='equipo'?'detailEquipmentImg':'detailExerciseImg').src=src;$(type==='equipo'?'equipmentNoPhoto':'exerciseNoPhoto').hidden=available}
-function install(){$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('resetSubdivisions').addEventListener('click',()=>changeSeriesMode('normal'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('progressExercise').addEventListener('change',()=>drawProgressChart(model.records));$('progressMetric').addEventListener('change',()=>drawProgressChart(model.records));$('progressRange').addEventListener('change',()=>drawProgressChart(model.records));document.querySelectorAll('[data-history-field]').forEach(field=>field.addEventListener('change',()=>drawHistory(true)));$('historyView').addEventListener('change',()=>drawHistory(true));$('historyDateFrom').addEventListener('change',()=>drawHistory(true));$('historyDateTo').addEventListener('change',()=>drawHistory(true));$('historyClearFilters').addEventListener('click',()=>{resetHistoryFilters();drawHistory(true)});$('historyLoadMore').addEventListener('click',()=>{historyVisible+=60;drawHistory()});$('historyRefresh').addEventListener('click',refreshHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.querySelector('#addOptionForm [name="tipo"]')?.addEventListener('change',renderIndependentCatalog);
+function install(){$('catalogModifyAdjacent')?.addEventListener('click',()=>document.querySelector('[data-catalog-modify="exercise"]')?.click());$('addExerciseTab').addEventListener('click',()=>newDraft());$('exerciseTabs').addEventListener('click',event=>{const closed=event.target.closest('[data-exercise-close]'),switched=event.target.closest('[data-exercise-switch]');if(closed)closeDraft(closed.dataset.exerciseClose);else if(switched&&switched.dataset.exerciseSwitch!==activeDraftId)openDraft(switched.dataset.exerciseSwitch);});for(let i=0;i<FLOW.length;i++){const [key,id]=FLOW[i];if(key==='kind'){document.querySelectorAll('input[name="tipo"]').forEach(input=>input.addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();}))}else $(id).addEventListener('change',()=>{cascade(i+1);refreshActiveDraftTitle();})}document.querySelectorAll('[data-page]').forEach(x=>x.addEventListener('click',()=>showPage(x.dataset.page)));$('openDetail').addEventListener('click',detailOpen);$('closeDetail').addEventListener('click',()=>$('detailModal').close());$('closeDetailBottom').addEventListener('click',()=>$('detailModal').close());document.querySelectorAll('[data-upload]').forEach(x=>x.addEventListener('change',uploadPhoto));$('seriesRows').addEventListener('input',updateSeriesCount);document.querySelectorAll('[data-mobile-step]').forEach(b=>b.addEventListener('click',()=>setMobileStep(b.dataset.mobileStep)));$('continueToSeries').addEventListener('click',()=>setMobileStep('series'));$('backToContext').addEventListener('click',()=>setMobileStep('context'));$('resetSubdivisions').addEventListener('click',()=>changeSeriesMode('normal'));$('toggleSubdivisions').addEventListener('click',()=>{const open=$('splitOptions').hidden;$('splitOptions').hidden=!open;$('toggleSubdivisions').setAttribute('aria-expanded',String(open))});document.querySelectorAll('[data-series-mode]').forEach(b=>b.addEventListener('click',()=>changeSeriesMode(b.dataset.seriesMode)));$('addSeriesGroup').addEventListener('click',()=>resizeSeries(1));$('removeSeriesGroup').addEventListener('click',()=>resizeSeries(-1));$('saveRecords').addEventListener('click',saveSeries);$('clearSeries').addEventListener('click',()=>{renderSeries();toast('Tabla vaciada')});$('progressExercise').addEventListener('change',()=>drawProgressChart(model.records));$('progressMetric').addEventListener('change',()=>drawProgressChart(model.records));$('progressRange').addEventListener('change',()=>drawProgressChart(model.records));document.querySelectorAll('[data-history-field]').forEach(field=>field.addEventListener('change',()=>drawHistory(true)));$('historyView').addEventListener('change',()=>drawHistory(true));$('historyDateFrom').addEventListener('change',()=>drawHistory(true));$('historyDateTo').addEventListener('change',()=>drawHistory(true));$('historyClearFilters').addEventListener('click',()=>{resetHistoryFilters();drawHistory(true)});$('historyLoadMore').addEventListener('click',()=>{historyVisible+=60;drawHistory()});$('historyRefresh').addEventListener('click',refreshHistory);$('exportCsv').addEventListener('click',exportCsv);$('exportJson').addEventListener('click',exportJson);document.querySelector('#addOptionForm [name="tipo"]')?.addEventListener('change',renderIndependentCatalog);
 document.querySelectorAll('[data-catalog-existing]').forEach(select=>select.addEventListener('change',()=>{
  const kind=select.dataset.catalogExisting;
  const item=existingCatalogItems(kind).find(x=>x.id===select.value);

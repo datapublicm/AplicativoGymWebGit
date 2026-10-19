@@ -1141,3 +1141,20 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
 
 /* Distintivo verificable de instalación 01.14; discreto y legible en Android. */
 .gym-mock-titles>strong{letter-spacing:.025em}
+
+/* 01.15 · edición contextual original → nuevo */
+#page-catalogos .catalog-rename-inline[hidden]{display:none!important}
+#page-catalogos .catalog-inline-modify{border:1px solid #3d93ac;border-radius:7px;color:#d4f5ff;background:#123b53;font-size:11px;font-weight:700;padding:5px 7px;min-height:34px;white-space:nowrap}
+#page-catalogos .catalog-compact-bar{flex-wrap:wrap}
+#page-catalogos .catalog-rename-inline{border:1px solid #357e99;border-radius:10px;background:rgba(8,42,66,.76);padding:12px;margin:9px 2px}
+#page-catalogos .rename-fields{display:grid;grid-template-columns:minmax(0,1fr) 25px minmax(0,1fr);align-items:end;gap:5px}
+#page-catalogos .rename-fields label{min-width:0;display:grid;gap:4px;font-size:12px;color:#d7ebf8}
+#page-catalogos .rename-fields input{width:100%;min-width:0;min-height:39px;background:#0d2a42;border:1px solid #4b7997;border-radius:8px;color:white;padding:7px}
+#page-catalogos .rename-fields [readonly]{opacity:.7}
+#page-catalogos .rename-arrow{align-self:end;text-align:center;font-size:24px;line-height:39px;color:#4adaf0}
+#page-catalogos .rename-actions{display:flex;gap:8px;margin-top:12px}
+#page-catalogos .rename-actions button{flex:1;min-width:0;min-height:40px;font-size:12px}
+#page-catalogos [data-rename-status]{font-size:12px;color:#ffdfad}
+#page-catalogos .catalog-exercise-submit-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;grid-column:1/-1}
+#page-catalogos .catalog-exercise-submit-row>button{width:100%;min-width:0;min-height:44px;font-size:13px}
+.toast{background:rgba(5,78,95,.77)!important;backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}
