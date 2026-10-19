@@ -1,10 +1,10 @@
-/* GymLytics 01.12: administración offline de campos personalizados, en Catálogos y Registro. */
+/* GymLytics 01.13: campos adicionales configurables en Catálogos; Registro solo muestra sus valores. */
 const get=id=>document.getElementById(id);
 const fixed=new Set(['Agrupación','Anotación','Máquina','Instrumento','Agarre / Implemento','Técnica','Nombre del ejercicio']);
 function createPanel(kind){
  const panel=document.createElement('section');panel.className='gym-extra-field-panel';
  panel.dataset.fieldPanel=kind;
- panel.innerHTML='<details><summary>➕ Nuevos detalles · Administrar campos</summary>'+
+ panel.innerHTML='<details><summary>➕ Detalles adicionales</summary>'+
  '<p class="gym-extra-help">Añade características a tus ejercicios y registros. Puedes renombrarlas o eliminarlas desde aquí.</p>'+
  '<label>Nuevo campo<input data-field-new maxlength="120" placeholder="Ej.: Ángulo de trabajo"></label>'+
  '<button type="button" class="outline-btn" data-field-action="add">+ Agregar campo</button>'+
@@ -54,26 +54,31 @@ function setButtonState(panel){
 const catalog=document.querySelector('[data-catalog-kind="exercise"]');
 const browser=get('catalogDetailBrowser')?.closest('.catalog-detail-disambiguator');
 const registro=get('registroNuevosDetalles');
-const catalogPanel=createPanel('catalog'),registroPanel=createPanel('registro');
+const catalogPanel=createPanel('catalog');
+let previousExerciseId=null;
 if(catalog){
  if(browser)browser.before(catalogPanel);else catalog.after(catalogPanel);
 }
-if(registro)registro.append(registroPanel);
 function refresh(){
  const names=window.GymCloud?.detailFieldList?.()||[];
- for(const panel of [catalogPanel,registroPanel]){
-  const picker=panel.querySelector('[data-field-existing]'),previous=picker.value;
-  picker.replaceChildren(new Option(names.length?'Seleccionar campo…':'Sin campos personalizados',''));
-  for(const name of names)picker.add(new Option(name,name));
-  picker.value=names.includes(previous)?previous:'';
-  const input=panel.querySelector('[data-field-name]');
-  input.value=picker.value;
-  setButtonState(panel);
- }
- const register=get('registroDetalleValores');if(!register)return;
- const chosen=window.GymExerciseLibrary?.find(e=>e.id===window.GymSelectedExerciseId);
- const existing=Object.fromEntries((chosen?.detalles||[]).map(d=>[d.campo,d.valor]));
- const previous=Object.fromEntries([...register.querySelectorAll('[data-reg-extra]')].map(x=>[x.dataset.regExtra,x.value]));
+ const panel=catalogPanel;
+ const picker=panel.querySelector('[data-field-existing]'),prev=picker.value;
+ picker.replaceChildren(new Option(names.length?'Seleccionar campo…':'Sin campos personalizados',''));
+ for(const name of names)picker.add(new Option(name,name));
+ picker.value=names.includes(prev)?prev:'';
+ panel.querySelector('[data-field-name]').value=picker.value;
+ setButtonState(panel);
+ // El administrador aparece tras añadir un detalle a un ejercicio, no como fila vacía inicial.
+ const extras=document.querySelector('#catalogExtraDetails');
+ panel.hidden=!names.length&&!extras?.querySelector('.catalog-extra-row');
+ if(!registro)return;
+ const register=get('registroDetalleValores');
+ const exerciseId=window.GymSelectedExerciseId||'';
+ const exercise=(window.GymExerciseLibrary||[]).find(e=>e.id===exerciseId);
+ const existing=Object.fromEntries((exercise?.detalles||[]).map(d=>[d.campo,d.valor]));
+ const previous=exerciseId===previousExerciseId
+  ?Object.fromEntries([...register.querySelectorAll('[data-reg-extra]')].map(x=>[x.dataset.regExtra,x.value])):{};
+ previousExerciseId=exerciseId;
  register.replaceChildren();
  for(const name of names){
   if(fixed.has(name))continue;
@@ -83,8 +88,10 @@ function refresh(){
   field.value=previous[name]??existing[name]??'';
   label.append(field);register.append(label);
  }
+ registro.hidden=!names.length||!exerciseId;
 }
 window.GymCatalogFieldRefresh=refresh;
+window.GymRegistroRefresh=refresh;
 window.GymRegistroNewDetails=()=>Object.fromEntries([...document.querySelectorAll('#registroDetalleValores [data-reg-extra]')]
  .map(input=>[input.dataset.regExtra,input.value.trim()]).filter(([,value])=>!!value));
 document.addEventListener('change',event=>{
