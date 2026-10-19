@@ -13,11 +13,10 @@ function createPanel(kind){
  '<div class="gym-extra-actions"><button type="button" class="outline-btn" data-field-action="rename">✎ Modificar</button>'+
  '<button type="button" class="outline-btn gym-danger" data-field-action="delete">⚠ Eliminar</button></div>'+
  '<p data-field-status role="status"></p></details>';
- panel.addEventListener('change',event=>{
-  if(event.target.matches('[data-field-existing]')){
-   panel.querySelector('[data-field-name]').value=event.target.value;
-   setButtonState(panel);
-  }
+ const selectField=panel.querySelector('[data-field-existing]');
+ selectField.addEventListener('change',()=>{
+  panel.querySelector('[data-field-name]').value=selectField.value;
+  setButtonState(panel);
  });
  panel.addEventListener('click',async event=>{
   const button=event.target.closest('[data-field-action]');if(!button)return;
