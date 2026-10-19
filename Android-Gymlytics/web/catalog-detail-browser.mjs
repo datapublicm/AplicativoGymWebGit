@@ -70,8 +70,8 @@ if(root&&exerciseCard){
   if(!target||view.disabled)return;
   const picker=by('exerciseExistingSelect');
   if(![...picker.options].some(x=>x.value===id)){count.textContent='Actualiza el catálogo antes de consultar esta variante.';return;}
-  picker.value=id;
-  picker.dispatchEvent(new Event('change',{bubbles:true}));
+  if(typeof catalogSelectExerciseVariant==='function')catalogSelectExerciseVariant(id);
+  else{picker.value=id;picker.dispatchEvent(new Event('change',{bubbles:true}));}
   if(typeof catalogOpenCard==='function')catalogOpenCard('exercise','edit');
   // Selección por UUID: únicamente la variante elegida es editable.
   panel.open=false;

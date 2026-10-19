@@ -25,11 +25,13 @@
   return values;
  }
  function readExercise(){
-  const id=el('exerciseExistingSelect')?.value;
+  const id=window.GymCatalogSelectedExerciseId||el('exerciseExistingSelect')?.value;
   return (window.GymExerciseLibrary||[]).find(x=>String(x.id)===String(id));
  }
  function loadDetails(){
-  const exercise=readExercise();if(!exercise)return;
+  const exercise=readExercise();
+  if(!exercise){el('catalogForm').reset();el('catalogExtraDetails').replaceChildren();return;}
+  el('catalogForm').elements.namedItem('e').value=exercise.nombre;
   for(let i=0;i<details.length;i++){
    const field=el('catalogForm').querySelector('[name="'+detailKeys[i]+'"]');
    if(!field)continue;
@@ -57,8 +59,9 @@
  extra?.addEventListener('input',collect);
  el('catalogForm')?.addEventListener('submit',collect,true);
  el('exerciseExistingSelect')?.addEventListener('change',loadDetails);
+ window.GymCatalogExerciseChanged=loadDetails;
  el('editExerciseDetails')?.addEventListener('click',async event=>{
-  const id=el('exerciseExistingSelect').value,feedback=el('exerciseEditFeedback');
+  const id=window.GymCatalogSelectedExerciseId||el('exerciseExistingSelect').value,feedback=el('exerciseEditFeedback');
   if(!id){feedback.textContent='Selecciona primero un ejercicio de este perfil.';return;}
   event.currentTarget.disabled=true;
   try{
@@ -82,13 +85,16 @@
   frame.hidden=false;fallback.hidden=true;
  }
  el('openSiteGPS')?.addEventListener('click',()=>{
-  const id=el('siteExistingSelect').value;
+  const choices=(window.GymEntities?.sites||[]);
+  const id=el('siteExistingSelect').value||((choices.length===1)?String(choices[0].id):'');
   const site=(window.GymEntities?.sites||[]).find(x=>String(x.id)===id);
   const reference=(window.GymReferenceChoices?.('site',{})||[]).find(x=>x.id===id);
   if(!site&&!reference){el('siteFeedback').textContent='Selecciona primero una sede.';return;}
   dialog.dataset.siteId=id;el('siteGPSLabel').textContent='Sede: '+(site?.nombre||reference.name);
   el('siteGPSLat').value=site?.latitud??'';el('siteGPSLon').value=site?.longitud??'';
-  feedback.textContent='';map();dialog.showModal();
+  feedback.textContent='';map();
+  if(!dialog.open)dialog.showModal();
+  dialog.scrollIntoView?.({block:'center'});
  });
  el('closeSiteGPS')?.addEventListener('click',()=>dialog.close());
  for(const id of ['siteGPSLat','siteGPSLon'])el(id)?.addEventListener('change',map);

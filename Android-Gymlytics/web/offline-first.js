@@ -148,6 +148,7 @@ async function activate(id,initial=false){
   window.GymCustomCatalog=personalCatalogInit();
   model.records=structuredClone(p.data.records||[]);
   model.photos=structuredClone(p.data.photos||{});
+  window.GymCatalogSelectedExerciseId=null;
   if(typeof resetHistoryFilters==='function')resetHistoryFilters();
   if(typeof resetExerciseTabs==='function')resetExerciseTabs();
   if(typeof renderOwnCatalog==='function')renderOwnCatalog();

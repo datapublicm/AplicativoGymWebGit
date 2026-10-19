@@ -205,8 +205,19 @@ const catalogBaseOptions=kind=>{
 };
 function catalogChoices(kind){
  let own=[];
- if(['gym','site','machine','exercise'].includes(kind))
+ if(['gym','site','machine'].includes(kind))
   own=existingCatalogItems(kind).map(x=>({id:String(x.id),name:x.nombre,own:true}));
+ if(kind==='exercise'){
+  const grouped=new Map();
+  for(const e of existingCatalogItems('exercise')){
+   const key=catalogNorm(e.nombre);
+   if(!key)continue;
+   if(!grouped.has(key))grouped.set(key,{id:String(e.id),name:e.nombre,own:true,rawName:e.nombre,variantIds:[]});
+   const row=grouped.get(key);
+   if(!row.variantIds.includes(String(e.id)))row.variantIds.push(String(e.id));
+  }
+  own=[...grouped.values()].map(g=>({...g,name:g.rawName+' ('+g.variantIds.length+')'}));
+ }
  if(kind==='site'){
   const selected=$('gymExistingSelect')?.value||'';
   const sites=window.GymEntities?.sites||[];
@@ -219,13 +230,54 @@ function catalogChoices(kind){
  // Conservar también las referencias ya descargadas, sin acceder a la red.
  return [...own,...refs].sort((a,b)=>a.name.localeCompare(b.name,'es',{numeric:true})||Number(b.own)-Number(a.own));
 }
+let catalogSelectedExerciseId=null;
+function catalogSelectExerciseVariant(id,notify=true){
+ const exercise=(window.GymExerciseLibrary||[]).find(x=>String(x.id)===String(id));
+ if(!exercise)return false;
+ const group=catalogChoices('exercise').find(g=>g.variantIds?.includes(String(id)));
+ const picker=$('exerciseExistingSelect');
+ if(!group||!picker)return false;
+ picker.value=group.id;
+ catalogSelectedExerciseId=String(id);
+ window.GymCatalogSelectedExerciseId=String(id);
+ const name=$('exerciseEditName');if(name)name.value=exercise.nombre;
+ const form=$('catalogForm');
+ if(form?.elements?.namedItem('e'))form.elements.namedItem('e').value=exercise.nombre;
+ if(notify)window.GymCatalogExerciseChanged?.();
+ return true;
+}
+function catalogNavigateExercise(target){
+ const choice=catalogChoices('exercise').find(x=>x.id===$('exerciseExistingSelect')?.value);
+ const ids=choice?.variantIds||[];
+ if(!ids.length)return;
+ const index=Math.max(0,ids.indexOf(String(catalogSelectedExerciseId||ids[0])));
+ const next=target==='first'?0:target==='last'?ids.length-1:target==='previous'?Math.max(0,index-1):Math.min(ids.length-1,index+1);
+ catalogSelectExerciseVariant(ids[next]);
+ refreshExerciseNavigation();
+}
+function refreshExerciseNavigation(){
+ const node=$('exerciseVariantNav'),choice=catalogChoices('exercise').find(x=>x.id===$('exerciseExistingSelect')?.value);
+ if(!node)return;
+ const ids=choice?.variantIds||[];
+ node.hidden=ids.length===0;
+ if(!ids.length)return;
+ if(!ids.includes(String(catalogSelectedExerciseId)))catalogSelectExerciseVariant(ids[0]);
+ const index=ids.indexOf(String(catalogSelectedExerciseId));
+ const pos=node.querySelector('[data-variant-position]');if(pos)pos.textContent=(index+1)+' / '+ids.length;
+ node.querySelectorAll('[data-variant-go]').forEach(button=>{
+  button.disabled=(index===0&&['first','previous'].includes(button.dataset.variantGo))||
+   (index===ids.length-1&&['next','last'].includes(button.dataset.variantGo));
+ });
+}
 function catalogFillSelect(select,choices,placeholder){
  if(!select)return;
  const before=select.value;
  const emptyLabel={gymExistingSelect:'Agregar gimnasio',siteExistingSelect:'Agregar sede',exerciseExistingSelect:'Agregar ejercicio'}[select.id]||'Agregar elemento';
  select.replaceChildren(new Option(choices.length?placeholder||'Seleccionar…':emptyLabel,''));
  choices.forEach(x=>select.add(new Option(x.name+(x.own?'':' · referencia'),x.id)));
- select.value=choices.some(x=>x.id===before)?before:(choices.length===1?choices[0].id:'');
+ const wanted=select.id==='exerciseExistingSelect'
+  ?choices.find(x=>x.variantIds?.includes(String(catalogSelectedExerciseId)))?.id||before:before;
+ select.value=choices.some(x=>x.id===wanted)?wanted:(choices.length===1?choices[0].id:'');
  select.disabled=false;
  // Mostrar el nombre completo al consultar cada categoría, incluso si el
  // desplegable queda estrecho en dispositivos pequeños.
@@ -301,9 +353,10 @@ function catalogOpenCard(kind,action='add'){
   }
  }
  if(kind==='exercise'){
-  const entry=catalogChoices(kind).find(x=>x.id===$('exerciseExistingSelect')?.value);
-  $('exerciseEditName').value=entry?.name||'';
-  if(entry&&!entry.own)$('exerciseEditFeedback').textContent='Referencia: puedes modificar su nombre en este perfil offline, sin editar Supabase.';
+  const group=catalogChoices(kind).find(x=>x.id===$('exerciseExistingSelect')?.value);
+  const id=group?.variantIds?.includes(String(catalogSelectedExerciseId))?catalogSelectedExerciseId:group?.variantIds?.[0];
+  if(id)catalogSelectExerciseVariant(id);
+  refreshExerciseNavigation();
  }
  if(action==='add'){
   const form=detail.querySelector('form');const field=form?.querySelector('[name="nombre"],[name="e"]');field?.focus();
@@ -384,7 +437,19 @@ function setupCatalogCompact(){
   detail.id='catalogDetail'+item.kind;add.setAttribute('aria-controls',detail.id);add.setAttribute('aria-expanded','false');
   if(!item.readOnly)for(const part of item.parts)if(part&&part!==forms.option)detail.append(part);
   if(item.kind==='zone')detail.append(forms.option);
-  bar.append(heading,wrapper,count,add);row.append(bar,detail);holder.append(row);
+  bar.append(heading,wrapper);
+  if(item.kind==='exercise'){
+   const nav=document.createElement('div');nav.id='exerciseVariantNav';nav.className='exercise-variant-nav';nav.hidden=true;
+   nav.setAttribute('aria-label','Navegar por las variantes del mismo ejercicio');
+   for(const [action,title] of [['first','«'],['previous','‹'],['next','›'],['last','»']]){
+    const button=document.createElement('button');button.type='button';button.dataset.variantGo=action;
+    button.textContent=title;button.setAttribute('aria-label',{first:'Primera variante',previous:'Variante anterior',next:'Siguiente variante',last:'Última variante'}[action]);
+    button.addEventListener('click',()=>catalogNavigateExercise(action));nav.append(button);
+   }
+   const position=document.createElement('span');position.dataset.variantPosition='';position.textContent='0 / 0';
+   nav.insertBefore(position,nav.children[2]);bar.append(nav);
+  }
+  bar.append(count,add);row.append(bar,detail);holder.append(row);
   select.addEventListener('focus',()=>catalogActiveCard(item.kind));
   select.addEventListener('change',()=>{
    select.title=select.selectedOptions?.[0]?.textContent||'';
@@ -413,6 +478,13 @@ function setupCatalogCompact(){
    if(['gym','site','machine'].includes(item.kind)){
     const entry=existingCatalogItems(item.kind).find(x=>String(x.id)===select.value);
     const input=$(item.kind+'EditName');if(input)input.value=entry?.nombre||catalogChoices(item.kind).find(x=>x.id===select.value)?.name||'';
+   }
+   if(item.kind==='exercise'){
+    const group=catalogChoices('exercise').find(x=>x.id===select.value);
+    catalogSelectedExerciseId=group?.variantIds?.[0]||null;
+    window.GymCatalogSelectedExerciseId=catalogSelectedExerciseId;
+    if(catalogSelectedExerciseId)catalogSelectExerciseVariant(catalogSelectedExerciseId);
+    refreshExerciseNavigation();
    }
    catalogActiveCard(item.kind);
    refreshCatalogEmptyActions();
@@ -543,6 +615,7 @@ function renderIndependentCatalog(){
 function renderOwnCatalog(){
  const records=existingCatalogItems('exercise');
  populateCatalogSelect('exerciseExistingSelect',records,x=>x.nombre);
+ refreshExerciseNavigation();
  const entries=$('catalogEntries');
  if(entries)entries.innerHTML=records.length?'':'<div class="empty">Aún no hay ejercicios propios. Puedes agregar el primero aquí.</div>';
  refreshCatalogEmptyActions();
@@ -920,12 +993,21 @@ document.querySelectorAll('[data-catalog-existing]').forEach(select=>select.addE
 document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEventListener('click',async()=>{
  const kind=button.dataset.catalogModify;
  const select=$({gym:'gymExistingSelect',site:'siteExistingSelect',machine:'machineExistingSelect',option:'optionExistingSelect',exercise:'exerciseExistingSelect'}[kind]);
+ const targetId=kind==='exercise'?catalogSelectedExerciseId||select.value:select.value;
  const name=$(kind+'EditName')?.value.trim()||'',feedback=$(kind==='exercise'?'exerciseEditFeedback':{gym:'gymFeedback',site:'siteFeedback',machine:'machineFeedback',option:'optionFeedback'}[kind]);
- if(!select.value||!name){feedback.textContent='Selecciona un elemento y escribe su nuevo nombre.';return;}
+ if(!targetId||!name){feedback.textContent='Selecciona un elemento y escribe su nuevo nombre.';return;}
  if(!window.GymCloud?.canWrite?.()){feedback.textContent=window.GymCloud?.getWriteStatus?.()?.message||'El perfil local todavía no está disponible para modificar.';return;}
  const stamp=window.GymCloud.getSessionStamp?.(),current=()=>stamp===window.GymCloud.getSessionStamp?.()&&window.GymCloud.canWrite();
  button.disabled=true;
- try{await window.GymCloud.updateCatalogItem(kind,select.value,name);if(current())feedback.textContent='Nombre actualizado en este perfil.';}
+ try{
+  await window.GymCloud.updateCatalogItem(kind,targetId,name);
+  if(current()){
+   if(kind==='exercise')catalogSelectExerciseVariant(targetId);
+   else if(select.querySelector('option[value="'+CSS.escape(targetId)+'"]'))select.value=targetId;
+   feedback.textContent='✅ Nombre actualizado: '+name+'.';
+   refreshExerciseNavigation();
+  }
+ }
  catch(error){if(current())feedback.textContent='No se pudo modificar: '+error.message;}
  finally{button.disabled=false;}
 }));
