@@ -41,7 +41,7 @@ test('La compilación web verifica que empaquete los archivos reales del mockup'
   assert.ok(vite.includes("'"+id+"'"),id);
  assert.match(vite,/source\.equals\(output\)/);
  assert.match(vite,/throw Error\('El APK empaquetaría una versión antigua/);
- assert.match(sw,/gymlytics-correcciones-001004-20261019-v14-paquete/);
+ assert.match(sw,/gymlytics-indicaciones-001005-20261019-v15/);
 });
 test('Se mantienen Tablas y Dashboard independientes, sin cambiar su vista',()=>{
  assert.match(html,/id="page-tablas"/);
