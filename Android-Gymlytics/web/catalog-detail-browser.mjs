@@ -38,6 +38,12 @@ if(root&&exerciseCard){
    select.addEventListener('change',()=>{
     const previousFields=result.selectors.map(x=>x.field);
     selected[group.field]=select.value;
+    if(group.field==='Nombre del ejercicio'){
+     const main=by('exerciseExistingSelect');
+     const groupOption=typeof catalogChoices==='function'?catalogChoices('exercise').find(g=>g.rawName===select.value):null;
+     if(main&&groupOption&&main.value!==groupOption.id){main.value=groupOption.id;main.dispatchEvent(new Event('change',{bubbles:true}));}
+     selected={'Nombre del ejercicio':select.value};
+    }
     // Al cambiar un campo, limpiar las decisiones posteriores y evitar
     // combinaciones incoherentes de diferentes variantes.
     for(const f of previousFields.slice(i+1))delete selected[f];
@@ -48,7 +54,7 @@ if(root&&exerciseCard){
   view.disabled=!result.unique;
   count.textContent=library.length===0?'Aún no hay ejercicios. Agrega uno en la sección Ejercicio.':
    result.matches.length===1?'1 variante identificada; puedes pulsar «Ver».':
-   result.matches.length+' variantes coincidentes de '+library.length+'. Filtra otro campo para continuar.';
+   result.matches.length+' variantes coincidentes. Filtra otro campo para continuar.';
   const nameCount=new Map();
   for(const e of result.matches)nameCount.set(e.nombre,(nameCount.get(e.nombre)||0)+1);
   list.replaceChildren();
@@ -56,7 +62,7 @@ if(root&&exerciseCard){
    const li=document.createElement('li');
    const summary=availableFields([ex]).filter(x=>x!=='Nombre del ejercicio').slice(0,6)
     .map(f=>f+': '+exerciseValue(ex,f)).join(' · ');
-   li.textContent=ex.nombre+' ('+nameCount.get(ex.nombre)+')'+(summary?' — '+summary:'')+' · '+ex.id.slice(-8);
+   li.textContent=ex.nombre+' ('+nameCount.get(ex.nombre)+')'+(summary?' — '+summary:'');
    list.append(li);
   }
   if(result.matches.length>80){const li=document.createElement('li');li.textContent='…y '+(result.matches.length-80)+' variantes adicionales';list.append(li);}
@@ -69,7 +75,8 @@ if(root&&exerciseCard){
   const target=currentLibrary().find(x=>x.id===id);
   if(!target||view.disabled)return;
   const picker=by('exerciseExistingSelect');
-  if(![...picker.options].some(x=>x.value===id)){count.textContent='Actualiza el catálogo antes de consultar esta variante.';return;}
+  const matching=typeof catalogChoices==='function'?catalogChoices('exercise').find(g=>g.variantIds?.includes(id)):null;
+  if(!matching){count.textContent='La variante ya no existe en el perfil.';return;}
   if(typeof catalogSelectExerciseVariant==='function')catalogSelectExerciseVariant(id);
   else{picker.value=id;picker.dispatchEvent(new Event('change',{bubbles:true}));}
   if(typeof catalogOpenCard==='function')catalogOpenCard('exercise','edit');
@@ -78,6 +85,12 @@ if(root&&exerciseCard){
   count.textContent='Variante seleccionada: '+target.nombre+'.';
   by('catalogDetailexercise')?.scrollIntoView?.({block:'start'});
  });
+ window.GymCatalogDetailSelectName=name=>{
+  const desired=String(name||'').trim();
+  if(selected['Nombre del ejercicio']===desired)return;
+  selected=desired?{'Nombre del ejercicio':desired}:{};
+  render();
+ };
  window.GymCatalogDetailRefresh=render;
  panel.addEventListener('toggle',()=>{if(panel.open)render();});
  render();

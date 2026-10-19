@@ -243,7 +243,7 @@ function catalogSelectExerciseVariant(id,notify=true){
  const name=$('exerciseEditName');if(name)name.value=exercise.nombre;
  const form=$('catalogForm');
  if(form?.elements?.namedItem('e'))form.elements.namedItem('e').value=exercise.nombre;
- if(notify)window.GymCatalogExerciseChanged?.();
+ if(notify){window.GymCatalogExerciseChanged?.();window.GymCatalogDetailSelectName?.(exercise.nombre);}
  return true;
 }
 function catalogNavigateExercise(target){
@@ -402,41 +402,13 @@ function filterCatalogSearch(text){
  if(status&&needle)status.textContent=found+' categorías coincidentes';
  else if(status&&status.textContent?.includes('categorías coincidentes'))status.textContent='';
 }
-function catalogOpenInlineRename(row,kind){
- const select=row.querySelector('.catalog-compact-picker select'),chosen=catalogChoices(kind).find(x=>x.id===select?.value);
- if(!chosen){toast('Selecciona primero el elemento que deseas modificar.');return;}
- const editor=row.querySelector('.catalog-rename-inline');if(!editor)return;
- editor.hidden=!editor.hidden;if(editor.hidden)return;
- editor.dataset.kind=kind;editor.dataset.id=kind==='exercise'?String(catalogSelectedExerciseId||chosen.variantIds?.[0]||chosen.id):chosen.id;
- editor.querySelector('[data-rename-old]').value=chosen.rawName||chosen.name;
- const next=editor.querySelector('[data-rename-new]');next.value=editor.querySelector('[data-rename-old]').value;next.focus();
-}
-async function catalogSaveInlineRename(row){
- const editor=row.querySelector('.catalog-rename-inline');
- const kind=editor.dataset.kind,id=editor.dataset.id,newName=editor.querySelector('[data-rename-new]').value.trim();
- const feedback=editor.querySelector('[data-rename-status]'),save=editor.querySelector('[data-rename-save]');
- if(!id||!newName){feedback.textContent='Escribe el nombre nuevo antes de guardar.';return;}
- if(!window.GymCloud?.canWrite?.()){feedback.textContent='Selecciona un perfil local editable.';return;}
- save.disabled=true;
- try{
-  if(kind==='exercise'){
-   if(!catalogSelectExerciseVariant(id))throw Error('No existe esa variante de ejercicio.');
-   const values=window.GymCatalogCollectExerciseValues?.()||Object.fromEntries(new FormData($('catalogForm')).entries());
-   await window.GymCloud.saveExerciseChanges(id,{...values,e:newName});
-  }else await window.GymCloud.updateCatalogItem(kind,id,newName);
-  editor.hidden=true;toast('✓ Nombre modificado y guardado');
-  const picker=row.querySelector('.catalog-compact-picker select');
-  if(kind==='exercise')catalogSelectExerciseVariant(id);
-  else{picker.value=id;picker.dispatchEvent(new Event('change',{bubbles:true}));}
- }catch(error){feedback.textContent='No se pudo modificar: '+error.message;}
- finally{save.disabled=false;}
-}
 function setupCatalogCompact(){
  const holder=$('catalogCompactRows');
  if(!holder||holder.dataset.compactReady)return;
  holder.dataset.compactReady='1';
  const forms={gym:$('addGymForm'),site:$('addSiteForm'),machine:$('addMachineForm'),exercise:$('catalogForm'),option:$('addOptionForm')};
  const originalExercise=$('exerciseExistingSelect')?.closest('.catalog-exercise-selector'),entries=$('catalogEntries'),muscle=$('muscleExistingSelect');
+ if(originalExercise)originalExercise.hidden=true;
  // Conservar los formularios activos; nunca duplicarlos ni reemplazar sus IDs.
  const items=[
   {kind:'gym',label:'Gimnasio',icon:'▦',select:$('gymExistingSelect'),count:$('gymCount'),parts:[forms.gym]},
@@ -479,18 +451,7 @@ function setupCatalogCompact(){
    const position=document.createElement('span');position.dataset.variantPosition='';position.textContent='0 / 0';
    nav.insertBefore(position,nav.children[2]);detail.prepend(nav);
   }
-  const mini=document.createElement('button');mini.type='button';mini.className='catalog-inline-modify';
-  mini.textContent='Modificar';mini.setAttribute('aria-label','Modificar el nombre de '+item.label);
-  mini.addEventListener('click',()=>catalogOpenInlineRename(row,item.kind));
-  const editor=document.createElement('div');editor.className='catalog-rename-inline';editor.hidden=true;
-  editor.innerHTML='<div class="rename-fields"><label>Nombre actual<input data-rename-old readonly aria-label="Nombre actual"></label>'+
-   '<span aria-hidden="true" class="rename-arrow">→</span>'+
-   '<label>Nombre nuevo<input data-rename-new maxlength="160" aria-label="Nombre nuevo"></label></div>'+
-   '<div class="rename-actions"><button type="button" data-rename-save class="primary-btn">Guardar modificación</button>'+
-   '<button type="button" class="outline-btn" data-rename-cancel>Cancelar</button></div><p data-rename-status role="status"></p>';
-  editor.querySelector('[data-rename-save]').addEventListener('click',()=>catalogSaveInlineRename(row));
-  editor.querySelector('[data-rename-cancel]').addEventListener('click',()=>{editor.hidden=true;});
-  bar.append(count,mini,add);row.append(bar,editor,detail);holder.append(row);
+  bar.append(count,add);row.append(bar,detail);holder.append(row);
   select.addEventListener('focus',()=>catalogActiveCard(item.kind));
   select.addEventListener('change',()=>{
    select.title=select.selectedOptions?.[0]?.textContent||'';
@@ -521,10 +482,12 @@ function setupCatalogCompact(){
     const input=$(item.kind+'EditName');if(input)input.value=entry?.nombre||catalogChoices(item.kind).find(x=>x.id===select.value)?.name||'';
    }
    if(item.kind==='exercise'){
+    window.GymCatalogCancelFieldEdits?.();
     const group=catalogChoices('exercise').find(x=>x.id===select.value);
     catalogSelectedExerciseId=group?.variantIds?.[0]||null;
     window.GymCatalogSelectedExerciseId=catalogSelectedExerciseId;
     if(catalogSelectedExerciseId)catalogSelectExerciseVariant(catalogSelectedExerciseId);
+    window.GymCatalogDetailSelectName?.(group?.rawName||'');
     refreshExerciseNavigation();
    }
    catalogActiveCard(item.kind);
@@ -1053,22 +1016,31 @@ document.querySelectorAll('[data-catalog-modify]').forEach(button=>button.addEve
  const kind=button.dataset.catalogModify;
  const select=$({gym:'gymExistingSelect',site:'siteExistingSelect',machine:'machineExistingSelect',option:'optionExistingSelect',exercise:'exerciseExistingSelect'}[kind]);
  const targetId=kind==='exercise'?catalogSelectedExerciseId||select.value:select.value;
- const name=$(kind+'EditName')?.value.trim()||'',feedback=$(kind==='exercise'?'exerciseEditFeedback':{gym:'gymFeedback',site:'siteFeedback',machine:'machineFeedback',option:'optionFeedback'}[kind]);
+ const name=(kind==='exercise'?($('catalogForm')?.elements.namedItem('e')?.value||''):$(kind+'EditName')?.value||'').trim(),feedback=$(kind==='exercise'?'exerciseEditFeedback':{gym:'gymFeedback',site:'siteFeedback',machine:'machineFeedback',option:'optionFeedback'}[kind]);
  if(!targetId||!name){feedback.textContent='Selecciona un elemento y escribe su nuevo nombre.';return;}
  if(!window.GymCloud?.canWrite?.()){feedback.textContent=window.GymCloud?.getWriteStatus?.()?.message||'El perfil local todavía no está disponible para modificar.';return;}
  const stamp=window.GymCloud.getSessionStamp?.(),current=()=>stamp===window.GymCloud.getSessionStamp?.()&&window.GymCloud.canWrite();
  button.disabled=true;
  try{
   if(kind==='exercise'){
+   window.GymCatalogPrepareFieldEdits?.();
    const values=window.GymCatalogCollectExerciseValues?.()||
     Object.fromEntries(new FormData($('catalogForm')).entries());
    values.e=name;
+   values.e=$('catalogForm')?.elements.namedItem('e')?.value?.trim()||name;
    await window.GymCloud.saveExerciseChanges(targetId,values);
   }else await window.GymCloud.updateCatalogItem(kind,targetId,name);
   if(current()){
    if(kind==='exercise')catalogSelectExerciseVariant(targetId);
    else if(select.querySelector('option[value="'+CSS.escape(targetId)+'"]'))select.value=targetId;
-   feedback.textContent=kind==='exercise'?'✅ Nombre y detalles guardados en la misma variante.':'✅ Nombre actualizado: '+name+'.';
+   feedback.textContent=kind==='exercise'?'✅ Ejercicio modificado en la misma variante.':'✅ Nombre actualizado: '+name+'.';
+   if(kind==='exercise'){
+    window.GymCatalogCancelFieldEdits?.();
+    const section=$('catalogDetailexercise');
+    if(section){section.hidden=true;const toggle=section.closest('.catalog-compact-card')?.querySelector('.catalog-compact-toggle');if(toggle){toggle.textContent='+';toggle.setAttribute('aria-expanded','false');}}
+    toast('✓ Ejercicio modificado correctamente');
+    window.GymCatalogDetailSelectName?.((window.GymExerciseLibrary||[]).find(x=>String(x.id)===String(targetId))?.nombre||'');
+   }
    refreshExerciseNavigation();
   }
  }
