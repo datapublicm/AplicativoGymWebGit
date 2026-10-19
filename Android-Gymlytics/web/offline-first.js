@@ -281,9 +281,11 @@ function detailFields(data){
  return [...new Set(names.filter(x=>x&&!fixedDetails.has(x)))].sort((a,b)=>a.localeCompare(b,'es'));
 }
 function fieldStats(data,field){
- const exercises=(data.library||[]).filter(e=>(e.detalles||[]).some(d=>fieldKey(d.campo)===fieldKey(field))).length;
- const records=(data.records||[]).filter(r=>r.detailValues&&Object.keys(r.detailValues).some(k=>fieldKey(k)===fieldKey(field))).length;
- return {exercises,records};
+ const affected=(data.library||[]).filter(e=>(e.detalles||[]).some(d=>fieldKey(d.campo)===fieldKey(field)));
+ const linked=new Set(affected.map(e=>String(e.id)));
+ const records=(data.records||[]).filter(r=>linked.has(String(r.exerciseId))||
+  r.detailValues&&Object.keys(r.detailValues).some(k=>fieldKey(k)===fieldKey(field))).length;
+ return {exercises:affected.length,records};
 }
 function ensureCustomField(data,name,old=null){
  const clean=fieldNormalize(name);
