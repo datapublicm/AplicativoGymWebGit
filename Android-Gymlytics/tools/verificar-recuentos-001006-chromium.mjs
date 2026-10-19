@@ -60,10 +60,10 @@ try{
  assert.equal(await evaluate('document.querySelector("#offlineLinkStatus")?.textContent'),"No vinculado");
  assert.equal(await evaluate('document.querySelector("#gimnasio")?.disabled'),true,'Ningún gimnasio precargado');
  console.log('PASS 1: primera instalación, gimnasio/sede/ejercicio/sesión/serie en cero y sin nube');
- assert.equal(await evaluate('document.querySelector(".gym-catalog-header strong")?.textContent?.includes("01.16")'),true);
+ assert.equal(await evaluate('document.querySelector(".gym-catalog-header strong")?.textContent?.includes("01.17")'),true);
  assert.equal(await evaluate('typeof window.GymCatalogCollectExerciseValues'), 'function');
  assert.equal(await evaluate('typeof window.GymSiteGpsRefresh'), 'function');
- console.log('PASS APK WEB: código del módulo externo de Catálogos funciona en DIST y se ve versión 01.16');
+ console.log('PASS APK WEB: código del módulo externo de Catálogos funciona en DIST y se ve versión 01.17');
  const imported=await evaluate("localStorage.getItem('gymlytics-hojamatriz-seed-v1-completed')");
  assert.equal(imported,null,'Ninguna marca de HojaMatriz se registró');
  await navigate();p=await profiles();assert.equal(p.length,1);assert.equal(p[0].records,0);assert.equal(p[0].gyms,0);
