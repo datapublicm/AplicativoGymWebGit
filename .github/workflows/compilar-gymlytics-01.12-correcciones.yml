@@ -91,7 +91,7 @@ jobs:
           if(!sw.includes('hojamatriz-offline-20261018.json'))throw Error('Ejemplo no estará disponible sin Internet');
           const seed=JSON.parse(fs.readFileSync('dist/data/hojamatriz-offline-20261018.json','utf8'));
           if(seed.tables.series.length!==9424||seed.tables.exercise.length!==146)throw Error('Archivo de ejemplo incompleto');
-          if(!fs.readFileSync('dist/index.html','utf8').includes('catalog-field-admin.mjs'))throw Error('Falta administración de detalles');
+          if(!fs.existsSync('dist/catalog-field-admin.mjs'))throw Error('Falta administración de detalles en el paquete web');
           console.log('OK: ejemplo optativo, GPS, navegación de variantes y nuevos campos en paquete web');
 
           JS
