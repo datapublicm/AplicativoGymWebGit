@@ -1,15 +1,20 @@
 import { defineConfig } from 'vite';
+import { build as esbuildBuild } from 'esbuild';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 const here=fileURLToPath(new URL('.',import.meta.url));
-function copyPreviewAssets(){return {name:'copy-gymlytics-assets',closeBundle(){
+function copyPreviewAssets(){return {name:'copy-gymlytics-assets',async closeBundle(){
  const required=['app.js','catalog-offline-enhancements.js','dashboard.js','offline-first.js','gymlytics-cloud-v2.mjs','gymlytics-seed-offline.mjs','catalog-detail-browser.mjs','catalog-detail-filter.mjs','catalog-field-admin.mjs','offline-catalog-download.js','catalog-sync-engine.js','reference-overrides.js','photo-sync-engine.js','profile-policy.js','cloud-sync.js','sync-engine.js','legacy-compat.js','sw.js','manifest.webmanifest','styles.css'];
  for(const name of required)fs.copyFileSync(path.join(here,'web',name),path.join(here,'dist',name));
  for(const directory of ['assets','icons','data']){
   const from=path.join(here,'web',directory),to=path.join(here,'dist',directory);
   fs.cpSync(from,to,{recursive:true,force:true});
  }
+ // Crear un bundle ejecutable localmente con el puente GPS del plugin nativo de Capacitor.
+ await esbuildBuild({entryPoints:[path.join(here,'web','gps-native-entry.mjs')],
+  outfile:path.join(here,'dist','gymlytics-gps-native.js'),
+  bundle:true,platform:'browser',format:'iife',target:'es2022',minify:true});
  // El ejemplo se empaqueta pero se importa SOLO tras pulsar «Agregar ejemplo».
  // Incluir en la caché inicial los bundles con hash generados por Vite.
  // De otro modo, tras instalar y perder Internet antes del segundo arranque

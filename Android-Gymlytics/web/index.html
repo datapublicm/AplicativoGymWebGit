@@ -207,7 +207,7 @@ Almacenamiento local · Nube opcional</div></aside>
 <div class="dialog-header"><h2>📍 Ubicación GPS (opcional)</h2><button type="button" class="icon-btn" id="closeSiteGPS" aria-label="Cerrar mapa">✕</button></div>
 <div class="gps-dialog-content">
 <p id="siteGPSLabel">Selecciona una sede para asociar la ubicación.</p>
-<div id="siteGPSMapFallback" class="gps-map-fallback">El mapa se mostrará cuando haya conexión. Las coordenadas pueden guardarse sin Internet.</div>
+<div id="siteGPSMapFallback" class="gps-map-fallback">Activa tu ubicación o introduce coordenadas para visualizar el mapa. Necesita conexión a Internet.</div><a id="siteGPSExternal" href="#" hidden target="_blank" rel="noopener noreferrer">Abrir ubicación en mapa externo ↗</a>
 <iframe id="siteGPSMap" title="Mapa de ubicación de la sede" loading="lazy" hidden referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe>
 <div class="gps-fields"><label>Latitud <input id="siteGPSLat" type="number" step="any" min="-90" max="90" placeholder="Latitud"/></label>
 <label>Longitud <input id="siteGPSLon" type="number" step="any" min="-180" max="180" placeholder="Longitud"/></label></div>
@@ -216,4 +216,4 @@ Almacenamiento local · Nube opcional</div></aside>
 <button type="button" class="primary-btn" id="saveSiteGPS">Guardar coordenadas offline</button></div>
 </div></dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
-<script src="./app.js"></script><script src="./catalog-offline-enhancements.js"></script><script src="./dashboard.js"></script><script src="./offline-first.js" type="module"></script><script src="./catalog-detail-browser.mjs" type="module"></script><script src="./catalog-field-admin.mjs" type="module"></script></body></html>
+<script src="./gymlytics-gps-native.js"></script><script src="./app.js"></script><script src="./catalog-offline-enhancements.js"></script><script src="./dashboard.js"></script><script src="./offline-first.js" type="module"></script><script src="./catalog-detail-browser.mjs" type="module"></script><script src="./catalog-field-admin.mjs" type="module"></script></body></html>

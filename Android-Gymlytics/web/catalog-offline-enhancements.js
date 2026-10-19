@@ -78,14 +78,23 @@
   const latitude=Number(el('siteGPSLat').value),longitude=Number(el('siteGPSLon').value);
   const valid=el('siteGPSLat').value!==''&&el('siteGPSLon').value!==''&&
    Number.isFinite(latitude)&&Math.abs(latitude)<=90&&Number.isFinite(longitude)&&Math.abs(longitude)<=180;
-  const frame=el('siteGPSMap'),fallback=el('siteGPSMapFallback');
+  const frame=el('siteGPSMap'),fallback=el('siteGPSMapFallback'),external=el('siteGPSExternal');
+  if(valid&&external){
+   external.href='https://www.openstreetmap.org/?mlat='+encodeURIComponent(latitude)+'&mlon='+encodeURIComponent(longitude)+'#map=17/'+latitude+'/'+longitude;
+   external.hidden=false;
+  }else if(external)external.hidden=true;
   if(!valid||!navigator.onLine){
-   frame.hidden=true;frame.removeAttribute('src');fallback.hidden=false;return;
+   frame.hidden=true;frame.removeAttribute('src');fallback.hidden=false;
+   fallback.textContent=!valid?'Obtén la ubicación con GPS o introduce latitud y longitud.':'Sin Internet: coordenadas disponibles offline; el mapa requiere conexión.';
+   return;
   }
   const delta=.004,bbox=[longitude-delta,latitude-delta,longitude+delta,latitude+delta].join(',');
   frame.src='https://www.openstreetmap.org/export/embed.html?bbox='+encodeURIComponent(bbox)+
    '&layer=mapnik&marker='+encodeURIComponent(latitude+','+longitude);
-  frame.hidden=false;fallback.hidden=true;
+  frame.hidden=false;fallback.hidden=false;
+  fallback.textContent='Cargando mapa desde OpenStreetMap…';
+  frame.onload=()=>{fallback.hidden=true;};
+  frame.onerror=()=>{frame.hidden=true;fallback.hidden=false;fallback.textContent='No se pudo cargar el mapa integrado. Abre el enlace externo.';};
  }
  el('openSiteGPS')?.addEventListener('click',()=>{
   const choices=(window.GymEntities?.sites||[]);
@@ -101,16 +110,26 @@
  });
  el('closeSiteGPS')?.addEventListener('click',()=>dialog.close());
  for(const id of ['siteGPSLat','siteGPSLon'])el(id)?.addEventListener('change',map);
- el('getCurrentGPS')?.addEventListener('click',()=>{
-  if(!navigator.geolocation){feedback.textContent='El dispositivo no ofrece GPS.';return;}
-  feedback.textContent='Obteniendo ubicación…';
-  navigator.geolocation.getCurrentPosition(position=>{
+ el('getCurrentGPS')?.addEventListener('click',async event=>{
+  const button=event.currentTarget;button.disabled=true;
+  feedback.textContent='Solicitando permiso y obteniendo ubicación GPS…';
+  try{
+   let position;
+   if(window.Capacitor?.isNativePlatform?.()&&window.GymNativeGPS)
+    position=await window.GymNativeGPS.getCurrentPosition();
+   else if(navigator.geolocation)
+    position=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,
+     {enableHighAccuracy:true,timeout:25000,maximumAge:0}));
+   else throw Error('Ubicación no disponible en este dispositivo.');
    if(!dialog.open)return;
+   if(!Number.isFinite(position.coords.latitude)||!Number.isFinite(position.coords.longitude))
+    throw Error('El dispositivo no devolvió coordenadas válidas.');
    el('siteGPSLat').value=position.coords.latitude.toFixed(7);
    el('siteGPSLon').value=position.coords.longitude.toFixed(7);
-   map();feedback.textContent='Ubicación obtenida. Confirma para guardarla offline.';
-  },error=>{feedback.textContent='GPS no disponible: '+error.message;},
-  {enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+   map();feedback.textContent='✓ Ubicación obtenida. Pulsa «Guardar coordenadas offline» para asociarla a la sede.';
+  }catch(error){
+   feedback.textContent='No se pudo obtener GPS: '+String(error.message||error)+'. Comprueba que la ubicación del celular esté activada y autoriza el permiso de esta APK.';
+  }finally{button.disabled=false;}
  });
  el('saveSiteGPS')?.addEventListener('click',async event=>{
   event.currentTarget.disabled=true;
