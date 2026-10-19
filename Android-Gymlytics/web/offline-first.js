@@ -1074,7 +1074,12 @@ async function init(){
    $('catalogExtraDetails')?.replaceChildren();
    $('catalogExtraPayload').value='[]';
    const section=document.querySelector('[data-catalog-kind="exercise"] .catalog-compact-detail');
-   if(section&&!section.hidden)catalogOpenCard('exercise','toggle');
+   if(section){
+    section.hidden=true;
+    const toggle=section.closest('.catalog-compact-card')?.querySelector('.catalog-compact-toggle');
+    if(toggle){toggle.textContent='+';toggle.setAttribute('aria-expanded','false');}
+    window.GymCatalogFieldRefresh?.();
+   }
    $('catalogFeedback').textContent='✓ Ejercicio agregado correctamente.';
    if(typeof toast==='function')toast('✓ Ejercicio registrado correctamente');}
   catch(e){$('catalogFeedback').textContent=e.message;
