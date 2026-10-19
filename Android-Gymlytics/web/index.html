@@ -109,10 +109,6 @@ Almacenamiento local · Nube opcional</div></aside>
 </section>
 <section class="page" id="page-tablas"><div class="page-title"><div><div class="eyebrow">SEGUIMIENTO</div><h1>Historial registrado</h1><p>Filtra los registros sincronizados con Supabase. Los campos sin seleccionar incluyen todos los valores.</p></div></div>
 <div class="panel">
-<div class="history-export-actions" role="group" aria-label="Exportación y respaldo">
-<button class="outline-btn" id="exportCsv" type="button" disabled>↓ Exportar CSV</button>
-<button class="outline-btn" id="exportJson" type="button" disabled>↓ Respaldo JSON</button>
-</div>
 <div class="history-filters">
 <label>Gimnasio<select id="historyGym" data-history-field="gym"></select></label>
 <label>Sede<select id="historySede" data-history-field="sede"></select></label>
@@ -137,6 +133,10 @@ Almacenamiento local · Nube opcional</div></aside>
 <p class="history-filter-summary" id="historyFilterSummary" role="status" aria-live="polite"></p>
 <div id="historyRecords" aria-live="polite"></div>
 <div class="history-pagination" id="historyPagination" hidden><span id="historyPageInfo"></span><button class="outline-btn" id="historyLoadMore" type="button">Mostrar más series</button></div>
+<div class="history-export-actions" role="group" aria-label="Exportar historial">
+<button class="outline-btn" id="exportCsv" type="button" disabled>↓ Exportar CSV</button>
+<button class="outline-btn" id="exportJson" type="button" disabled>↓ Exportar JSON</button>
+</div>
 </div><p class="history-backup-note">Para conservar también cambios pendientes y relaciones, utiliza <strong>Respaldar</strong> en Perfil.</p></section>
 <section class="page" id="page-dashboard">
 <div class="page-title"><div><div class="eyebrow">TU PROGRESO EN DATOS</div><h1>Dashboard</h1><p>Frecuencia, evolución y comparaciones reales de tus entrenamientos.</p></div></div>
