@@ -1,5 +1,5 @@
 const PREFIX='gymlytics-mobile-';
-const CACHE=PREFIX+'gymlytics-contadores-reactivos-20261019-v17';
+const CACHE=PREFIX+'gymlytics-tablas-acciones-fechas-20261019-v18';
 const ASSETS=['./','./index.html','./styles.css','./gymlytics-gps-native.js','./app.js','./catalog-offline-enhancements.js','./dashboard.js','./offline-first.js','./gymlytics-cloud-v2.mjs','./gymlytics-seed-offline.mjs','./data/hojamatriz-offline-20261018.json','./catalog-detail-browser.mjs','./catalog-detail-filter.mjs','./catalog-field-admin.mjs','./offline-catalog-download.js','./catalog-sync-engine.js','./reference-overrides.js','./photo-sync-engine.js','./profile-policy.js','./cloud-sync.js','./sync-engine.js','./legacy-compat.js','./manifest.webmanifest','./assets/polea-alta.webp','./assets/jalon-pecho.webp','./icons/icon-192.png','./icons/icon-512.png'];
 const STATIC_URLS=new Set(ASSETS.map(path=>new URL(path,self.location.href).href));
 

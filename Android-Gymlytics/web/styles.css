@@ -1286,3 +1286,101 @@ body{background:radial-gradient(ellipse 90% 40% at 75% -10%,#11356b99,transparen
  #page-catalogos #catalogForm .catalog-field-modify{min-width:60px;font-size:10px}
  #page-registro .registro-field-grid{column-gap:6px!important}
 }
+
+
+/* GymLytics 01.18 · Tablas: dos acciones de exportación; tres herramientas homogéneas. */
+#page-tablas .history-export-actions{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:9px!important;align-items:stretch;margin:0 0 13px;min-width:0;
+}
+#page-tablas .history-export-actions .outline-btn{
+ display:flex!important;align-items:center;justify-content:center;box-sizing:border-box;
+ width:100%!important;height:48px!important;min-height:48px!important;min-width:0!important;
+ padding:7px 8px!important;border:1px solid #427698!important;border-radius:12px!important;
+ background:#123150!important;color:#8bddfa!important;
+ font-size:13px;font-weight:750;line-height:1.2;text-align:center;white-space:normal;
+}
+#page-tablas .history-export-actions .outline-btn:disabled{opacity:.4}
+#page-tablas .history-filters{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:10px!important;align-items:start!important;min-width:0;
+ margin:0 0 12px!important;
+}
+#page-tablas .history-filters>label{
+ display:flex!important;flex-direction:column!important;gap:6px!important;
+ grid-column:auto!important;min-width:0!important;max-width:100%!important;
+ margin:0!important;color:#adc9df;font-size:12px;font-weight:700;
+}
+#page-tablas .history-filters>label.history-subdivision{
+ grid-column:1/-1!important;
+}
+#page-tablas .history-filters>label select{
+ box-sizing:border-box;width:100%!important;min-width:0!important;
+ min-height:46px!important;max-width:100%!important;
+}
+#page-tablas .history-dates{
+ grid-column:1/-1!important;display:grid!important;
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:10px!important;width:100%!important;min-width:0!important;align-items:end;
+}
+#page-tablas .history-dates label{
+ display:flex!important;flex-direction:column!important;gap:6px!important;
+ min-width:0!important;width:100%!important;margin:0!important;
+ color:#adc9df;font-size:12px;font-weight:700;
+}
+#page-tablas .history-dates input[type=date]{
+ box-sizing:border-box;display:block;width:100%!important;max-width:100%!important;
+ min-width:0!important;height:46px!important;min-height:46px!important;
+ padding:7px 5px!important;font-size:clamp(10px,3vw,13px)!important;
+ letter-spacing:-.02em!important;overflow:hidden;text-overflow:clip;
+ border:1px solid #365c7b;border-radius:9px;background:#081a32;color:#e9f8ff;
+ color-scheme:dark;
+}
+#page-tablas .history-management{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:7px!important;align-items:stretch!important;margin:13px 0 7px!important;
+ min-width:0!important;
+}
+#page-tablas .history-management>button,
+#page-tablas .history-management-version{
+ box-sizing:border-box!important;min-width:0!important;max-width:100%!important;
+ width:100%!important;height:66px!important;min-height:66px!important;
+ border:1px solid #427698!important;border-radius:11px!important;
+ background:#123150!important;color:#9bdef5!important;
+}
+#page-tablas .history-management>button{
+ display:flex!important;justify-content:center;align-items:center;
+ padding:7px 6px!important;text-align:center!important;line-height:1.2!important;
+ white-space:normal!important;font-size:12px!important;font-weight:750!important;
+}
+#page-tablas .history-management-version{
+ display:flex!important;flex-direction:column!important;justify-content:center;
+ align-items:stretch!important;padding:5px 6px!important;gap:3px!important;
+ margin:0!important;
+}
+#page-tablas .history-management-version label{
+ display:block;min-width:0!important;margin:0!important;text-align:center!important;
+ color:inherit!important;font-size:10px!important;font-weight:750!important;
+ line-height:1.15!important;
+}
+#page-tablas .history-management-version select{
+ display:block!important;width:100%!important;max-width:100%!important;
+ min-width:0!important;height:33px!important;min-height:33px!important;
+ margin:0!important;padding:3px 13px 3px 4px!important;
+ color:#e9f8ff!important;background:#081a32!important;
+ border:1px solid #365c7b!important;border-radius:8px!important;
+ font-size:12px!important;color-scheme:dark;
+}
+#page-tablas .history-management>button:disabled{opacity:.4}
+#page-tablas .history-view-note,
+#page-tablas .history-backup-note{
+ display:block;margin:8px 0 12px;line-height:1.45;font-size:12px;color:#90b5ca;
+}
+#page-tablas .history-backup-note{margin:9px 14px 20px}
+@media(max-width:370px){
+ #page-tablas .history-management{gap:5px!important}
+ #page-tablas .history-management>button{font-size:11px!important;padding:5px 3px!important}
+ #page-tablas .history-management-version{padding:4px 3px!important}
+ #page-tablas .history-dates{gap:7px!important}
+ #page-tablas .history-dates input[type=date]{font-size:10px!important;padding:5px 2px!important}
+}
